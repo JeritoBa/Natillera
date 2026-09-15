@@ -1,0 +1,120 @@
+# ============================================
+# .NET / ASP.NET Core
+# ============================================
+
+# Build output
+**/bin/
+**/obj/
+
+# Visual Studio
+.vs/
+*.user
+*.userossc
+*.suo
+*.userprefs
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# Test results
+**/TestResults/
+*.trx
+
+# NuGet
+**/packages/
+*.nupkg
+*.snupkg
+
+# ASP.NET generated files
+**/Properties/launchSettings.json
+
+
+# ============================================
+# React / Vite / Node
+# ============================================
+
+# Dependencies
+**/node_modules/
+
+# Build output
+**/dist/
+**/build/
+
+# Vite
+**/.vite/
+
+# npm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# Keep example environment files
+!**/.env.example
+
+
+# ============================================
+# IDE / Editors
+# ============================================
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+*.swp
+*.swo
+*~
+
+
+# ============================================
+# Operating System
+# ============================================
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+
+# Linux
+*~
+
+
+# ============================================
+# Docker
+# ============================================
+
+# Docker override files
+docker-compose.override.yml
+
+# Local Docker environment files
+docker-compose.local.yml
+
+
+# ============================================
+# Logs
+# ============================================
+
+*.log
+logs/
+**/logs/
+
+
+# ============================================
+# Local / Temporary files
+# ============================================
+
+*.tmp
+*.temp
+*.cache

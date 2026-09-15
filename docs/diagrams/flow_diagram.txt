@@ -1,0 +1,483 @@
+# Natillera — Business Process Flow Diagrams
+
+## Purpose
+
+These flow diagrams represent the main business processes of the Natillera system.
+
+They focus on **what happens in the business**, not on software classes, controllers, repositories, or database implementation details.
+
+---
+
+# 1. Register Monthly Payment
+
+## Business objective
+
+Register a member's monthly contribution to the Natillera and record the corresponding financial movement.
+
+## Flow
+
+```text
+START
+  ↓
+Member initiates monthly payment
+  ↓
+Identify member
+  ↓
+Validate member
+  ↓
+Is the member active?
+  ├── NO → Reject payment → END
+  │
+  └── YES
+        ↓
+   Identify payment period
+   (Year + Month)
+        ↓
+   Check whether the member
+   already has a payment
+   for this period
+        ↓
+   Does a payment already exist?
+   ├── YES → Reject duplicate payment → END
+   │
+   └── NO
+         ↓
+      Enter payment amount
+         ↓
+      Validate amount
+         ↓
+      Is the amount valid?
+      ├── NO → Reject payment → END
+      │
+      └── YES
+            ↓
+         Register MonthlyPayment
+            ↓
+         Register financial Transaction
+         Direction = INCOME
+         Type = MONTHLY_PAYMENT
+            ↓
+         Confirm payment
+            ↓
+           END
+```
+
+## Important business rules
+
+* Only active members can make monthly payments.
+* A member cannot have two monthly payments for the same year and month if the business rule is one contribution per period.
+* The payment amount must satisfy the Natillera's defined amount rules.
+* The monthly payment and its financial transaction must be registered consistently.
+* If the financial transaction cannot be registered, the monthly payment should not be considered successfully completed.
+
+---
+
+# 2. Create Loan
+
+## Business objective
+
+Create a loan for an eligible member and register the money disbursement made by the Natillera.
+
+## Flow
+
+```text
+START
+  ↓
+Member requests loan
+  ↓
+Identify borrower
+  ↓
+Validate borrower
+  ↓
+Is the borrower eligible?
+  ├── NO → Reject loan request → END
+  │
+  └── YES
+        ↓
+     Enter loan information
+     - Principal amount
+     - Interest rate
+     - Start date
+        ↓
+     Validate loan information
+        ↓
+     Is the information valid?
+     ├── NO → Reject loan → END
+     │
+     └── YES
+           ↓
+        Create Loan
+           ↓
+        Disburse money to borrower
+           ↓
+        Register financial Transaction
+        Direction = EXPENSE
+        Type = LOAN
+           ↓
+        Confirm loan
+           ↓
+          END
+```
+
+## Important business rules
+
+* Only eligible members can receive a loan.
+* The principal amount must be valid according to Natillera rules.
+* The interest rate must be valid.
+* Creating the loan and registering its disbursement should be treated as one consistent financial operation.
+
+---
+
+# 3. Make Loan Payment
+
+## Business objective
+
+Register a payment made by a borrower toward an existing loan and update the loan's financial state.
+
+## Flow
+
+```text
+START
+  ↓
+Borrower makes payment
+  ↓
+Identify loan
+  ↓
+Validate loan
+  ↓
+Does the loan exist?
+  ├── NO → Reject payment → END
+  │
+  └── YES
+        ↓
+     Is the loan active?
+        ↓
+      ├── NO → Reject payment → END
+      │
+      └── YES
+            ↓
+         Calculate outstanding balance
+         based on registered payments
+            ↓
+         Enter payment amount
+            ↓
+         Is payment amount valid?
+         ├── NO → Reject payment → END
+         │
+         └── YES
+               ↓
+            Is payment greater than
+            outstanding balance?
+               ↓
+            ├── YES → Reject or adjust payment
+            │         according to business rules
+            │         → END
+            │
+            └── NO
+                  ↓
+               Create LoanPayment
+                  ↓
+               Register financial Transaction
+               Direction = INCOME
+               Type = LOAN_PAYMENT
+                  ↓
+               Is loan completely paid and no performance pending?
+                  ↓
+               ├── YES → Change Loan status to PAID
+               │
+               └── NO → Keep Loan status ACTIVE
+                  ↓
+               Confirm payment
+                  ↓
+                 END
+```
+
+## Important business rules
+
+* The loan must exist.
+* Only an active loan can normally receive payments.
+* The payment must be greater than zero.
+* The payment cannot exceed the outstanding balance unless the business explicitly supports overpayments.
+* Outstanding balance is calculated from the loan principal and its registered payments.
+* When the outstanding balance reaches zero and there isn't any pending performance, the loan becomes `PAID`.
+* The LoanPayment and its Transaction must be registered consistently.
+
+---
+
+# 4. Create and Assign Activity
+
+## Business objective
+
+Create an activity financed by Natillera resources and assign a quantity of products or units to a participating member.
+
+## Flow
+
+```text
+START
+  ↓
+Natillera decides to create activity
+  ↓
+Define activity information
+  - Name
+  - Description
+  - Quantity
+  - Unit cost
+  - Unit sale price
+  - Start date
+  ↓
+Validate activity information
+  ↓
+Is the information valid?
+  ├── NO → Reject activity → END
+  │
+  └── YES
+        ↓
+     Create Activity
+        ↓
+     Identify participating member
+        ↓
+     Is the member active?
+     ├── NO → Reject assignment → END
+     │
+     └── YES
+           ↓
+        Define quantity assigned
+           ↓
+        Is quantity available?
+        ├── NO → Reject assignment → END
+        │
+        └── YES
+              ↓
+           Create ActivityAssignment
+              ↓
+           Reduce available activity quantity
+              ↓
+           Confirm assignment
+              ↓
+             END
+```
+
+## Important business rules
+
+* An activity must contain valid product and financial information.
+* Only active members can participate.
+* A member cannot be assigned more units than are available.
+* The assignment represents the responsibility of a member for a quantity of units.
+* Individual sales are not tracked in the current model.
+* The member keeps the profit generated from the units they sell according to the Natillera's business rules.
+
+---
+
+# 5. Register Financial Transaction
+
+## Business objective
+
+Record an actual financial movement generated by a business operation.
+
+## Flow
+
+```text
+START
+  ↓
+Business operation generates
+a financial movement
+  ↓
+Identify movement
+  ↓
+Determine amount
+  ↓
+Determine direction
+  - INCOME
+  - EXPENSE
+  ↓
+Determine transaction type
+  - MONTHLY_PAYMENT
+  - LOAN_PAYMENT
+  - LOAN_DISBURSEMENT
+  - Other valid business types
+  ↓
+Validate transaction information
+  ↓
+Is the information valid?
+  ├── NO → Reject transaction → END
+  │
+  └── YES
+        ↓
+     Create Transaction
+        ↓
+     Associate transaction
+     with the originating
+     business operation
+        ↓
+     Confirm financial movement
+        ↓
+       END
+```
+
+## Important business rules
+
+* Every transaction represents an actual financial movement.
+* `Direction` describes what happened to the money:
+
+  * `INCOME` = money enters the Natillera.
+  * `EXPENSE` = money leaves the Natillera.
+* `Type` describes the business reason for the movement.
+* A transaction should not exist without a legitimate business reason.
+* A transaction should not be used as a generic container for unrelated business entities.
+* Financial transactions should not be silently modified in ways that compromise financial history.
+
+---
+
+# 6. Generate and Pay Loan Performance / Return
+
+## Business objective
+
+Represent the financial return generated by a loan and register the payment when that return is collected.
+
+## Phase A — Generate performance
+
+```text
+START
+  ↓
+Loan exists
+  ↓
+Loan becomes subject to
+interest / financial return
+  ↓
+Determine applicable interest
+rate
+  ↓
+Determine period or condition
+used to generate the return
+  ↓
+Calculate generated return
+  ↓
+Is the generated amount valid?
+  ├── NO → Do not generate return → END
+  │
+  └── YES
+        ↓
+     Create Loan Performance
+     / Loan Return
+        ↓
+     Mark return as generated
+     but not yet paid
+        ↓
+       END
+```
+
+## Phase B — Pay generated performance
+
+```text
+START
+  ↓
+Borrower pays generated return
+  ↓
+Identify Loan Return
+  ↓
+Validate return
+  ↓
+Does the return exist?
+  ├── NO → Reject payment → END
+  │
+  └── YES
+        ↓
+     Is the return still unpaid?
+     ├── NO → Reject duplicate payment → END
+     │
+     └── YES
+           ↓
+        Validate payment amount
+           ↓
+        Is payment valid?
+        ├── NO → Reject payment → END
+        │
+        └── YES
+              ↓
+           Register payment
+              ↓
+           Register financial Transaction
+           Direction = INCOME
+           Type = LOAN_RETURN / LOAN_INTEREST
+              ↓
+           Mark return as paid
+              ↓
+           Confirm payment
+              ↓
+             END
+```
+
+## Important business rules
+
+* A loan must exist before a return can be generated.
+* The return must be calculated according to the defined interest/return rules.
+* A generated return and a paid return are different business states.
+* A return should not be paid more than once.
+* When the return is paid, the corresponding financial transaction must record an `INCOME`.
+* The generated return and its payment should remain distinguishable from the loan principal and from the loan repayment itself.
+
+---
+
+# Diagram Relationship Overview
+
+These processes are related but should remain separate diagrams.
+
+```text
+                  ┌─────────────────────┐
+                  │ Monthly Payment     │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                       Financial
+                       Transaction
+
+
+                  ┌─────────────────────┐
+                  │ Create Loan         │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                       Loan Disbursement
+                             │
+                             ▼
+                       Financial
+                       Transaction
+
+
+                  ┌─────────────────────┐
+                  │ Loan Payment        │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                       Financial
+                       Transaction
+
+
+                  ┌─────────────────────┐
+                  │ Activity            │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                  Activity Assignment
+                             │
+                             ▼
+                         Member
+
+
+                  ┌─────────────────────┐
+                  │ Loan Return        │
+                  │ Generation         │
+                  └──────────┬──────────┘
+                             │
+                             ▼
+                    Generated Return
+                             │
+                             ▼
+                    Return Payment
+                             │
+                             ▼
+                       Financial
+                       Transaction
+```
+
+
