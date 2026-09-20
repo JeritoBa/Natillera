@@ -3,13 +3,13 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 WORKDIR /src
 
-COPY ["Natillera.Api.csproj", "./"]
+COPY ["Natillera.Backend.csproj", "./"]
 
-RUN dotnet restore "Natillera.Api.csproj"
+RUN dotnet restore "Natillera.Backend.csproj"
 
 COPY . .
 
-RUN dotnet publish "Natillera.Api.csproj" \
+RUN dotnet publish "Natillera.Backend.csproj" \
     -c Release \
     -o /app/publish \
     /p:UseAppHost=false
@@ -24,4 +24,4 @@ COPY --from=build /app/publish .
 
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "Natillera.Api.dll"]
+ENTRYPOINT ["dotnet", "Natillera.Backend.dll"]

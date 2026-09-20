@@ -22,7 +22,7 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - api
+      - backend
 
   postgres:
     image: postgres:18-alpine
