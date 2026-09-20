@@ -96,3 +96,10 @@ Versions Management -> Git
 Project Setup -> Docker & Docker Compose
 
 Will be deployed in Vercel with free hosting.
+
+### 9. Business Logic
+- A loan cannot be marked as finished if there's any loan amount or performance pending
+- The interest is simple, generated monthly by the loan remaining amount
+- A user cannot have more than one monthly payment per month & year
+- An activity cannot be finished if there's any activity assignment pending
+- Every business entity must have a transaction
