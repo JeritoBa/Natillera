@@ -1,0 +1,102 @@
+Entities Properties Guide for AI Agent
+
+Important: 
+- Id it's always primary key and with UUID format
+- All entities are required, except those who are marked with POSSIBLE NULL
+
+User
+- id
+- first_name VARCHAR(45)
+- last_name VARCHAR(45)
+- email VARCHAR(100) UNIQUE
+- password_hash VARCHAR(300)
+- phone VARCHAR(10)
+- role ENUM('member', 'admin') DEFAULT 'member'
+- is_active BOOL DEFAULT true
+- created_at DATETIME DEFAULT now()
+- updated_at DATETIME POSSIBLE NULL
+
+Technical Entities
+
+Transaction
+- id 
+- amount DECIMAL
+- direction ENUM('income', 'expense')
+- type ENUM('monthly_payment', 'activity', 'activity_sale', 'loan', 'loan_payment', 'performance')
+- occurred_at DATETIME DEFAULT now()
+- description VARCHAR(200)
+
+Business Entities
+
+Activity
+- id
+- name VARCHAR(100)
+- description VARCHAR(200)
+- quantity INT
+- unit_cost DECIMAL
+- unit_sale_price DECIMAL
+- start_date DATE
+- status ENUM('pending', 'finished', 'cancelled') DEFAULT 'pending'
+- created_at DATETIME DEFAULT now()
+- transaction_id FK WITH Transaction
+
+ActivityAssignment
+- id
+- quantity_assigned INT
+- assigned_at DATETIME DEFAULT now()
+- status ENUM('pending', 'paid', 'cancelled')
+- paid_at DATETIME POSSIBLE NULL
+- activity_id FK WITH Activity
+- user_id FK WITH User
+- transaction_id FK WITH Transaction
+
+Loan
+- id
+- initial_amount DECIMAL
+- interest_rate DECIMAL
+- start_date DATE
+- end_date DATE
+- status ENUM('active', 'paid', 'cancelled')
+- created_at DATETIME DEFAULT now()
+- updated_at DATETIME POSSIBLE NULL
+- borrower_id FK WITH User
+- transaction_id FK WITH Transaction
+
+LoanPayment
+- id
+- amount DECIMAL
+- paid_at DATETIME
+- payment_method ENUM('cash', 'transfer') 
+- loan_id FK WITH Loan
+- transaction_id FK WITH Transaction
+
+Performance
+- id
+- amount DECIMAL
+- description VARCHAR(200)
+- status ENUM('pending', 'paid', 'cancelled') DEFAULT 'pending'
+- paid_at DATETIME POSSIBLE NULL
+- created_at DATETIME DEFAULT now()
+- transaction_id FK WITH Transaction
+- loan_id FK WITH Loan
+
+MonthlyPayment
+- id
+- amount DECIMAL
+- paid_at DATETIME
+- year INT
+- month INT
+- status ENUM('pending', 'paid', 'cancelled')
+- created_at DATETIME DEFAULT now()
+- transaction_id FK WITH Transaction
+- user_id FK WITH User
+
+Too, create index for the following entities:
+- User.email UNIQUE
+- MonthlyPayment(user_id, year, month) UNIQUE
+- LoanPayment.loan_id
+- Performance.loan_id
+- ActivityAssignment.activity_id
+- ActivityAssignment.user_id
+
+
