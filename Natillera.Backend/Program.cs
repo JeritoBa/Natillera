@@ -1,22 +1,127 @@
+using System.Text;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
+using Natillera.Backend.Application.Authentication;
+using Natillera.Backend.Application.Security;
+using Natillera.Backend.Application.Users;
+using Natillera.Backend.Infrastructure.Authentication;
+using Natillera.Backend.Infrastructure.Security;
 using Natillera.Backend.Persistence;
+using Natillera.Backend.Persistence.Repositories;
+using Natillera.Backend.Persistence.Seed;
+
+if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("JWT_SECRET")))
+    DotNetEnv.Env.TraversePath().Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
+var jwtOptions = new JwtOptions
+{
+    Secret = RequiredConfiguration(builder.Configuration, "JWT_SECRET"),
+    Issuer = RequiredConfiguration(builder.Configuration, "JWT_ISSUER"),
+    Audience = RequiredConfiguration(builder.Configuration, "JWT_AUDIENCE"),
+    ExpirationMinutes = ParseExpiration(builder.Configuration)
+};
+
+if (Encoding.UTF8.GetByteCount(jwtOptions.Secret) < 32)
+    throw new InvalidOperationException("JWT_SECRET must contain at least 32 bytes.");
+
+builder.Services.AddSingleton(jwtOptions);
+builder.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(jwtOptions));
 builder.Services.AddDbContext<NatilleraDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddControllers();
-builder.Services.AddOpenApi();
+builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
+builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<AuthenticationService>();
+builder.Services.AddScoped<UserService>();
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Secret)),
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions.Audience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromSeconds(30)
+        };
+    });
+builder.Services.AddAuthorization();
+
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Natillera API",
+        Version = "v1",
+        Description = "Backend API for Natillera authentication and financial management."
+    });
+
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter a JWT token using the Bearer scheme."
+    });
+
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = new List<string>()
+    });
+
+    var xmlFile = $"{typeof(Program).Assembly.GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+        options.IncludeXmlComments(xmlPath);
+});
 
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<NatilleraDbContext>();
+    await dbContext.Database.MigrateAsync();
+    await AdminSeeder.SeedAsync(
+        dbContext,
+        scope.ServiceProvider.GetRequiredService<IPasswordHasher>(),
+        app.Configuration);
+
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static string RequiredConfiguration(IConfiguration configuration, string key) =>
+    configuration[key] ?? throw new InvalidOperationException($"Missing required configuration: {key}");
+
+static int ParseExpiration(IConfiguration configuration)
+{
+    var value = RequiredConfiguration(configuration, "JWT_EXPIRATION_MINUTES");
+    if (!int.TryParse(value, out var minutes) || minutes <= 0)
+        throw new InvalidOperationException("JWT_EXPIRATION_MINUTES must be a positive integer.");
+
+    return minutes;
+}
