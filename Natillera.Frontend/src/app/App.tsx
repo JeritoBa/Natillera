@@ -6,7 +6,9 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
 import { LandingPage } from '@/features/landing/pages/LandingPage'
 import { MembersPage } from '@/features/members/pages/MembersPage'
-import { ActivitiesPage, LoansPage, PaymentsPage, TransactionsPage } from '@/features/management/pages/ManagementPages'
+import { ActivitiesPage, LoansPage } from '@/features/management/pages/ManagementPages'
+import { MonthlyPaymentsPage } from '@/features/monthlyPayments/pages/MonthlyPaymentsPage'
+import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage'
 import type { Page } from '@/shared/model/types'
 import { AppShell } from '@/shared/layout/AppShell'
 
@@ -42,7 +44,7 @@ function DashboardLayout() {
     members: <MembersPage />,
     loans: <LoansPage />,
     activities: <ActivitiesPage />,
-    payments: <PaymentsPage />,
+    payments: <MonthlyPaymentsPage />,
     transactions: <TransactionsPage />,
   }
 

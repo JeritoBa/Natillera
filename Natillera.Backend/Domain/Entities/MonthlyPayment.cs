@@ -43,6 +43,16 @@ public class MonthlyPayment
         Status = status;
     }
 
+    public void UpdateDetails(decimal amount, int year, int month, Guid userId)
+    {
+        ValidatePeriod(year, month);
+        ValidateAmount(amount);
+        Amount = amount;
+        Year = year;
+        Month = month;
+        UserId = userId;
+    }
+
     private static void ValidateAmount(decimal amount)
     {
         if (amount <= 0)

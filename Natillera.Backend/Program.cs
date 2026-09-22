@@ -1,10 +1,14 @@
 using System.Text;
+using System.Globalization;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Natillera.Backend.Application.Authentication;
+using Natillera.Backend.Application.Common;
+using Natillera.Backend.Application.MonthlyPayments;
+using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Application.Security;
 using Natillera.Backend.Application.Users;
 using Natillera.Backend.Infrastructure.Authentication;
@@ -33,6 +37,7 @@ builder.Services.AddSingleton(jwtOptions);
 builder.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(jwtOptions));
 builder.Services.AddDbContext<NatilleraDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddSingleton(new MonthlyPaymentOptions(ParseMinimumMonthlyPayment(builder.Configuration)));
 
 var corsOrigins = (builder.Configuration["CORS_ORIGINS"] ?? "http://localhost:5173,http://localhost:3000")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -45,7 +50,12 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IMonthlyPaymentRepository, MonthlyPaymentRepository>();
+builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
+builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<AuthenticationService>();
+builder.Services.AddScoped<MonthlyPaymentService>();
+builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<UserService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -133,4 +143,13 @@ static int ParseExpiration(IConfiguration configuration)
         throw new InvalidOperationException("JWT_EXPIRATION_MINUTES must be a positive integer.");
 
     return minutes;
+}
+
+static decimal ParseMinimumMonthlyPayment(IConfiguration configuration)
+{
+    var value = RequiredConfiguration(configuration, "NATILLERA_MIN_MONTHLY_PAYMENT");
+    if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) || amount <= 0)
+        throw new InvalidOperationException("NATILLERA_MIN_MONTHLY_PAYMENT must be a positive decimal.");
+
+    return amount;
 }
