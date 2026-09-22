@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 
 export interface ColumnDefinition<T> {
   label: string
@@ -19,6 +20,8 @@ export interface CrudConfig<T> {
 }
 
 export function CrudPage<T extends { id: number }>({ data: initial, config }: { data: T[]; config: CrudConfig<T> }) {
+  const { session } = useAuth()
+  const canManage = session?.user.role === 'Admin'
   const [data, setData] = useState(initial)
   const [modal, setModal] = useState<null | 'create' | 'edit'>(null)
   const [editing, setEditing] = useState<T | null>(null)
@@ -51,7 +54,7 @@ export function CrudPage<T extends { id: number }>({ data: initial, config }: { 
     <div className="p-6 lg:p-8 max-w-5xl">
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">{config.title}</h1><p className="text-[#4e7460] text-sm">{config.subtitle}</p></div>
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Agregar</button>
+        {canManage && <button onClick={openCreate} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Agregar</button>}
       </div>
 
       {config.summaryStats && <div className="grid grid-cols-3 gap-3 mb-5">{config.summaryStats.map(stat => <div key={stat.label} className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">{stat.label}</p><p className="text-lg font-bold text-[#0c1a12] mono">{stat.value}</p></div>)}</div>}
@@ -60,14 +63,14 @@ export function CrudPage<T extends { id: number }>({ data: initial, config }: { 
         <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
             {config.columns.map(column => <th key={column.label} className={`px-5 py-3 text-[#4e7460] text-xs font-medium ${column.align === 'right' ? 'text-right' : 'text-left'}`}>{column.label}</th>)}
-            <th className="px-5 py-3 text-right text-[#4e7460] text-xs font-medium">Acciones</th>
+            {canManage && <th className="px-5 py-3 text-right text-[#4e7460] text-xs font-medium">Acciones</th>}
           </tr></thead>
           <tbody>
             {data.map(row => <tr key={row.id} className="table-row">
               {config.columns.map((column, index) => <td key={index} className={`px-5 py-3.5 ${column.align === 'right' ? 'text-right' : ''}`}>{column.render(row)}</td>)}
-              <td className="px-5 py-3.5 text-right"><div className="flex items-center justify-end gap-1"><button onClick={() => openEdit(row)} className="btn-ghost p-1.5 rounded-md"><Icon.Edit /></button><button onClick={() => setDeleteId(row.id)} className="btn-danger p-1.5 rounded-md"><Icon.Trash /></button></div></td>
+              {canManage && <td className="px-5 py-3.5 text-right"><div className="flex items-center justify-end gap-1"><button onClick={() => openEdit(row)} className="btn-ghost p-1.5 rounded-md"><Icon.Edit /></button><button onClick={() => setDeleteId(row.id)} className="btn-danger p-1.5 rounded-md"><Icon.Trash /></button></div></td>}
             </tr>)}
-            {data.length === 0 && <tr><td colSpan={config.columns.length + 1} className="px-5 py-12 text-center text-[#4e7460] text-sm">Sin registros</td></tr>}
+            {data.length === 0 && <tr><td colSpan={config.columns.length + (canManage ? 1 : 0)} className="px-5 py-12 text-center text-[#4e7460] text-sm">Sin registros</td></tr>}
           </tbody>
         </table></div>
       </div>

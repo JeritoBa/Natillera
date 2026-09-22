@@ -11,9 +11,13 @@ interface SidebarProps {
 }
 
 function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
-  const { logout } = useAuth()
+  const { logout, session } = useAuth()
+  const user = session?.user
+  const initials = user ? `${user.firstName[0] ?? ''}${user.lastName[0] ?? ''}`.toUpperCase() : ''
+  const roleLabel = user?.role === 'Admin' ? 'Administrador' : 'Miembro'
   const nav = [
     { id: 'dashboard', label: 'Dashboard', Icon: Icon.Dashboard },
+    { id: 'members', label: 'Miembros', Icon: Icon.Members },
     { id: 'loans', label: 'Préstamos', Icon: Icon.Loans },
     { id: 'activities', label: 'Actividades', Icon: Icon.Activities },
     { id: 'payments', label: 'Cuotas', Icon: Icon.Payments },
@@ -58,11 +62,11 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
               className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
               style={{ background: '#0c5c38', fontFamily: 'Outfit, sans-serif' }}
             >
-              AM
+              {initials}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-[#0c1a12] truncate" style={{ fontFamily: 'Outfit, sans-serif' }}>Ana Martínez</p>
-              <p className="text-[11px] text-[#4e7460]">Administrador</p>
+              <p className="text-sm font-medium text-[#0c1a12] truncate" style={{ fontFamily: 'Outfit, sans-serif' }}>{user ? `${user.firstName} ${user.lastName}` : ''}</p>
+              <p className="text-[11px] text-[#4e7460]">{roleLabel}</p>
             </div>
           </div>
           <button

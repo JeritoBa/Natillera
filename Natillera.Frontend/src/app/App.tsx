@@ -5,12 +5,13 @@ import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
 import { LandingPage } from '@/features/landing/pages/LandingPage'
+import { MembersPage } from '@/features/members/pages/MembersPage'
 import { ActivitiesPage, LoansPage, PaymentsPage, TransactionsPage } from '@/features/management/pages/ManagementPages'
 import type { Page } from '@/shared/model/types'
 import { AppShell } from '@/shared/layout/AppShell'
 
 const pagePaths: Record<Page, string> = {
-  landing: '/', auth: '/login', dashboard: '/dashboard', loans: '/loans',
+  landing: '/', auth: '/login', dashboard: '/dashboard', members: '/members', loans: '/loans',
   activities: '/activities', payments: '/payments', transactions: '/transactions',
 }
 type DashboardPage = Exclude<Page, 'landing' | 'auth'>
@@ -31,13 +32,14 @@ function DashboardLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const pageByPath: Record<string, Page> = {
-    '/dashboard': 'dashboard', '/loans': 'loans', '/activities': 'activities',
+    '/dashboard': 'dashboard', '/members': 'members', '/loans': 'loans', '/activities': 'activities',
     '/payments': 'payments', '/transactions': 'transactions',
   }
   const page = pageByPath[location.pathname] as DashboardPage
 
   const pages: Record<DashboardPage, ReactNode> = {
     dashboard: <DashboardPage />,
+    members: <MembersPage />,
     loans: <LoansPage />,
     activities: <ActivitiesPage />,
     payments: <PaymentsPage />,
@@ -54,6 +56,7 @@ export default function App() {
       <Route path="/login" element={<LoginRoute />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<DashboardLayout />} />
+        <Route path="/members" element={<DashboardLayout />} />
         <Route path="/loans" element={<DashboardLayout />} />
         <Route path="/activities" element={<DashboardLayout />} />
         <Route path="/payments" element={<DashboardLayout />} />
