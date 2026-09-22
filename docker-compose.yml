@@ -12,6 +12,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      CORS_ORIGINS: ${CORS_ORIGINS}
     depends_on:
       postgres:
         condition: service_healthy

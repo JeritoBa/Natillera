@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import type { Page } from '@/shared/model/types'
 import { Icon } from '@/shared/ui/Icon'
 
@@ -10,6 +11,7 @@ interface SidebarProps {
 }
 
 function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
+  const { logout } = useAuth()
   const nav = [
     { id: 'dashboard', label: 'Dashboard', Icon: Icon.Dashboard },
     { id: 'loans', label: 'Préstamos', Icon: Icon.Loans },
@@ -64,7 +66,7 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
             </div>
           </div>
           <button
-            onClick={() => setPage('landing')}
+            onClick={() => { logout(); setPage('auth') }}
             className="nav-item w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm"
           >
             <Icon.Logout />

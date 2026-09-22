@@ -51,8 +51,8 @@ export function AuthPage({ setPage }: { setPage: (page: Page) => void }) {
                 <button type="button" onClick={() => authForm.setShowPassword(value => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#4e7460] hover:text-[#0c1a12] transition-colors"><Icon.Eye open={authForm.showPassword} /></button>
               </div>
             </div>
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" className="w-3.5 h-3.5 accent-[#0c5c38]" /><span className="text-[#4e7460] text-sm">Recordarme</span></label>
+            {authForm.error && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{authForm.error}</p>}
+            <div className="flex items-center justify-end pt-1">
               <button type="button" className="text-sm text-[#0c5c38] hover:underline">¿Olvidaste tu contraseña?</button>
             </div>
             <button type="submit" disabled={authForm.loading} className="btn-primary w-full py-3 rounded-lg text-sm mt-1 flex items-center justify-center gap-2">

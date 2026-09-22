@@ -34,6 +34,14 @@ builder.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(jwtOpt
 builder.Services.AddDbContext<NatilleraDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+var corsOrigins = (builder.Configuration["CORS_ORIGINS"] ?? "http://localhost:5173,http://localhost:3000")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+builder.Services.AddCors(options =>
+    options.AddPolicy("Frontend", policy => policy
+        .WithOrigins(corsOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()));
+
 builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -108,6 +116,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
