@@ -57,12 +57,14 @@ builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 builder.Services.AddScoped<ILogRepository, LogRepository>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
+builder.Services.AddScoped<IMemberDetailRepository, MemberDetailRepository>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<MonthlyPaymentService>();
 builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<LogService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<MemberDetailService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

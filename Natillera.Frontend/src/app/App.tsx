@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react'
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AuthPage } from '@/features/auth/pages/AuthPage'
 import { AdminRoute } from '@/features/auth/components/AdminRoute'
 import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
@@ -7,6 +6,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
 import { LandingPage } from '@/features/landing/pages/LandingPage'
 import { MembersPage } from '@/features/members/pages/MembersPage'
+import { MemberDetailPage } from '@/features/members/pages/MemberDetailPage'
 import { ActivitiesPage, LoansPage } from '@/features/management/pages/ManagementPages'
 import { MonthlyPaymentsPage } from '@/features/monthlyPayments/pages/MonthlyPaymentsPage'
 import { LogsPage } from '@/features/audit/pages/LogsPage'
@@ -37,23 +37,14 @@ function LoginRoute() {
 function DashboardLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const pageByPath: Record<string, Page> = {
-    '/dashboard': 'dashboard', '/members': 'members', '/loans': 'loans', '/activities': 'activities',
-    '/payments': 'payments', '/transactions': 'transactions', '/logs': 'logs',
+  const pageBySection: Record<string, DashboardPage> = {
+    dashboard: 'dashboard', members: 'members', loans: 'loans', activities: 'activities',
+    payments: 'payments', transactions: 'transactions', logs: 'logs',
   }
-  const page = pageByPath[location.pathname] as DashboardPage
+  // Detail routes (/members/:id, /logs/:id...) keep their parent section highlighted in the sidebar.
+  const page = pageBySection[location.pathname.split('/')[1]] ?? 'dashboard'
 
-  const pages: Record<DashboardPage, ReactNode> = {
-    dashboard: <DashboardPage />,
-    members: <MembersPage />,
-    loans: <LoansPage />,
-    activities: <ActivitiesPage />,
-    payments: <MonthlyPaymentsPage />,
-    transactions: <TransactionsPage />,
-    logs: <LogsPage />,
-  }
-
-  return <AppShell page={page} setPage={nextPage => navigate(pagePaths[nextPage])}>{pages[page]}</AppShell>
+  return <AppShell page={page} setPage={nextPage => navigate(pagePaths[nextPage])}><Outlet /></AppShell>
 }
 
 export default function App() {
@@ -62,16 +53,19 @@ export default function App() {
       <Route path="/" element={<LandingRoute />} />
       <Route path="/login" element={<LoginRoute />} />
       <Route element={<ProtectedRoute />}>
-        <Route path="/dashboard" element={<DashboardLayout />} />
-        <Route path="/members" element={<DashboardLayout />} />
-        <Route path="/loans" element={<DashboardLayout />} />
-        <Route path="/activities" element={<DashboardLayout />} />
-        <Route path="/payments" element={<DashboardLayout />} />
-        <Route path="/transactions" element={<DashboardLayout />} />
-        <Route path="/transactions/:id" element={<TransactionDetailPage />} />
-        <Route element={<AdminRoute />}>
-          <Route path="/logs" element={<DashboardLayout />} />
-          <Route path="/logs/:id" element={<LogDetailPage />} />
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/members" element={<MembersPage />} />
+          <Route path="/loans" element={<LoansPage />} />
+          <Route path="/activities" element={<ActivitiesPage />} />
+          <Route path="/payments" element={<MonthlyPaymentsPage />} />
+          <Route path="/transactions" element={<TransactionsPage />} />
+          <Route path="/transactions/:id" element={<TransactionDetailPage />} />
+          <Route element={<AdminRoute />}>
+            <Route path="/members/:id" element={<MemberDetailPage />} />
+            <Route path="/logs" element={<LogsPage />} />
+            <Route path="/logs/:id" element={<LogDetailPage />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

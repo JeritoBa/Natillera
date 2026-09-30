@@ -10,12 +10,22 @@ namespace Natillera.Backend.Presentation.Controllers;
 [ApiController]
 [Route("api/members")]
 [Authorize]
-public sealed class MembersController(UserService userService, IConfiguration configuration) : ControllerBase
+public sealed class MembersController(UserService userService, MemberDetailService memberDetailService, IConfiguration configuration) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyCollection<UserResponse>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<UserResponse>>> Get(CancellationToken cancellationToken) =>
         Ok(await userService.GetMembersAsync(cancellationToken));
+
+    [HttpGet("{id:guid}/details")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [ProducesResponseType(typeof(MemberDetailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<MemberDetailResponse>> GetDetails(Guid id, CancellationToken cancellationToken)
+    {
+        var detail = await memberDetailService.GetDetailAsync(id, cancellationToken);
+        return detail is null ? NotFound(new { message = "Member not found." }) : Ok(detail);
+    }
 
     [HttpPost]
     [Authorize(Roles = nameof(UserRole.Admin))]
