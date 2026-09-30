@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { getLogs, type LogAction, type LogEntityType, type LogListItem } from '@/features/audit/api/logsApi'
-import { actionBackground, actionColor, actionLabel, actions, entityLabel, entityTypes } from '@/features/audit/model/labels'
+import { actionBackground, actionColor, actionLabel, actions, entityBackground, entityColor, entityLabel, entityTypes } from '@/features/audit/model/labels'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
 
@@ -73,7 +73,7 @@ export function LogsPage() {
         {loading && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">Cargando logs...</td></tr>}
         {!loading && !error && logs.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">No hay logs registrados</td></tr>}
         {!loading && logs.length > 0 && filtered.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">No hay resultados para los filtros aplicados</td></tr>}
-        {!loading && filtered.map(log => <tr key={log.id} className="table-row"><td className="px-5 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap">{new Date(log.occurredAt).toLocaleString('es-CO')}</td><td className="px-4 py-3.5"><span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: actionBackground[log.action], color: actionColor[log.action] }}>{actionLabel[log.action]}</span></td><td className="px-4 py-3.5 text-[#0c1a12]">{entityLabel[log.entityType]}</td><td className="px-4 py-3.5 text-[#4e7460] hidden md:table-cell">{log.userName}</td><td className="px-5 py-3.5 text-right mono text-sm text-[#0c1a12] whitespace-nowrap">{money(log.oldValue)} → {money(log.newValue)}</td><td className="px-5 py-3.5 text-right"><div className="flex justify-end gap-1"><button onClick={() => navigate(`/logs/${log.id}`)} className="btn-ghost p-1.5 rounded-md" aria-label="Ver detalle"><Icon.Eye open /></button></div></td></tr>)}
+        {!loading && filtered.map(log => <tr key={log.id} className="table-row"><td className="px-5 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap">{new Date(log.occurredAt).toLocaleString('es-CO')}</td><td className="px-4 py-3.5"><span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: actionBackground[log.action], color: actionColor[log.action] }}>{actionLabel[log.action]}</span></td><td className="px-4 py-3.5"><span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: entityBackground[log.entityType], color: entityColor[log.entityType] }}>{entityLabel[log.entityType]}</span></td><td className="px-4 py-3.5 text-[#4e7460] hidden md:table-cell">{log.userName}</td><td className="px-5 py-3.5 text-right mono text-sm text-[#0c1a12] whitespace-nowrap">{money(log.oldValue)} → {money(log.newValue)}</td><td className="px-5 py-3.5 text-right"><div className="flex justify-end gap-1"><button onClick={() => navigate(`/logs/${log.id}`)} className="btn-ghost p-1.5 rounded-md" aria-label="Ver detalle"><Icon.Eye open /></button></div></td></tr>)}
       </tbody></table></div></div>
     </div>
   )

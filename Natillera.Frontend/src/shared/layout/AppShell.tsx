@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import type { Page } from '@/shared/model/types'
+import { BrandLogo } from '@/shared/ui/BrandLogo'
 import { Icon } from '@/shared/ui/Icon'
 
 interface SidebarProps {
@@ -16,13 +17,13 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
   const initials = user ? `${user.firstName[0] ?? ''}${user.lastName[0] ?? ''}`.toUpperCase() : ''
   const roleLabel = user?.role === 'Admin' ? 'Administrador' : 'Miembro'
   const nav = [
-    { id: 'dashboard', label: 'Dashboard', Icon: Icon.Dashboard },
-    { id: 'members', label: 'Miembros', Icon: Icon.Members },
-    { id: 'loans', label: 'Préstamos', Icon: Icon.Loans },
-    { id: 'activities', label: 'Actividades', Icon: Icon.Activities },
-    { id: 'payments', label: 'Cuotas', Icon: Icon.Payments },
-    { id: 'transactions', label: 'Transacciones', Icon: Icon.Transactions },
-    { id: 'logs', label: 'Logs', Icon: Icon.Logs },
+    { id: 'dashboard', label: 'Dashboard', Icon: Icon.Dashboard, disabled: false },
+    { id: 'members', label: 'Miembros', Icon: Icon.Members, disabled: false },
+    { id: 'payments', label: 'Cuotas', Icon: Icon.Payments, disabled: false },
+    { id: 'activities', label: 'Actividades', Icon: Icon.Activities, disabled: true },
+    { id: 'loans', label: 'Préstamos', Icon: Icon.Loans, disabled: true },
+    { id: 'transactions', label: 'Transacciones', Icon: Icon.Transactions, disabled: false },
+    { id: 'logs', label: 'Logs', Icon: Icon.Logs, disabled: false },
   ] as const
   const visibleNav = nav.filter(item => item.id !== 'logs' || user?.role === 'Admin')
 
@@ -36,21 +37,17 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
         style={{ background: '#fff', borderRight: '1px solid #d6e8dc' }}
       >
         <div className="flex items-center gap-2.5 px-5 py-4 border-b" style={{ borderColor: '#d6e8dc' }}>
-          <Icon.Logo />
-          <div>
-            <p className="text-[#0c1a12] font-bold text-[15px] leading-none" style={{ fontFamily: 'Outfit, sans-serif' }}>
-              Natillera
-            </p>
-            <p className="text-[10px] text-[#4e7460] font-mono uppercase tracking-widest mt-0.5">Familiar</p>
-          </div>
+          <BrandLogo />
         </div>
 
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-          {visibleNav.map(({ id, label, Icon: NavIcon }) => (
+          {visibleNav.map(({ id, label, Icon: NavIcon, disabled }) => (
             <button
               key={id}
+              disabled={disabled}
+              title={disabled ? 'No disponible por ahora' : undefined}
               onClick={() => { setPage(id); setSidebarOpen(false) }}
-              className={`nav-item w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-left ${page === id ? 'active' : ''}`}
+              className={`nav-item w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-left ${page === id ? 'active' : ''} ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
               <NavIcon />
               <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 500 }}>{label}</span>
@@ -104,9 +101,7 @@ export function AppShell({ page, setPage, children }: AppShellProps) {
           <button onClick={() => setSidebarOpen(true)} className="text-[#4e7460]">
             <Icon.Menu />
           </button>
-          <span className="font-semibold text-[#0c1a12] text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>
-            Natillera Familiar
-          </span>
+          <BrandLogo className="h-9 w-[50px]" />
         </header>
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>

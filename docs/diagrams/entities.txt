@@ -34,7 +34,7 @@ Log
 - occured_at DATETIME
 - old_value DECIMAL POSSIBLE NULL
 - new_value DECIMAL POSSIBLE NULL
-- user_id FK WITH User
+- user_id FK WITH User 
 
 Business Entities
 

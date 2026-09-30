@@ -1,5 +1,6 @@
 import type { Page } from '@/shared/model/types'
 import { useAuthForm } from '@/features/auth/hooks/useAuthForm'
+import { BrandLogo } from '@/shared/ui/BrandLogo'
 import { Icon } from '@/shared/ui/Icon'
 
 export function AuthPage({ setPage }: { setPage: (page: Page) => void }) {
@@ -9,12 +10,7 @@ export function AuthPage({ setPage }: { setPage: (page: Page) => void }) {
     <div className="min-h-screen flex" style={{ background: '#f5f7f5' }}>
       <div className="hidden lg:flex flex-col justify-between w-2/5 p-12" style={{ background: '#0c5c38', color: '#fff' }}>
         <div className="flex items-center gap-2.5">
-          <svg width="26" height="26" viewBox="0 0 30 30" fill="none">
-            <rect width="30" height="30" rx="6" fill="rgba(255,255,255,0.15)"/>
-            <path d="M9 21L15 9L21 21" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M11.5 17.5H18.5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round"/>
-          </svg>
-          <span className="font-bold text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>Natillera</span>
+          <div className="rounded-lg bg-white px-2 py-1"><BrandLogo /></div>
         </div>
         <div>
           <p className="text-3xl font-bold leading-snug mb-4" style={{ fontFamily: 'Outfit, sans-serif' }}>
@@ -35,7 +31,7 @@ export function AuthPage({ setPage }: { setPage: (page: Page) => void }) {
 
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm fade-up">
-          <div className="lg:hidden flex items-center gap-2 mb-8"><Icon.Logo /><span className="font-bold text-[#0c1a12]" style={{ fontFamily: 'Outfit, sans-serif' }}>Natillera</span></div>
+          <div className="lg:hidden flex items-center gap-2 mb-8"><BrandLogo /></div>
           <h1 className="text-2xl font-bold text-[#0c1a12] mb-1">Bienvenido de vuelta</h1>
           <p className="text-[#4e7460] text-sm mb-8">Ingresa con tu correo y contraseña</p>
 

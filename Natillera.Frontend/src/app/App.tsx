@@ -15,6 +15,7 @@ import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage
 import { TransactionDetailPage } from '@/features/transactions/pages/TransactionDetailPage'
 import type { Page } from '@/shared/model/types'
 import { AppShell } from '@/shared/layout/AppShell'
+import { useDocumentTitle } from '@/app/useDocumentTitle'
 
 const pagePaths: Record<Page, string> = {
   landing: '/', auth: '/login', dashboard: '/dashboard', members: '/members', loans: '/loans',
@@ -48,6 +49,8 @@ function DashboardLayout() {
 }
 
 export default function App() {
+  useDocumentTitle()
+
   return (
     <Routes>
       <Route path="/" element={<LandingRoute />} />

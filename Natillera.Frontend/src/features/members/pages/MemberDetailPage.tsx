@@ -2,22 +2,12 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { getMemberDetail, type MemberDetail } from '@/features/members/api/membersApi'
-import type { TransactionType } from '@/features/transactions/api/transactionsApi'
+import { typeBackground, typeColor, typeLabel } from '@/features/transactions/model/labels'
 import { ApiError, getFriendlyApiError } from '@/shared/api/apiError'
-import { formatCurrency } from '@/shared/lib/formatters'
+import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 
-const typeLabel: Record<TransactionType, string> = {
-  MonthlyPayment: 'Cuota mensual', Activity: 'Actividad', ActivitySale: 'Venta', Loan: 'Préstamo', LoanPayment: 'Pago préstamo', Performance: 'Rendimiento',
-}
-const typeColor: Record<TransactionType, string> = {
-  MonthlyPayment: '#0a6635', Activity: '#9a6e00', ActivitySale: '#0074b3', Loan: '#c0392b', LoanPayment: '#0a6635', Performance: '#0074b3',
-}
-const typeBackground: Record<TransactionType, string> = {
-  MonthlyPayment: '#dcf5e8', Activity: '#fef6dc', ActivitySale: '#ddf0ff', Loan: '#fde8e4', LoanPayment: '#dcf5e8', Performance: '#ddf0ff',
-}
-const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 const roleLabel: Record<string, string> = { Admin: 'Administrador', Member: 'Miembro' }
 const paymentStatus: Record<string, string> = { Pending: 'pending', Paid: 'paid', Cancelled: 'cancelled' }
 const card = { background: '#fff', border: '1px solid #d6e8dc' }
@@ -62,12 +52,12 @@ export function MemberDetailPage() {
     <h2 className="text-sm font-bold text-[#0c1a12] mt-6 mb-3">Pagos pendientes</h2>
     <div className="rounded-xl overflow-hidden" style={card}><div className="overflow-x-auto"><table className="w-full text-sm">{header(['Período', 'Monto', 'Estado', 'Fecha de registro'], [])}<tbody>
       {pendingPayments.length === 0 && <tr><td colSpan={4} className="px-5 py-12 text-center text-[#4e7460]">Este miembro no tiene pagos pendientes</td></tr>}
-      {pendingPayments.map(payment => <tr key={payment.id} className="table-row"><td className="px-5 py-3.5 text-[#0c1a12] capitalize">{months[payment.month - 1] ?? payment.month} {payment.year}</td><td className="px-4 py-3.5 text-[#0c1a12] mono">{formatCurrency(payment.amount)}</td><td className="px-4 py-3.5"><Badge status={paymentStatus[payment.status] ?? payment.status} /></td><td className="px-4 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap">{new Date(payment.createdAt).toLocaleDateString('es-CO')}</td></tr>)}
+      {pendingPayments.map(payment => <tr key={payment.id} className="table-row"><td className="px-5 py-3.5 text-[#0c1a12] capitalize">{formatMonth(payment.month)} {payment.year}</td><td className="px-4 py-3.5 text-[#0c1a12] mono">{formatCurrency(payment.amount)}</td><td className="px-4 py-3.5"><Badge status={paymentStatus[payment.status] ?? payment.status} /></td><td className="px-4 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap">{new Date(payment.createdAt).toLocaleDateString('es-CO')}</td></tr>)}
     </tbody></table></div></div>
     <h2 className="text-sm font-bold text-[#0c1a12] mt-6 mb-3">Transacciones</h2>
     <div className="rounded-xl overflow-hidden" style={card}><div className="overflow-x-auto"><table className="w-full text-sm">{header(['Fecha', 'Descripción', 'Tipo', 'Dirección', 'Valor', 'Acciones'], [4, 5])}<tbody>
       {transactions.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">Este miembro no tiene transacciones registradas</td></tr>}
-      {transactions.map(transaction => <tr key={transaction.id} className="table-row"><td className="px-5 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap">{new Date(transaction.occurredAt).toLocaleDateString('es-CO')}</td><td className="px-4 py-3.5 text-[#0c1a12] max-w-[220px] truncate">{transaction.description}</td><td className="px-4 py-3.5"><span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: typeBackground[transaction.type], color: typeColor[transaction.type] }}>{typeLabel[transaction.type]}</span></td><td className={`px-4 py-3.5 text-xs font-medium ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{transaction.direction === 'Expense' ? 'Egreso' : 'Ingreso'}</td><td className={`px-5 py-3.5 text-right mono font-semibold text-sm ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{transaction.direction === 'Expense' ? '−' : '+'}{formatCurrency(transaction.amount)}</td><td className="px-5 py-3.5 text-right"><div className="flex justify-end gap-1"><button onClick={() => navigate(`/transactions/${transaction.id}`)} className="btn-ghost p-1.5 rounded-md" aria-label="Ver detalle"><Icon.Eye open /></button></div></td></tr>)}
+      {transactions.map(transaction => <tr key={transaction.id} className="table-row"><td className="px-5 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap">{new Date(transaction.occurredAt).toLocaleDateString('es-CO')}</td><td className="px-4 py-3.5 text-[#0c1a12] max-w-[220px] truncate">{transaction.description}</td><td className="px-4 py-3.5"><span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: typeBackground[transaction.type], color: typeColor[transaction.type] }}>{typeLabel[transaction.type]}</span></td><td className="px-4 py-3.5"><Badge status={transaction.direction === 'Income' ? 'income' : 'expense'} /></td><td className={`px-5 py-3.5 text-right mono font-semibold text-sm ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{transaction.direction === 'Expense' ? '−' : '+'}{formatCurrency(transaction.amount)}</td><td className="px-5 py-3.5 text-right"><div className="flex justify-end gap-1"><button onClick={() => navigate(`/transactions/${transaction.id}`)} className="btn-ghost p-1.5 rounded-md" aria-label="Ver detalle"><Icon.Eye open /></button></div></td></tr>)}
     </tbody></table></div></div>
   </div>
 }

@@ -1,30 +1,25 @@
 import type { Page } from '@/shared/model/types'
-import { Icon } from '@/shared/ui/Icon'
+import { BrandLogo } from '@/shared/ui/BrandLogo'
 
 export function LandingPage({ setPage }: { setPage: (page: Page) => void }) {
   return (
     <div className="min-h-screen" style={{ background: '#f5f7f5' }}>
       <nav className="flex items-center justify-between px-6 md:px-12 py-4 border-b" style={{ background: '#fff', borderColor: '#d6e8dc' }}>
-        <div className="flex items-center gap-2.5">
-          <Icon.Logo />
-          <span className="text-[#0c1a12] font-bold text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>Natillera</span>
-        </div>
+        <BrandLogo />
         <button onClick={() => setPage('auth')} className="btn-primary px-5 py-2 rounded-lg text-sm">Ingresar</button>
       </nav>
 
       <section className="px-6 md:px-12 pt-16 pb-20 max-w-6xl mx-auto">
         <div className="grid md:grid-cols-5 gap-12 items-center">
           <div className="md:col-span-3 fade-up">
-            <p className="text-xs font-mono uppercase tracking-widest text-[#0c5c38] mb-5">Ahorro colectivo familiar</p>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold text-[#0c1a12] leading-[1.1] mb-6">
-              Tu familia<br />ahorra junta,<br /><span className="text-[#0c5c38]">prospera junta.</span>
+              Familia que<br />ahorra junta,<br /><span className="text-[#0c5c38]">prospera junta.</span>
             </h1>
             <p className="text-[#4e7460] text-lg leading-relaxed mb-8 max-w-md">
               Organiza tu natillera de forma digital. Aportes mensuales, préstamos justos, transparencia total en cada peso.
             </p>
             <div className="flex flex-col sm:flex-row gap-3">
               <button onClick={() => setPage('auth')} className="btn-primary px-7 py-3 rounded-lg text-sm">Comenzar gratis</button>
-              <button onClick={() => setPage('auth')} className="btn-ghost px-7 py-3 rounded-lg text-sm">Ver demo</button>
             </div>
           </div>
 
