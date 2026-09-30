@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Natillera.Backend.Domain.Entities;
 
-namespace Natillera.Backend.Persistence.Configurations;
+namespace Natillera.Backend.Infrastructure.Persistence.Configurations;
 
 public sealed class LoanPaymentConfiguration : IEntityTypeConfiguration<LoanPayment>
 {

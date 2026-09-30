@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Natillera.Backend.Application.Users;
 using Natillera.Backend.Domain.Entities;
 
-namespace Natillera.Backend.Persistence.Repositories;
+namespace Natillera.Backend.Infrastructure.Persistence.Repositories;
 
 public sealed class UserRepository(NatilleraDbContext dbContext) : IUserRepository
 {

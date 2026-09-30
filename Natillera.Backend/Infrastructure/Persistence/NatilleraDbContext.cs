@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Natillera.Backend.Domain.Entities;
 
-namespace Natillera.Backend.Persistence;
+namespace Natillera.Backend.Infrastructure.Persistence;
 
 public class NatilleraDbContext(DbContextOptions<NatilleraDbContext> options) : DbContext(options)
 {
@@ -13,6 +13,7 @@ public class NatilleraDbContext(DbContextOptions<NatilleraDbContext> options) : 
     public DbSet<Performance> Performances => Set<Performance>();
     public DbSet<Activity> Activities => Set<Activity>();
     public DbSet<ActivityAssignment> ActivityAssignments => Set<ActivityAssignment>();
+    public DbSet<Log> Logs => Set<Log>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

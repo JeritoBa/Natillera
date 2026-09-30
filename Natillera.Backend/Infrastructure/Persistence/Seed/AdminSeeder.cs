@@ -3,7 +3,7 @@ using Natillera.Backend.Application.Security;
 using Natillera.Backend.Domain.Entities;
 using Natillera.Backend.Domain.Enums;
 
-namespace Natillera.Backend.Persistence.Seed;
+namespace Natillera.Backend.Infrastructure.Persistence.Seed;
 
 public static class AdminSeeder
 {

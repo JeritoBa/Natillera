@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Natillera.Backend.Application.MonthlyPayments;
 using Natillera.Backend.Domain.Entities;
 
-namespace Natillera.Backend.Persistence.Repositories;
+namespace Natillera.Backend.Infrastructure.Persistence.Repositories;
 
 public sealed class MonthlyPaymentRepository(NatilleraDbContext dbContext) : IMonthlyPaymentRepository
 {

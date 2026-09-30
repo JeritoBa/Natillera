@@ -2,18 +2,21 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Natillera.Backend.Persistence;
+using Natillera.Backend.Infrastructure.Persistence;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Natillera.Backend.Persistence.Migrations
+namespace Natillera.Backend.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(NatilleraDbContext))]
-    partial class NatilleraDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930154403_AddLogEntity")]
+    partial class AddLogEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -187,6 +190,49 @@ namespace Natillera.Backend.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("loan_payments", (string)null);
+                });
+
+            modelBuilder.Entity("Natillera.Backend.Domain.Entities.Log", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal?>("NewValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("OldValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("EntityType", "EntityId");
+
+                    b.ToTable("logs", (string)null);
                 });
 
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.MonthlyPayment", b =>
@@ -433,6 +479,17 @@ namespace Natillera.Backend.Persistence.Migrations
                     b.Navigation("Loan");
 
                     b.Navigation("Transaction");
+                });
+
+            modelBuilder.Entity("Natillera.Backend.Domain.Entities.Log", b =>
+                {
+                    b.HasOne("Natillera.Backend.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.MonthlyPayment", b =>

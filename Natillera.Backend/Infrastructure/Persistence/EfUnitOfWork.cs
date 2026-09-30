@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Natillera.Backend.Application.Common;
 
-namespace Natillera.Backend.Persistence;
+namespace Natillera.Backend.Infrastructure.Persistence;
 
 public sealed class EfUnitOfWork(NatilleraDbContext dbContext) : IUnitOfWork
 {
