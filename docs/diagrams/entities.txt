@@ -26,6 +26,16 @@ Transaction
 - occurred_at DATETIME DEFAULT now()
 - description VARCHAR(200)
 
+Log
+- id
+- entity_type ENUM('monthly_payment', 'activity', 'activity_sale', 'loan', 'loan_payment', 'performance', 'transaction')
+- entity_id
+- action ENUM ('create', 'update', 'delete')  DEFAULT 'create'
+- occured_at DATETIME
+- old_value DECIMAL POSSIBLE NULL
+- new_value DECIMAL POSSIBLE NULL
+- user_id FK WITH User
+
 Business Entities
 
 Activity
@@ -98,5 +108,6 @@ Too, create index for the following entities:
 - Performance.loan_id
 - ActivityAssignment.activity_id
 - ActivityAssignment.user_id
+- Log.user_id
 
 
