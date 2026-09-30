@@ -8,6 +8,7 @@ using Microsoft.OpenApi;
 using Natillera.Backend.Application.Authentication;
 using Natillera.Backend.Application.Common;
 using Natillera.Backend.Application.Dashboard;
+using Natillera.Backend.Application.Audit;
 using Natillera.Backend.Application.MonthlyPayments;
 using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Application.Security;
@@ -53,12 +54,14 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IMonthlyPaymentRepository, MonthlyPaymentRepository>();
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
+builder.Services.AddScoped<ILogRepository, LogRepository>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<MonthlyPaymentService>();
 builder.Services.AddScoped<TransactionService>();
+builder.Services.AddScoped<LogService>();
 builder.Services.AddScoped<UserService>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -22,7 +22,9 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
     { id: 'activities', label: 'Actividades', Icon: Icon.Activities },
     { id: 'payments', label: 'Cuotas', Icon: Icon.Payments },
     { id: 'transactions', label: 'Transacciones', Icon: Icon.Transactions },
+    { id: 'logs', label: 'Logs', Icon: Icon.Logs },
   ] as const
+  const visibleNav = nav.filter(item => item.id !== 'logs' || user?.role === 'Admin')
 
   return (
     <>
@@ -44,7 +46,7 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
         </div>
 
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-          {nav.map(({ id, label, Icon: NavIcon }) => (
+          {visibleNav.map(({ id, label, Icon: NavIcon }) => (
             <button
               key={id}
               onClick={() => { setPage(id); setSidebarOpen(false) }}

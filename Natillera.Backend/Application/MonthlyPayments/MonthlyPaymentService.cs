@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Natillera.Backend.Application.Common;
+using Natillera.Backend.Application.Audit;
 using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Application.Users;
 using Natillera.Backend.Domain.Entities;
@@ -12,6 +13,7 @@ public sealed class MonthlyPaymentService(
     IUserRepository memberReader,
     IMonthlyPaymentRepository paymentRepository,
     ITransactionRepository transactionRepository,
+    ILogRepository logRepository,
     IUnitOfWork unitOfWork,
     MonthlyPaymentOptions options)
 {
@@ -20,6 +22,7 @@ public sealed class MonthlyPaymentService(
 
     public async Task<MonthlyPaymentResponse> CreateAsync(
         CreateMonthlyPaymentRequest request,
+        Guid performedByUserId,
         CancellationToken cancellationToken)
     {
         if (request.Amount < options.MinimumAmount)
@@ -53,6 +56,9 @@ public sealed class MonthlyPaymentService(
             {
                 await transactionRepository.AddAsync(transaction, ct);
                 await paymentRepository.AddAsync(payment, ct);
+                await logRepository.AddAsync(
+                    new Log(performedByUserId, LogEntityType.MonthlyPayment, payment.Id, LogAction.Create, null, payment.Amount),
+                    ct);
             }, cancellationToken);
         }
         catch (DbUpdateException exception) when (exception.InnerException is not null)
@@ -72,7 +78,7 @@ public sealed class MonthlyPaymentService(
             member.FirstName + " " + member.LastName);
     }
 
-    public async Task<MonthlyPaymentResponse> UpdateAsync(Guid paymentId, UpdateMonthlyPaymentRequest request, CancellationToken cancellationToken)
+    public async Task<MonthlyPaymentResponse> UpdateAsync(Guid paymentId, UpdateMonthlyPaymentRequest request, Guid performedByUserId, CancellationToken cancellationToken)
     {
         if (request.Amount < options.MinimumAmount)
             throw new DomainException($"Monthly payment must be at least {options.MinimumAmount:0.00}.");
@@ -88,10 +94,16 @@ public sealed class MonthlyPaymentService(
             throw new DomainException("A monthly payment already exists for this member and period.");
 
         var description = $"Monthly payment - {request.Month:00}/{request.Year} - {member.FirstName} {member.LastName}";
-        payment.UpdateDetails(request.Amount, request.Year, request.Month, request.UserId);
-        payment.Transaction.Update(request.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, description);
 
-        await unitOfWork.ExecuteInTransactionAsync(_ => Task.CompletedTask, cancellationToken);
+        await unitOfWork.ExecuteInTransactionAsync(async ct =>
+        {
+            var oldAmount = payment.Amount;
+            payment.UpdateDetails(request.Amount, request.Year, request.Month, request.UserId);
+            payment.Transaction.Update(request.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, description);
+            await logRepository.AddAsync(
+                new Log(performedByUserId, LogEntityType.MonthlyPayment, payment.Id, LogAction.Update, oldAmount, payment.Amount),
+                ct);
+        }, cancellationToken);
 
         return new MonthlyPaymentResponse(payment.Id, payment.UserId, payment.TransactionId, payment.Amount, payment.Year, payment.Month, payment.PaidAt, payment.Status, member.FirstName + " " + member.LastName);
     }

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AuthPage } from '@/features/auth/pages/AuthPage'
+import { AdminRoute } from '@/features/auth/components/AdminRoute'
 import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
@@ -8,6 +9,8 @@ import { LandingPage } from '@/features/landing/pages/LandingPage'
 import { MembersPage } from '@/features/members/pages/MembersPage'
 import { ActivitiesPage, LoansPage } from '@/features/management/pages/ManagementPages'
 import { MonthlyPaymentsPage } from '@/features/monthlyPayments/pages/MonthlyPaymentsPage'
+import { LogsPage } from '@/features/audit/pages/LogsPage'
+import { LogDetailPage } from '@/features/audit/pages/LogDetailPage'
 import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage'
 import { TransactionDetailPage } from '@/features/transactions/pages/TransactionDetailPage'
 import type { Page } from '@/shared/model/types'
@@ -15,7 +18,7 @@ import { AppShell } from '@/shared/layout/AppShell'
 
 const pagePaths: Record<Page, string> = {
   landing: '/', auth: '/login', dashboard: '/dashboard', members: '/members', loans: '/loans',
-  activities: '/activities', payments: '/payments', transactions: '/transactions',
+  activities: '/activities', payments: '/payments', transactions: '/transactions', logs: '/logs',
 }
 type DashboardPage = Exclude<Page, 'landing' | 'auth'>
 
@@ -36,7 +39,7 @@ function DashboardLayout() {
   const navigate = useNavigate()
   const pageByPath: Record<string, Page> = {
     '/dashboard': 'dashboard', '/members': 'members', '/loans': 'loans', '/activities': 'activities',
-    '/payments': 'payments', '/transactions': 'transactions',
+    '/payments': 'payments', '/transactions': 'transactions', '/logs': 'logs',
   }
   const page = pageByPath[location.pathname] as DashboardPage
 
@@ -47,6 +50,7 @@ function DashboardLayout() {
     activities: <ActivitiesPage />,
     payments: <MonthlyPaymentsPage />,
     transactions: <TransactionsPage />,
+    logs: <LogsPage />,
   }
 
   return <AppShell page={page} setPage={nextPage => navigate(pagePaths[nextPage])}>{pages[page]}</AppShell>
@@ -65,6 +69,10 @@ export default function App() {
         <Route path="/payments" element={<DashboardLayout />} />
         <Route path="/transactions" element={<DashboardLayout />} />
         <Route path="/transactions/:id" element={<TransactionDetailPage />} />
+        <Route element={<AdminRoute />}>
+          <Route path="/logs" element={<DashboardLayout />} />
+          <Route path="/logs/:id" element={<LogDetailPage />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

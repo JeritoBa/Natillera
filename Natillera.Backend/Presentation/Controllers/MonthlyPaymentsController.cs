@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using Natillera.Backend.Application.MonthlyPayments;
 using Natillera.Backend.Domain.Enums;
 using Natillera.Backend.Domain.Exceptions;
@@ -29,9 +30,11 @@ public sealed class MonthlyPaymentsController(MonthlyPaymentService monthlyPayme
         [FromBody] CreateMonthlyPaymentRequest request,
         CancellationToken cancellationToken)
     {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
         try
         {
-            var payment = await monthlyPaymentService.CreateAsync(request, cancellationToken);
+            var payment = await monthlyPaymentService.CreateAsync(request, userId, cancellationToken);
             return Created($"/api/monthly-payments/{payment.Id}", payment);
         }
         catch (DomainException exception) when (exception.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
@@ -54,9 +57,11 @@ public sealed class MonthlyPaymentsController(MonthlyPaymentService monthlyPayme
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<MonthlyPaymentResponse>> Update(Guid id, [FromBody] UpdateMonthlyPaymentRequest request, CancellationToken cancellationToken)
     {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
         try
         {
-            return Ok(await monthlyPaymentService.UpdateAsync(id, request, cancellationToken));
+            return Ok(await monthlyPaymentService.UpdateAsync(id, request, userId, cancellationToken));
         }
         catch (DomainException exception) when (exception.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
@@ -70,5 +75,11 @@ public sealed class MonthlyPaymentsController(MonthlyPaymentService monthlyPayme
         {
             return BadRequest(new { message = exception.Message });
         }
+    }
+
+    private bool TryGetUserId(out Guid userId)
+    {
+        var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        return Guid.TryParse(userIdValue, out userId);
     }
 }
