@@ -9,6 +9,7 @@ import { MembersPage } from '@/features/members/pages/MembersPage'
 import { ActivitiesPage, LoansPage } from '@/features/management/pages/ManagementPages'
 import { MonthlyPaymentsPage } from '@/features/monthlyPayments/pages/MonthlyPaymentsPage'
 import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage'
+import { TransactionDetailPage } from '@/features/transactions/pages/TransactionDetailPage'
 import type { Page } from '@/shared/model/types'
 import { AppShell } from '@/shared/layout/AppShell'
 
@@ -63,6 +64,7 @@ export default function App() {
         <Route path="/activities" element={<DashboardLayout />} />
         <Route path="/payments" element={<DashboardLayout />} />
         <Route path="/transactions" element={<DashboardLayout />} />
+        <Route path="/transactions/:id" element={<TransactionDetailPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

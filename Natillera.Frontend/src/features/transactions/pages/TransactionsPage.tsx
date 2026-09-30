@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useNavigate } from 'react-router-dom'
 import { getTransactions, type RealTransaction, type TransactionType } from '@/features/transactions/api/transactionsApi'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatShortCurrency } from '@/shared/lib/formatters'
@@ -16,6 +17,7 @@ const typeBackground: Record<TransactionType, string> = {
 
 export function TransactionsPage() {
   const { session } = useAuth()
+  const navigate = useNavigate()
   const [transactions, setTransactions] = useState<RealTransaction[]>([])
   const [filter, setFilter] = useState<TransactionType | 'all'>('all')
   const [loading, setLoading] = useState(true)
@@ -45,7 +47,7 @@ export function TransactionsPage() {
       <div className="rounded-xl overflow-hidden" style={{ background: '#fff', border: '1px solid #d6e8dc' }}><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>{['Fecha', 'Descripción', 'Miembro', 'Tipo', 'Valor'].map((heading, index) => <th key={heading} className={`px-5 py-3 text-[#4e7460] text-xs font-medium ${index === 4 ? 'text-right' : 'text-left'} ${index === 2 ? 'hidden md:table-cell' : ''}`}>{heading}</th>)}</tr></thead><tbody>
         {loading && <tr><td colSpan={5} className="px-5 py-12 text-center text-[#4e7460]">Cargando transacciones...</td></tr>}
         {!loading && filtered.length === 0 && <tr><td colSpan={5} className="px-5 py-12 text-center text-[#4e7460]">No hay transacciones registradas</td></tr>}
-        {!loading && filtered.map(transaction => <tr key={transaction.id} className="table-row"><td className="px-5 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap">{new Date(transaction.occurredAt).toLocaleDateString('es-CO')}</td><td className="px-4 py-3.5 text-[#0c1a12] max-w-[220px] truncate">{transaction.description}</td><td className="px-4 py-3.5 text-[#4e7460] hidden md:table-cell">{transaction.memberName ?? '—'}</td><td className="px-4 py-3.5"><span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: typeBackground[transaction.type], color: typeColor[transaction.type] }}>{typeLabel[transaction.type]}</span></td><td className={`px-5 py-3.5 text-right mono font-semibold text-sm ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{transaction.direction === 'Expense' ? '−' : '+'}{formatCurrency(transaction.amount)}</td></tr>)}
+        {!loading && filtered.map(transaction => <tr key={transaction.id} onClick={() => navigate(`/transactions/${transaction.id}`)} className="table-row cursor-pointer"><td className="px-5 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap">{new Date(transaction.occurredAt).toLocaleDateString('es-CO')}</td><td className="px-4 py-3.5 text-[#0c1a12] max-w-[220px] truncate">{transaction.description}</td><td className="px-4 py-3.5 text-[#4e7460] hidden md:table-cell">{transaction.memberName ?? '—'}</td><td className="px-4 py-3.5"><span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: typeBackground[transaction.type], color: typeColor[transaction.type] }}>{typeLabel[transaction.type]}</span></td><td className={`px-5 py-3.5 text-right mono font-semibold text-sm ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{transaction.direction === 'Expense' ? '−' : '+'}{formatCurrency(transaction.amount)}</td></tr>)}
       </tbody></table></div></div>
     </div>
   )

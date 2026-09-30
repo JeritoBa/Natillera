@@ -4,4 +4,6 @@ public sealed class TransactionService(ITransactionRepository transactionReposit
 {
     public Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(CancellationToken cancellationToken) =>
         transactionRepository.GetOrderedAsync(cancellationToken);
+
+    public Task<TransactionDetailResponse?> GetDetailAsync(Guid id, CancellationToken cancellationToken) => transactionRepository.GetDetailAsync(id, cancellationToken);
 }
