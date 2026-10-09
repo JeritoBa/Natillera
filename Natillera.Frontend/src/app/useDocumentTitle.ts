@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 
-const appName = 'Natillera Gallego Nanclares'
+export const appName = 'Natillera Gallego Nanclares'
 
 const sectionTitles: Record<string, { list: string, detail?: string }> = {
   login: { list: 'Iniciar sesión' },

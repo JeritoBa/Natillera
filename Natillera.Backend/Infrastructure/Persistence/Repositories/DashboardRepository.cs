@@ -33,7 +33,17 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
             .Select(assignment => assignment.QuantityAssigned * assignment.Activity.UnitCost)
             .SumAsync(cancellationToken);
 
-        var recentTransactions = await GetRecentTransactionsAsync(null, cancellationToken);
+        var loanInterestEarned = await dbContext.Performances
+            .Where(performance => performance.Status == PaymentStatus.Paid)
+            .Select(performance => (decimal?)performance.Amount)
+            .SumAsync(cancellationToken) ?? 0m;
+
+        var realizedActivityEarnings = await PaidAssignments()
+            .Select(assignment => (decimal?)(assignment.QuantityAssigned * (assignment.Activity.UnitSalePrice - assignment.Activity.UnitCost)))
+            .SumAsync(cancellationToken) ?? 0m;
+
+        var recentTransactions = await GetRecentTransactionsAsync(cancellationToken);
+        var topSellers = await GetTopSellersAsync(cancellationToken);
         return new DashboardSummaryResponse(
             nameof(UserRole.Admin),
             availableMoney,
@@ -43,22 +53,17 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
             null,
             null,
             null,
-            recentTransactions);
+            recentTransactions,
+            topSellers,
+            null,
+            loanInterestEarned,
+            realizedActivityEarnings,
+            null,
+            null);
     }
 
     private async Task<DashboardSummaryResponse> GetMemberSummaryAsync(Guid userId, decimal availableMoney, CancellationToken cancellationToken)
     {
-        var monthlyPaymentTransactionIds = dbContext.MonthlyPayments.Where(payment => payment.UserId == userId).Select(payment => payment.TransactionId);
-        var loanTransactionIds = dbContext.Loans.Where(loan => loan.BorrowerId == userId).Select(loan => loan.TransactionId);
-        var loanPaymentTransactionIds = dbContext.LoanPayments.Where(payment => payment.Loan.BorrowerId == userId).Select(payment => payment.TransactionId);
-        var performanceTransactionIds = dbContext.Performances.Where(performance => performance.Loan.BorrowerId == userId && performance.TransactionId != null).Select(performance => performance.TransactionId!.Value);
-        var activityTransactionIds = dbContext.ActivityAssignments.Where(assignment => assignment.UserId == userId && assignment.TransactionId != null).Select(assignment => assignment.TransactionId!.Value);
-        var userTransactionIds = monthlyPaymentTransactionIds
-            .Union(loanTransactionIds)
-            .Union(loanPaymentTransactionIds)
-            .Union(performanceTransactionIds)
-            .Union(activityTransactionIds);
-
         // Same definition as MemberDetailRepository/MemberDetailService (member balance.total).
         var paidMonthlyPayments = await dbContext.MonthlyPayments
             .Where(payment => payment.UserId == userId && payment.Status == PaymentStatus.Paid)
@@ -85,12 +90,11 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
         var mySavings = paidMonthlyPayments + activityEarnings + performanceShare;
         var myEarnings = activityEarnings + performanceShare;
 
-        var now = DateTime.UtcNow;
-        var hasCurrentPayment = await dbContext.MonthlyPayments.AnyAsync(payment =>
-            payment.UserId == userId && payment.Year == now.Year && payment.Month == now.Month && payment.Status == PaymentStatus.Paid,
-            cancellationToken);
+        var pendingPayments = await dbContext.MonthlyPayments
+            .CountAsync(payment => payment.UserId == userId && payment.Status == PaymentStatus.Pending, cancellationToken);
 
-        var recentTransactions = await GetRecentTransactionsAsync(userTransactionIds, cancellationToken);
+        var recentTransactions = await GetRecentTransactionsAsync(cancellationToken);
+        var topSellers = await GetTopSellersAsync(cancellationToken);
         return new DashboardSummaryResponse(
             nameof(UserRole.Member),
             availableMoney,
@@ -99,14 +103,52 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
             null,
             mySavings,
             myEarnings,
-            hasCurrentPayment ? 0 : 1,
-            recentTransactions);
+            pendingPayments,
+            recentTransactions,
+            topSellers,
+            paidMonthlyPayments,
+            null,
+            null,
+            activityEarnings,
+            performanceShare);
     }
 
-    private Task<DashboardTransactionResponse[]> GetRecentTransactionsAsync(IQueryable<Guid>? transactionIds, CancellationToken cancellationToken)
+    private IQueryable<Domain.Entities.ActivityAssignment> PaidAssignments() =>
+        dbContext.ActivityAssignments.Where(assignment =>
+            assignment.Status == AssignmentStatus.Paid && assignment.Activity.Status != ActivityStatus.Cancelled);
+
+    private async Task<TopSellerItem[]> GetTopSellersAsync(CancellationToken cancellationToken)
+    {
+        var totals = await PaidAssignments()
+            .GroupBy(assignment => assignment.UserId)
+            .Select(group => new
+            {
+                UserId = group.Key,
+                UnitsSold = group.Sum(assignment => assignment.QuantityAssigned),
+                Collected = group.Sum(assignment => assignment.QuantityAssigned * assignment.Activity.UnitSalePrice),
+                Earnings = group.Sum(assignment => assignment.QuantityAssigned * (assignment.Activity.UnitSalePrice - assignment.Activity.UnitCost))
+            })
+            .Where(total => total.Earnings != 0m || total.Collected != 0m)
+            .ToListAsync(cancellationToken);
+
+        var userIds = totals.Select(total => total.UserId).ToList();
+        var names = await dbContext.Users
+            .Where(user => userIds.Contains(user.Id))
+            .Select(user => new { user.Id, Name = user.FirstName + " " + user.LastName })
+            .ToDictionaryAsync(user => user.Id, user => user.Name, cancellationToken);
+
+        return totals
+            .Select(total => new TopSellerItem(total.UserId, names.GetValueOrDefault(total.UserId, string.Empty), total.UnitsSold, total.Collected, total.Earnings))
+            .OrderByDescending(item => item.Earnings)
+            .ThenByDescending(item => item.CollectedAmount)
+            .ThenBy(item => item.MemberName, StringComparer.CurrentCultureIgnoreCase)
+            .Take(10)
+            .ToArray();
+    }
+
+    private Task<DashboardTransactionResponse[]> GetRecentTransactionsAsync(CancellationToken cancellationToken)
     {
         var query = dbContext.Transactions.Where(transaction => !transaction.IsCancelled);
-        if (transactionIds is not null) query = query.Where(transaction => transactionIds.Contains(transaction.Id));
 
         return query.OrderByDescending(transaction => transaction.OccurredAt).Take(10)
             .Select(transaction => new DashboardTransactionResponse(

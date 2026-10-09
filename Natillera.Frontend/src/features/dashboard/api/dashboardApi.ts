@@ -23,6 +23,20 @@ export interface DashboardSummary {
   myEarnings: number | null
   pendingPayments: number | null
   recentTransactions: DashboardTransaction[]
+  topSellers: TopSeller[]
+  myPaidMonthlyPayments: number | null
+  loanInterestEarned: number | null
+  activityEarnings: number | null
+  myActivityEarnings: number | null
+  myPerformanceShare: number | null
+}
+
+export interface TopSeller {
+  userId: string
+  memberName: string
+  unitsSold: number
+  collectedAmount: number
+  earnings: number
 }
 
 export const getDashboardSummary = (token: string) =>

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { getDashboardSummary, type DashboardSummary, type DashboardTransactionType } from '@/features/dashboard/api/dashboardApi'
+import { getDashboardSummary, type DashboardSummary } from '@/features/dashboard/api/dashboardApi'
 import { getFriendlyApiError } from '@/shared/api/apiError'
-import { formatCurrency, formatShortCurrency } from '@/shared/lib/formatters'
+import { formatCurrency } from '@/shared/lib/formatters'
 
-const typeLabel: Record<DashboardTransactionType, string> = { MonthlyPayment: 'Cuota mensual', Activity: 'Actividad', ActivitySale: 'Venta', Loan: 'Préstamo', LoanPayment: 'Pago préstamo', Performance: 'Rendimiento' }
-const typeColor: Record<DashboardTransactionType, string> = { MonthlyPayment: '#0a6635', Activity: '#9a6e00', ActivitySale: '#0074b3', Loan: '#c0392b', LoanPayment: '#0a6635', Performance: '#0074b3' }
-const typeBackground: Record<DashboardTransactionType, string> = { MonthlyPayment: '#dcf5e8', Activity: '#fef6dc', ActivitySale: '#ddf0ff', Loan: '#fde8e4', LoanPayment: '#dcf5e8', Performance: '#ddf0ff' }
+const signed = (amount: number) => `${amount < 0 ? '−' : '+'}${formatCurrency(Math.abs(amount))}`
+const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CO')
 
 export function DashboardPage() {
   const { session } = useAuth()
@@ -25,22 +25,90 @@ export function DashboardPage() {
   }, [session])
 
   const isAdmin = session?.user.role === 'Admin'
-  const metrics = isAdmin ? [
-    { label: 'Saldo total', value: summary?.totalNatilleraBalance ?? null, detail: 'Disponible + préstamos + actividades' },
-    { label: 'Dinero disponible', value: summary?.availableMoney ?? null, detail: 'Saldo disponible actual' },
-    { label: 'Dinero prestado', value: summary?.lentMoney ?? null, detail: 'Capital pendiente por recuperar' },
-    { label: 'Invertido en actividades', value: summary?.pendingActivitiesInvestment ?? null, detail: 'Asignaciones pendientes' },
-  ] : [
-    { label: 'Saldo disponible', value: summary?.availableMoney ?? null, detail: 'Saldo actual de la natillera' },
-    { label: 'Mis ahorros', value: summary?.mySavings ?? null, detail: 'Balance neto de mis operaciones' },
-    { label: 'Mis ganancias', value: summary?.myEarnings ?? null, detail: 'Rendimientos pagados' },
-    { label: 'Pagos pendientes', value: summary?.pendingPayments ?? null, detail: 'Cuotas del período actual' },
-  ]
+  const available = summary?.availableMoney ?? 0
+  const sellers = summary?.topSellers ?? []
+  const maxEarnings = Math.max(...sellers.map(seller => seller.earnings), 0)
+  const transactions = (summary?.recentTransactions ?? []).slice(0, 5)
+  const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
+  const rowClass = 'flex justify-between border-t border-[#eef4f0] pt-2'
 
   return <div className="p-6 lg:p-8 max-w-5xl">
-    <div className="mb-7"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">{isAdmin ? 'Resumen de la natillera' : 'Mi resumen'}</h1><p className="text-[#4e7460] text-sm">{isAdmin ? 'Métricas globales y movimientos reales' : 'Tu información financiera y movimientos visibles'}</p></div>
+    <div className="mb-7">
+      <h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">{isAdmin ? 'Resumen de la natillera' : 'Mi resumen'}</h1>
+      <p className="text-[#4e7460] text-sm">{isAdmin ? 'Cuánto dinero hay y cómo se mueve' : 'Cuánto hay en la natillera y cuánto llevas ahorrado'}</p>
+    </div>
     {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
-    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-7">{loading ? [1, 2, 3, 4].map(index => <div key={index} className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-3">Cargando...</p><p className="text-xl font-bold text-[#0c1a12] mono">—</p></div>) : metrics.map(metric => <div key={metric.label} className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-3">{metric.label}</p><p className="text-xl font-bold text-[#0c1a12] mono mb-2">{metric.label === 'Pagos pendientes' ? metric.value : formatShortCurrency(metric.value ?? 0)}</p><p className="text-xs text-[#4e7460]">{metric.detail}</p></div>)}</div>
-    <div className="rounded-xl overflow-hidden" style={{ background: '#fff', border: '1px solid #d6e8dc' }}><div className="px-5 py-3.5 border-b flex items-center justify-between" style={{ borderColor: '#eef4f0' }}><h2 className="font-semibold text-[#0c1a12] text-sm">Movimientos recientes</h2><span className="text-xs text-[#4e7460] mono">{summary?.recentTransactions.length ?? 0} registros</span></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>{['Fecha', 'Descripción', 'Miembro', 'Tipo', 'Valor'].map((heading, index) => <th key={heading} className={`px-5 py-3 text-[#4e7460] text-xs font-medium ${index === 4 ? 'text-right' : 'text-left'} ${index === 2 ? 'hidden md:table-cell' : ''}`}>{heading}</th>)}</tr></thead><tbody>{!loading && (summary?.recentTransactions.length ?? 0) === 0 && <tr><td colSpan={5} className="px-5 py-12 text-center text-[#4e7460]">No hay movimientos registrados</td></tr>}{summary?.recentTransactions.map(transaction => <tr key={transaction.id} className="table-row"><td className="px-5 py-3 text-[#4e7460] mono text-xs whitespace-nowrap">{new Date(transaction.occurredAt).toLocaleDateString('es-CO')}</td><td className="px-4 py-3 text-[#0c1a12] max-w-[180px] truncate">{transaction.description}</td><td className="px-4 py-3 text-[#4e7460] text-sm hidden md:table-cell">{transaction.memberName ?? '—'}</td><td className="px-4 py-3"><span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: typeBackground[transaction.type], color: typeColor[transaction.type] }}>{typeLabel[transaction.type]}</span></td><td className={`px-5 py-3 text-right mono font-semibold text-sm ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{transaction.direction === 'Expense' ? '−' : '+'}{formatCurrency(transaction.amount)}</td></tr>)}</tbody></table></div></div>
+    {!isAdmin && !loading && (summary?.pendingPayments ?? 0) > 0 && <p role="status" className="mb-4 rounded-lg border border-[#f3dc9a] bg-[#fef6dc] px-3 py-2.5 text-sm text-[#9a6e00]">{summary!.pendingPayments === 1 ? 'Tienes 1 cuota pendiente.' : `Tienes ${summary!.pendingPayments} cuotas pendientes.`}</p>}
+    {!error && <div className="flex flex-col gap-4 lg:gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <section aria-labelledby="available-title" aria-busy={loading} className="rounded-xl p-5 lg:p-6 text-white lg:col-span-3" style={{ background: '#0c5c38' }}>
+          <h2 id="available-title" className="text-sm font-medium text-[#cfe8da]">Dinero disponible</h2>
+          <p className="mono font-bold text-3xl md:text-4xl mt-2 break-words">
+            {loading ? '—' : available < 0 ? <><span>−</span><span className="bg-[#fde8e4] text-[#c0392b] px-2 rounded">{formatCurrency(Math.abs(available))}</span></> : formatCurrency(available)}
+          </p>
+          <p className="text-sm text-[#cfe8da] mt-2">Lo que hay hoy en caja para prestar o invertir. No incluye lo prestado ni lo invertido en actividades.</p>
+          {isAdmin && !loading && <div className="border-t border-white/20 mt-4 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><p className="text-xs text-[#cfe8da]">Prestado (por recuperar)</p><p className="mono text-base font-semibold text-white">{formatCurrency(summary?.lentMoney ?? 0)}</p></div>
+            <div><p className="text-xs text-[#cfe8da]">En actividades (por cobrar)</p><p className="mono text-base font-semibold text-white">{formatCurrency(summary?.pendingActivitiesInvestment ?? 0)}</p></div>
+          </div>}
+        </section>
+        <section aria-labelledby="savings-title" aria-busy={loading} className="stat-card rounded-xl p-5 lg:col-span-2" style={{ border: '1px solid #0c5c38' }}>
+          {isAdmin ? <>
+            <h2 id="savings-title" className="text-sm font-semibold text-[#0c1a12]">Rendimiento de la natillera</h2>
+            <p className="mono text-2xl font-bold text-[#0a6635] mt-2 break-words">{loading ? '—' : formatCurrency(summary?.totalNatilleraBalance ?? 0)}</p>
+            <p className="text-xs text-[#4e7460]">Dinero total de la natillera</p>
+            <p className="text-xs text-[#4e7460]">Disponible + prestado + actividades</p>
+            {!loading && <dl className="mt-4 space-y-2 text-sm">
+              <div className={rowClass}><dt><span className="text-[#0c1a12]">Rendimientos de préstamos</span><span className="block text-xs text-[#4e7460]">Intereses pagados</span></dt><dd className="mono text-[#0a6635]">{formatCurrency(summary?.loanInterestEarned ?? 0)}</dd></div>
+              <div className={rowClass}><dt><span className="text-[#0c1a12]">Ganancias de actividades</span><span className="block text-xs text-[#4e7460]">Ventas pagadas</span></dt><dd className="mono text-[#0a6635]">{formatCurrency(summary?.activityEarnings ?? 0)}</dd></div>
+            </dl>}
+          </> : <>
+            <h2 id="savings-title" className="text-sm font-semibold text-[#0c1a12]">Mis ahorros</h2>
+            <p className="mono text-2xl font-bold text-[#0a6635] mt-2 break-words">{loading ? '—' : formatCurrency(summary?.mySavings ?? 0)}</p>
+            <p className="text-xs text-[#4e7460]">Lo que has aportado más lo que has ganado</p>
+            {!loading && <>
+              <dl className="mt-4 space-y-2 text-sm">
+                <div className={rowClass}><dt className="text-[#0c1a12]">Cuotas pagadas</dt><dd className="mono text-[#0c1a12]">{formatCurrency(summary?.myPaidMonthlyPayments ?? 0)}</dd></div>
+                <div className={rowClass}><dt><span className="text-[#0c1a12]">Ganancia en actividades</span><span className="block text-xs text-[#4e7460]">Ventas de actividades</span></dt><dd className="mono text-[#0a6635]">{formatCurrency(summary?.myActivityEarnings ?? 0)}</dd></div>
+                <div className={rowClass}><dt><span className="text-[#0c1a12]">Rendimientos</span><span className="block text-xs text-[#4e7460]">Tu parte de los intereses de préstamos</span></dt><dd className="mono text-[#0a6635]">{formatCurrency(summary?.myPerformanceShare ?? 0)}</dd></div>
+              </dl>
+              {(summary?.mySavings ?? 0) === 0 && <p className="mt-3 text-xs text-[#4e7460]">Aún no tienes cuotas pagadas.</p>}
+            </>}
+          </>}
+        </section>
+      </div>
+
+      <section aria-labelledby="ranking-title" aria-busy={loading} className="rounded-xl overflow-hidden" style={cardStyle}>
+        <div className="px-5 py-3.5 border-b" style={{ borderColor: '#eef4f0' }}>
+          <h2 id="ranking-title" className="font-semibold text-[#0c1a12] text-sm">Top 10 de ventas</h2>
+          <p className="text-xs text-[#4e7460]">Ganancia de cada miembro en ventas pagadas</p>
+        </div>
+        {loading ? <p className="px-5 py-10 text-center text-sm text-[#4e7460]">Cargando ranking...</p>
+          : sellers.length === 0 ? <p className="px-5 py-10 text-center text-sm text-[#4e7460]">Todavía no hay ventas pagadas. Cuando se registre el pago de una venta, aparecerá aquí.</p>
+          : <ol className="divide-y divide-[#eef4f0]">{sellers.map((seller, index) => <li key={seller.userId} className="flex items-center gap-3 px-5 py-3 min-h-[56px]">
+            <span className={`w-8 h-8 rounded-full flex items-center justify-center mono text-sm font-bold flex-shrink-0 ${index < 3 ? 'bg-[#0c5c38] text-white' : 'bg-[#eef4f0] text-[#4e7460]'}`}><span className="sr-only">Puesto </span>{index + 1}</span>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm text-[#0c1a12] truncate ${index < 3 ? 'font-semibold' : ''}`}>{seller.memberName}</p>
+              <p className="text-xs text-[#4e7460]">{`${seller.unitsSold} unidades · Recaudado ${formatCurrency(seller.collectedAmount)}`}</p>
+              <div aria-hidden="true" className="h-1 rounded bg-[#eef4f0] mt-1.5"><div className="h-1 rounded bg-[#0c5c38]" style={{ width: `${maxEarnings > 0 ? Math.max(0, Math.min(100, (seller.earnings / maxEarnings) * 100)) : 0}%` }} /></div>
+            </div>
+            <p className="mono text-sm font-semibold text-[#0a6635] text-right whitespace-nowrap">{formatCurrency(seller.earnings)}</p>
+          </li>)}</ol>}
+      </section>
+
+      <section aria-labelledby="recent-title" aria-busy={loading} className="rounded-xl overflow-hidden" style={cardStyle}>
+        <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: '#eef4f0' }}>
+          <h2 id="recent-title" className="text-sm font-semibold text-[#4e7460]">Movimientos recientes</h2>
+          <Link to="/transactions" className="inline-flex items-center min-h-10 px-2 text-sm text-[#0a6635] underline rounded focus-visible:outline-2 focus-visible:outline-[#0c5c38]">Ver todos los movimientos</Link>
+        </div>
+        {loading ? <p className="px-5 py-10 text-center text-sm text-[#4e7460]">Cargando movimientos...</p>
+          : transactions.length === 0 ? <p className="px-5 py-10 text-center text-sm text-[#4e7460]">Aún no hay movimientos registrados</p>
+          : <table className="w-full text-sm"><tbody>{transactions.map(transaction => <tr key={transaction.id} className="table-row">
+            <td className="px-5 py-2.5 mono text-xs text-[#4e7460] whitespace-nowrap hidden sm:table-cell">{formatDate(transaction.occurredAt)}</td>
+            <td className="px-5 py-2.5"><p className="text-[#0c1a12] truncate max-w-[260px]">{transaction.description}</p><p className="text-xs text-[#4e7460]"><span className="sm:hidden">{formatDate(transaction.occurredAt)}{transaction.memberName ? ' · ' : ''}</span>{transaction.memberName}</p></td>
+            <td className={`px-5 py-2.5 text-right mono font-semibold whitespace-nowrap ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{signed(transaction.direction === 'Expense' ? -transaction.amount : transaction.amount)}</td>
+          </tr>)}</tbody></table>}
+      </section>
+    </div>}
   </div>
 }

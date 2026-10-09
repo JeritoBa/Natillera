@@ -64,7 +64,7 @@ export function MembersPage() {
           {!loading && members.map(member => <tr key={member.id} className="table-row">
             <td className="px-5 py-3.5"><span className="font-medium text-[#0c1a12]">{member.firstName} {member.lastName}</span></td>
             <td className="px-4 py-3.5 text-[#4e7460]">{member.email}</td><td className="px-4 py-3.5 text-[#4e7460] mono text-xs">{member.phone}</td>
-            <td className="px-4 py-3.5"><Badge status={member.isActive ? 'active' : 'cancelled'} /></td>
+            <td className="px-4 py-3.5"><Badge status={member.isActive ? 'active' : 'inactive'} /></td>
             {canManage && <td className="px-5 py-3.5 text-right"><div className="flex justify-end gap-1"><button onClick={() => navigate(`/members/${member.id}`)} className="btn-ghost p-1.5 rounded-md" aria-label="Ver detalle del miembro"><Icon.Eye open /></button><button onClick={() => openEdit(member)} className="btn-ghost p-1.5 rounded-md" aria-label="Editar miembro"><Icon.Edit /></button><button onClick={() => { if (window.confirm(`${member.isActive ? 'Desactivar' : 'Activar'} a ${member.firstName} ${member.lastName}?`)) void toggleStatus(member) }} className={member.isActive ? 'btn-danger p-1.5 rounded-md' : 'btn-ghost p-1.5 rounded-md'} aria-label={member.isActive ? 'Desactivar miembro' : 'Activar miembro'}><Icon.Check /></button></div></td>}
           </tr>)}
         </tbody></table></div>

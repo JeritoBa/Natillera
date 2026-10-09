@@ -11,7 +11,20 @@ public sealed record DashboardSummaryResponse(
     decimal? MySavings,
     decimal? MyEarnings,
     int? PendingPayments,
-    IReadOnlyCollection<DashboardTransactionResponse> RecentTransactions);
+    IReadOnlyCollection<DashboardTransactionResponse> RecentTransactions,
+    IReadOnlyCollection<TopSellerItem> TopSellers,
+    decimal? MyPaidMonthlyPayments,
+    decimal? LoanInterestEarned,
+    decimal? ActivityEarnings,
+    decimal? MyActivityEarnings,
+    decimal? MyPerformanceShare);
+
+public sealed record TopSellerItem(
+    Guid UserId,
+    string MemberName,
+    int UnitsSold,
+    decimal CollectedAmount,
+    decimal Earnings);
 
 public sealed record DashboardTransactionResponse(
     Guid Id,
