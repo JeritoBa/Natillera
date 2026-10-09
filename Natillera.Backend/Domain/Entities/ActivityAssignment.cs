@@ -9,7 +9,7 @@ public class ActivityAssignment
     {
     }
 
-    public ActivityAssignment(int quantityAssigned, Guid activityId, Guid userId, Guid transactionId)
+    public ActivityAssignment(int quantityAssigned, Guid activityId, Guid userId)
     {
         if (quantityAssigned <= 0)
             throw new DomainException("Assigned quantity must be greater than zero.");
@@ -20,7 +20,7 @@ public class ActivityAssignment
         Status = AssignmentStatus.Pending;
         ActivityId = activityId;
         UserId = userId;
-        TransactionId = transactionId;
+        TransactionId = null;
     }
 
     public Guid Id { get; private set; }
@@ -30,17 +30,36 @@ public class ActivityAssignment
     public DateTime? PaidAt { get; private set; }
     public Guid ActivityId { get; private set; }
     public Guid UserId { get; private set; }
-    public Guid TransactionId { get; private set; }
+    public Guid? TransactionId { get; private set; }
     public Activity Activity { get; private set; } = null!;
     public User User { get; private set; } = null!;
-    public Transaction Transaction { get; private set; } = null!;
+    public Transaction? Transaction { get; private set; }
 
-    public void MarkAsPaid()
+    public void MarkAsPaid(Guid transactionId)
     {
         if (Status != AssignmentStatus.Pending)
             throw new DomainException("Only pending assignments can be marked as paid.");
 
         Status = AssignmentStatus.Paid;
         PaidAt = DateTime.UtcNow;
+        TransactionId = transactionId;
+    }
+
+    public void UpdateQuantity(int quantity)
+    {
+        if (Status != AssignmentStatus.Pending)
+            throw new DomainException("Only pending assignments can be modified.");
+        if (quantity <= 0)
+            throw new DomainException("Assigned quantity must be greater than zero.");
+
+        QuantityAssigned = quantity;
+    }
+
+    public void Cancel()
+    {
+        if (Status == AssignmentStatus.Cancelled)
+            throw new DomainException("Activity assignment is already cancelled.");
+
+        Status = AssignmentStatus.Cancelled;
     }
 }

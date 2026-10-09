@@ -14,12 +14,7 @@ public class Activity
     public Activity(string name, string description, int quantity, decimal unitCost, decimal unitSalePrice,
         DateTime startDate, Guid transactionId)
     {
-        if (string.IsNullOrWhiteSpace(name) || name.Length > 100)
-            throw new DomainException("Activity name is required and must not exceed 100 characters.");
-        if (string.IsNullOrWhiteSpace(description) || description.Length > 200)
-            throw new DomainException("Activity description is required and must not exceed 200 characters.");
-        if (quantity <= 0 || unitCost <= 0 || unitSalePrice <= 0)
-            throw new DomainException("Activity quantities and prices must be greater than zero.");
+        Validate(name, description, quantity, unitCost, unitSalePrice);
 
         Id = Guid.NewGuid();
         Name = name.Trim();
@@ -46,17 +41,79 @@ public class Activity
     public Transaction Transaction { get; private set; } = null!;
     public IReadOnlyCollection<ActivityAssignment> Assignments => _assignments;
 
-    public void EnsureQuantityAvailable(int quantity)
+    public decimal TotalCost() => Quantity * UnitCost;
+
+    public int AssignedQuantity() => _assignments
+        .Where(assignment => assignment.Status != AssignmentStatus.Cancelled)
+        .Sum(assignment => assignment.QuantityAssigned);
+
+    public int AvailableQuantity() => Quantity - AssignedQuantity();
+
+    public void EnsureQuantityAvailable(int quantity, int previousQuantity = 0)
     {
+        EnsureNotCancelled();
         if (quantity <= 0)
             throw new DomainException("Assigned quantity must be greater than zero.");
 
-        var assignedQuantity = _assignments
-            .Where(assignment => assignment.Status != AssignmentStatus.Cancelled)
-            .Sum(assignment => assignment.QuantityAssigned);
-
-        if (assignedQuantity + quantity > Quantity)
+        if (AssignedQuantity() - previousQuantity + quantity > Quantity)
             throw new DomainException("The assigned quantity cannot exceed the activity quantity.");
+    }
+
+    public void UpdateDetails(string name, string description, int quantity, decimal unitCost, decimal unitSalePrice,
+        DateTime startDate)
+    {
+        EnsureNotCancelled();
+        Validate(name, description, quantity, unitCost, unitSalePrice);
+
+        if (quantity < AssignedQuantity())
+            throw new DomainException("Activity quantity cannot be lower than the assigned quantity.");
+        if (unitSalePrice != UnitSalePrice && _assignments.Any(assignment => assignment.Status == AssignmentStatus.Paid))
+            throw new DomainException("Unit sale price cannot change because there are paid assignments.");
+
+        Name = name.Trim();
+        Description = description.Trim();
+        Quantity = quantity;
+        UnitCost = unitCost;
+        UnitSalePrice = unitSalePrice;
+        StartDate = startDate.Date;
+    }
+
+    public ActivityAssignment AddAssignment(int quantity, Guid userId)
+    {
+        EnsureNotCancelled();
+        if (_assignments.Any(assignment => assignment.UserId == userId && assignment.Status != AssignmentStatus.Cancelled))
+            throw new DomainException("Member already has an assignment in this activity.");
+
+        EnsureQuantityAvailable(quantity);
+        var assignment = new ActivityAssignment(quantity, Id, userId);
+        _assignments.Add(assignment);
+        return assignment;
+    }
+
+    public void UpdateAssignmentQuantity(ActivityAssignment assignment, int quantity)
+    {
+        EnsureQuantityAvailable(quantity, assignment.QuantityAssigned);
+        assignment.UpdateQuantity(quantity);
+    }
+
+    public void Cancel()
+    {
+        if (Status == ActivityStatus.Cancelled)
+            throw new DomainException("Activity is already cancelled.");
+        if (_assignments.Any(assignment => assignment.Status != AssignmentStatus.Cancelled))
+            throw new DomainException("Activity cannot be cancelled because it has active assignments.");
+
+        Status = ActivityStatus.Cancelled;
+    }
+
+    public void RefreshStatus()
+    {
+        if (Status == ActivityStatus.Cancelled) return;
+
+        var active = _assignments.Where(assignment => assignment.Status != AssignmentStatus.Cancelled).ToArray();
+        Status = active.Length > 0 && active.All(assignment => assignment.Status == AssignmentStatus.Paid)
+            ? ActivityStatus.Finished
+            : ActivityStatus.Pending;
     }
 
     public void Finish()
@@ -65,5 +122,23 @@ public class Activity
             throw new DomainException("An activity cannot be finished while an assignment is pending.");
 
         Status = ActivityStatus.Finished;
+    }
+
+    private void EnsureNotCancelled()
+    {
+        if (Status == ActivityStatus.Cancelled)
+            throw new DomainException("Cancelled activities cannot be modified.");
+    }
+
+    private static void Validate(string name, string description, int quantity, decimal unitCost, decimal unitSalePrice)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 100)
+            throw new DomainException("Activity name is required and must not exceed 100 characters.");
+        if (string.IsNullOrWhiteSpace(description) || description.Length > 200)
+            throw new DomainException("Activity description is required and must not exceed 200 characters.");
+        if (quantity <= 0 || unitCost <= 0 || unitSalePrice <= 0)
+            throw new DomainException("Activity quantities and prices must be greater than zero.");
+        if (unitSalePrice < unitCost)
+            throw new DomainException("Unit sale price must be greater than or equal to unit cost.");
     }
 }

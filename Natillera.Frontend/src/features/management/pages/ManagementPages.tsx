@@ -1,30 +1,10 @@
 import { useState } from 'react'
-import type { Activity, Payment, Transaction } from '@/shared/model/types'
-import { activities, payments, transactions } from '@/shared/data/mockData'
+import type { Payment, Transaction } from '@/shared/model/types'
+import { payments, transactions } from '@/shared/data/mockData'
 import { formatCurrency, formatShortCurrency } from '@/shared/lib/formatters'
 import { CrudPage, type CrudConfig } from '@/shared/components/CrudPage'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
-
-export function ActivitiesPage() {
-  const config: CrudConfig<Activity> = {
-    title: 'Actividades', subtitle: 'Eventos, reuniones y acuerdos de la natillera',
-    emptyItem: { date: '', description: '', type: 'Reunión', amount: 0, status: 'pending' },
-    formFields: [
-      { name: 'date', label: 'Fecha', type: 'date' }, { name: 'description', label: 'Descripción', type: 'text' },
-      { name: 'type', label: 'Tipo', type: 'select', options: ['Reunión', 'Aprobación', 'Distribución', 'Administrativa'] },
-      { name: 'amount', label: 'Monto asociado ($)', type: 'number' }, { name: 'status', label: 'Estado', type: 'select', options: ['pending', 'completed', 'cancelled'] },
-    ],
-    columns: [
-      { label: 'Fecha', render: row => <span className="text-[#4e7460] mono text-xs">{row.date}</span> },
-      { label: 'Descripción', render: row => <span className="text-[#0c1a12]">{row.description}</span> },
-      { label: 'Tipo', render: row => <span className="badge-neutral px-2 py-0.5 rounded uppercase">{row.type}</span> },
-      { label: 'Monto', render: row => <span className="mono text-[#4e7460]">{row.amount > 0 ? formatCurrency(row.amount) : '—'}</span>, align: 'right' },
-      { label: 'Estado', render: row => <Badge status={row.status} /> },
-    ],
-  }
-  return <CrudPage data={activities} config={config} />
-}
 
 export function PaymentsPage() {
   const paid = payments.filter(payment => payment.status === 'paid')

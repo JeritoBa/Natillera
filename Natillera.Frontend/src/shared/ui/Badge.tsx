@@ -1,11 +1,11 @@
 export function Badge({ status }: { status: string }) {
   const cls: Record<string, string> = {
-    paid: 'badge-positive', active: 'badge-positive', completed: 'badge-positive', income: 'badge-positive',
+    paid: 'badge-positive', finished: 'badge-positive', active: 'badge-positive', completed: 'badge-positive', income: 'badge-positive',
     pending: 'badge-pending',
     overdue: 'badge-negative', cancelled: 'badge-negative', expense: 'badge-negative',
   }
   const label: Record<string, string> = {
-    paid: 'Pagado', active: 'Activo', completed: 'Completado', income: 'Ingreso',
+    paid: 'Pagado', finished: 'Cerrada', active: 'Activo', completed: 'Completado', income: 'Ingreso',
     pending: 'Pendiente',
     overdue: 'Vencido', cancelled: 'Cancelado', expense: 'Egreso',
   }

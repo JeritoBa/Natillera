@@ -7,7 +7,9 @@ import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
 import { LandingPage } from '@/features/landing/pages/LandingPage'
 import { MembersPage } from '@/features/members/pages/MembersPage'
 import { MemberDetailPage } from '@/features/members/pages/MemberDetailPage'
-import { ActivitiesPage } from '@/features/management/pages/ManagementPages'
+import { ActivitiesPage } from '@/features/activities/pages/ActivitiesPage'
+import { ActivityDetailPage } from '@/features/activities/pages/ActivityDetailPage'
+import { ActivityAssignmentDetailPage } from '@/features/activities/pages/ActivityAssignmentDetailPage'
 import { LoansPage } from '@/features/loans/pages/LoansPage'
 import { LoanDetailPage } from '@/features/loans/pages/LoanDetailPage'
 import { LoanPaymentDetailPage } from '@/features/loans/pages/LoanPaymentDetailPage'
@@ -68,6 +70,8 @@ export default function App() {
           <Route path="/loans/:loanId/payments/:paymentId" element={<LoanPaymentDetailPage />} />
           <Route path="/loans/:loanId/interest-payments/:interestId" element={<InterestPaymentDetailPage />} />
           <Route path="/activities" element={<ActivitiesPage />} />
+          <Route path="/activities/:id" element={<ActivityDetailPage />} />
+          <Route path="/activities/:activityId/assignments/:assignmentId" element={<ActivityAssignmentDetailPage />} />
           <Route path="/payments" element={<MonthlyPaymentsPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/transactions/:id" element={<TransactionDetailPage />} />

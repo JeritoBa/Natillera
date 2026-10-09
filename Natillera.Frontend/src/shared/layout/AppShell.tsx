@@ -20,7 +20,7 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
     { id: 'dashboard', label: 'Dashboard', Icon: Icon.Dashboard, disabled: false },
     { id: 'members', label: 'Miembros', Icon: Icon.Members, disabled: false },
     { id: 'payments', label: 'Cuotas', Icon: Icon.Payments, disabled: false },
-    { id: 'activities', label: 'Actividades', Icon: Icon.Activities, disabled: true },
+    { id: 'activities', label: 'Actividades', Icon: Icon.Activities, disabled: false },
     { id: 'loans', label: 'Préstamos', Icon: Icon.Loans, disabled: false },
     { id: 'transactions', label: 'Transacciones', Icon: Icon.Transactions, disabled: false },
     { id: 'logs', label: 'Logs', Icon: Icon.Logs, disabled: false },

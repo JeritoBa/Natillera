@@ -1,6 +1,6 @@
 import { apiRequest } from '@/shared/api/apiClient'
 
-export type LogEntityType = 'MonthlyPayment' | 'Activity' | 'ActivitySale' | 'Loan' | 'LoanPayment' | 'Performance' | 'Transaction'
+export type LogEntityType = 'MonthlyPayment' | 'Activity' | 'ActivityAssignment' | 'Loan' | 'LoanPayment' | 'Performance' | 'Transaction'
 export type LogAction = 'Create' | 'Update' | 'Delete'
 
 export interface LogListItem {
