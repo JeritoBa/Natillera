@@ -1,0 +1,200 @@
+using Natillera.Backend.Application.Activities;
+using Natillera.Backend.Application.Audit;
+using Natillera.Backend.Application.Common;
+using Natillera.Backend.Application.Loans;
+using Natillera.Backend.Application.MonthlyPayments;
+using Natillera.Backend.Application.Security;
+using Natillera.Backend.Application.Transactions;
+using Natillera.Backend.Application.Users;
+using Natillera.Backend.Domain.Entities;
+
+namespace Natillera.Backend.Tests.Fakes;
+
+public sealed class FakeUnitOfWork : IUnitOfWork
+{
+    public int Executions { get; private set; }
+
+    public async Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken = default)
+    {
+        Executions++;
+        await operation(cancellationToken);
+    }
+}
+
+public sealed class FakeLogRepository : ILogRepository
+{
+    public List<Log> Logs { get; } = [];
+
+    public Task AddAsync(Log log, CancellationToken cancellationToken = default)
+    {
+        Logs.Add(log);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyCollection<LogListItem>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<LogDetailResponse?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+}
+
+public sealed class FakeTransactionRepository : ITransactionRepository
+{
+    public List<Transaction> Transactions { get; } = [];
+
+    public Task AddAsync(Transaction transaction, CancellationToken cancellationToken = default)
+    {
+        Transactions.Add(transaction);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<TransactionDetailResponse?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+}
+
+public sealed class FakeUserRepository : IUserRepository
+{
+    public Dictionary<Guid, User> Users { get; } = [];
+    public MemberPendingObligations Pending { get; set; } = new(0, 0, 0, 0);
+    public int SaveCount { get; private set; }
+
+    public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Users.Values.FirstOrDefault(u => u.Email == email));
+
+    public Task<List<User>> GetMembersAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Users.Values.ToList());
+
+    public Task<User?> GetMemberByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Users.GetValueOrDefault(id));
+
+    public Task<bool> EmailExistsAsync(string email, Guid? excludedUserId = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Users.Values.Any(u => u.Email == email && u.Id != excludedUserId));
+
+    public Task<bool> IsActiveUserAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Users.TryGetValue(id, out var u) && u.IsActive);
+
+    public Task<MemberPendingObligations> GetPendingObligationsAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Pending);
+
+    public Task AddAsync(User user, CancellationToken cancellationToken = default)
+    {
+        Users[user.Id] = user;
+        return Task.CompletedTask;
+    }
+
+    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        SaveCount++;
+        return Task.CompletedTask;
+    }
+
+    public User AddUser(bool active = true, string email = "juan@test.com")
+    {
+        var user = new User("Juan", "Perez", email, "hashed:secret123", "3001234567");
+        if (!active) user.Deactivate();
+        Users[user.Id] = user;
+        return user;
+    }
+}
+
+public sealed class FakeMonthlyPaymentRepository : IMonthlyPaymentRepository
+{
+    public List<MonthlyPayment> Payments { get; } = [];
+
+    public Task<bool> ExistsAsync(Guid userId, int year, int month, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Payments.Any(p => p.UserId == userId && p.Year == year && p.Month == month
+            && p.Status != Natillera.Backend.Domain.Enums.PaymentStatus.Cancelled));
+
+    public Task<MonthlyPayment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Payments.FirstOrDefault(p => p.Id == id));
+
+    public Task<bool> ExistsForAnotherPaymentAsync(Guid userId, int year, int month, Guid paymentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Payments.Any(p => p.UserId == userId && p.Year == year && p.Month == month && p.Id != paymentId
+            && p.Status != Natillera.Backend.Domain.Enums.PaymentStatus.Cancelled));
+
+    public Task AddAsync(MonthlyPayment payment, CancellationToken cancellationToken = default)
+    {
+        Payments.Add(payment);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyCollection<MonthlyPaymentListItem>> GetOrderedAsync(bool includeNonPaid, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+}
+
+public sealed class FakeLoanRepository : ILoanRepository
+{
+    public List<Loan> Loans { get; } = [];
+    public List<LoanPayment> AddedPayments { get; } = [];
+    public List<Performance> AddedPerformances { get; } = [];
+
+    public Task<IReadOnlyCollection<LoanListData>> GetListAsync(CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<Loan?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Loans.FirstOrDefault(l => l.Id == id));
+
+    public Task<Loan?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Loans.FirstOrDefault(l => l.Id == id));
+
+    public Task AddAsync(Loan loan, CancellationToken cancellationToken = default)
+    {
+        Loans.Add(loan);
+        return Task.CompletedTask;
+    }
+
+    public Task AddPaymentAsync(LoanPayment payment, CancellationToken cancellationToken = default)
+    {
+        AddedPayments.Add(payment);
+        return Task.CompletedTask;
+    }
+
+    public Task AddPerformanceAsync(Performance performance, CancellationToken cancellationToken = default)
+    {
+        AddedPerformances.Add(performance);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FakeActivityRepository : IActivityRepository
+{
+    public List<Activity> Activities { get; } = [];
+    public List<ActivityAssignment> AddedAssignments { get; } = [];
+
+    public Task<IReadOnlyCollection<ActivityListData>> GetListAsync(CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public Task<Activity?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Activities.FirstOrDefault(a => a.Id == id));
+
+    public Task<Activity?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Activities.FirstOrDefault(a => a.Id == id));
+
+    public Task AddAsync(Activity activity, CancellationToken cancellationToken = default)
+    {
+        Activities.Add(activity);
+        return Task.CompletedTask;
+    }
+
+    public Task AddAssignmentAsync(ActivityAssignment assignment, CancellationToken cancellationToken = default)
+    {
+        AddedAssignments.Add(assignment);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FakePasswordHasher : IPasswordHasher
+{
+    public string Hash(string password) => "hashed:" + password;
+    public bool Verify(string password, string passwordHash) => passwordHash == "hashed:" + password;
+}
+
+public sealed class FakeJwtTokenGenerator : IJwtTokenGenerator
+{
+    public static readonly DateTime Expiry = new(2030, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+    public JwtToken Generate(Guid userId, string email, string role) => new($"token:{userId}:{email}:{role}", Expiry);
+}
