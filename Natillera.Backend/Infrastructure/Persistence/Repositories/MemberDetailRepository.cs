@@ -41,7 +41,7 @@ public sealed class MemberDetailRepository(NatilleraDbContext dbContext) : IMemb
             .ToArrayAsync(cancellationToken);
 
         // Same linkage criteria as DashboardRepository.GetMemberSummaryAsync.
-        var userTransactionIds = dbContext.MonthlyPayments.Where(payment => payment.UserId == memberId).Select(payment => payment.TransactionId)
+        var userTransactionIds = dbContext.MonthlyPayments.Where(payment => payment.UserId == memberId && payment.TransactionId != null).Select(payment => payment.TransactionId!.Value)
             .Union(dbContext.Loans.Where(loan => loan.BorrowerId == memberId).Select(loan => loan.TransactionId))
             .Union(dbContext.LoanPayments.Where(payment => payment.Loan.BorrowerId == memberId).Select(payment => payment.TransactionId))
             .Union(dbContext.Performances.Where(performance => performance.Loan.BorrowerId == memberId && performance.TransactionId != null).Select(performance => performance.TransactionId!.Value))

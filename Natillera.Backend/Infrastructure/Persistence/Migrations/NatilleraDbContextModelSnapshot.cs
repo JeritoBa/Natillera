@@ -252,7 +252,7 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.Property<int>("Month")
                         .HasColumnType("integer");
 
-                    b.Property<DateTime>("PaidAt")
+                    b.Property<DateTime?>("PaidAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
@@ -260,7 +260,7 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<Guid>("TransactionId")
+                    b.Property<Guid?>("TransactionId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("UserId")
@@ -275,7 +275,8 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.HasIndex("UserId", "Year", "Month")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"Status\" <> 'Cancelled'");
 
                     b.ToTable("monthly_payments", (string)null);
                 });
@@ -501,8 +502,7 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.HasOne("Natillera.Backend.Domain.Entities.Transaction", "Transaction")
                         .WithOne()
                         .HasForeignKey("Natillera.Backend.Domain.Entities.MonthlyPayment", "TransactionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Natillera.Backend.Domain.Entities.User", "User")
                         .WithMany("MonthlyPayments")

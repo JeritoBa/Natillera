@@ -16,6 +16,9 @@ public sealed class CreateMonthlyPaymentRequest
 
     [Range(0.01, double.MaxValue)]
     public decimal Amount { get; init; }
+
+    [Required]
+    public PaymentStatus? Status { get; init; }
 }
 
 public sealed class UpdateMonthlyPaymentRequest
@@ -31,16 +34,19 @@ public sealed class UpdateMonthlyPaymentRequest
 
     [Range(0.01, double.MaxValue)]
     public decimal Amount { get; init; }
+
+    [Required]
+    public PaymentStatus? Status { get; init; }
 }
 
 public sealed record MonthlyPaymentResponse(
     Guid Id,
     Guid UserId,
-    Guid TransactionId,
+    Guid? TransactionId,
     decimal Amount,
     int Year,
     int Month,
-    DateTime PaidAt,
+    DateTime? PaidAt,
     PaymentStatus Status,
     string MemberName);
 
@@ -49,10 +55,10 @@ public sealed record MonthlyPaymentOptions(decimal MinimumAmount);
 public sealed record MonthlyPaymentListItem(
     Guid Id,
     Guid UserId,
-    Guid TransactionId,
+    Guid? TransactionId,
     decimal Amount,
     int Year,
     int Month,
-    DateTime PaidAt,
+    DateTime? PaidAt,
     PaymentStatus Status,
     string MemberName);

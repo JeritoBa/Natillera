@@ -14,7 +14,7 @@ public sealed record MemberInfoResponse(Guid Id, string FirstName, string LastNa
 public sealed record MemberBalanceResponse(decimal Savings, decimal ActivityEarnings, decimal PerformanceEarnings, decimal Total);
 
 public sealed record MemberPendingPaymentResponse(Guid Id, int Year, int Month, decimal Amount, PaymentStatus Status,
-    DateTime CreatedAt, Guid TransactionId);
+    DateTime CreatedAt, Guid? TransactionId);
 
 public sealed record MemberTransactionResponse(Guid Id, decimal Amount, TransactionDirection Direction,
     TransactionType Type, DateTime OccurredAt, string Description);

@@ -1,25 +1,28 @@
 import { apiRequest } from '@/shared/api/apiClient'
 
+export type MonthlyPaymentStatus = 'Pending' | 'Paid' | 'Cancelled'
+
 export interface CreateMonthlyPaymentRequest {
   userId: string
   year: number
   month: number
   amount: number
+  status: 'Pending' | 'Paid'
 }
 
 export interface MonthlyPaymentResponse {
   id: string
   userId: string
-  transactionId: string
+  transactionId: string | null
   amount: number
   year: number
   month: number
-  paidAt: string
-  status: string
+  paidAt: string | null
+  status: MonthlyPaymentStatus
   memberName: string
 }
 
-export const getPaidMonthlyPayments = (token: string) =>
+export const getMonthlyPayments = (token: string) =>
   apiRequest<MonthlyPaymentResponse[]>('/api/monthly-payments', { token })
 
 export function createMonthlyPayment(token: string, request: CreateMonthlyPaymentRequest) {
@@ -37,3 +40,6 @@ export function updateMonthlyPayment(token: string, id: string, request: CreateM
     body: JSON.stringify(request),
   })
 }
+
+export const cancelMonthlyPayment = (token: string, id: string) =>
+  apiRequest<void>(`/api/monthly-payments/${id}`, { method: 'DELETE', token })

@@ -95,17 +95,17 @@ Performance
 MonthlyPayment
 - id
 - amount DECIMAL
-- paid_at DATETIME
+- paid_at DATETIME POSSIBLE NULL
 - year INT
 - month INT
 - status ENUM('pending', 'paid', 'cancelled')
 - created_at DATETIME DEFAULT now()
-- transaction_id FK WITH Transaction
+- transaction_id FK WITH Transaction POSSIBLE NULL
 - user_id FK WITH User
 
 Too, create index for the following entities:
 - User.email UNIQUE
-- MonthlyPayment(user_id, year, month) UNIQUE
+- MonthlyPayment(user_id, year, month) UNIQUE WHERE status <> 'cancelled'
 - LoanPayment.loan_id
 - Performance.loan_id
 - ActivityAssignment.activity_id

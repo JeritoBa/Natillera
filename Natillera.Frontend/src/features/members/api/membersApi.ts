@@ -28,7 +28,7 @@ export interface MemberPendingPayment {
   amount: number
   status: string
   createdAt: string
-  transactionId: string
+  transactionId: string | null
 }
 
 export interface MemberTransaction {

@@ -9,48 +9,62 @@ public class MonthlyPayment
     {
     }
 
-    public MonthlyPayment(decimal amount, int year, int month, Guid userId, Guid transactionId)
+    public MonthlyPayment(decimal amount, int year, int month, Guid userId)
     {
         ValidatePeriod(year, month);
         ValidateAmount(amount);
         Id = Guid.NewGuid();
         Amount = amount;
-        PaidAt = DateTime.UtcNow;
         Year = year;
         Month = month;
-        Status = PaymentStatus.Paid;
+        Status = PaymentStatus.Pending;
+        PaidAt = null;
         CreatedAt = DateTime.UtcNow;
+        TransactionId = null;
         UserId = userId;
-        TransactionId = transactionId;
     }
 
     public Guid Id { get; private set; }
     public decimal Amount { get; private set; }
-    public DateTime PaidAt { get; private set; }
+    public DateTime? PaidAt { get; private set; }
     public int Year { get; private set; }
     public int Month { get; private set; }
     public PaymentStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
-    public Guid TransactionId { get; private set; }
+    public Guid? TransactionId { get; private set; }
     public Guid UserId { get; private set; }
     public User User { get; private set; } = null!;
-    public Transaction Transaction { get; private set; } = null!;
+    public Transaction? Transaction { get; private set; }
 
-    public void Update(decimal amount, PaymentStatus status)
+    public void MarkAsPaid(Guid transactionId)
     {
-        ValidateAmount(amount);
-        Amount = amount;
-        Status = status;
+        if (Status != PaymentStatus.Pending)
+            throw new DomainException("Only pending monthly payments can be marked as paid.");
+
+        Status = PaymentStatus.Paid;
+        PaidAt = DateTime.UtcNow;
+        TransactionId = transactionId;
     }
 
     public void UpdateDetails(decimal amount, int year, int month, Guid userId)
     {
+        if (Status == PaymentStatus.Cancelled)
+            throw new DomainException("Cancelled monthly payments cannot be modified.");
+
         ValidatePeriod(year, month);
         ValidateAmount(amount);
         Amount = amount;
         Year = year;
         Month = month;
         UserId = userId;
+    }
+
+    public void Cancel()
+    {
+        if (Status == PaymentStatus.Cancelled)
+            throw new DomainException("Monthly payment is already cancelled.");
+
+        Status = PaymentStatus.Cancelled;
     }
 
     private static void ValidateAmount(decimal amount)

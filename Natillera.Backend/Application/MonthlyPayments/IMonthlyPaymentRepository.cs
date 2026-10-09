@@ -8,5 +8,5 @@ public interface IMonthlyPaymentRepository
     Task<MonthlyPayment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<bool> ExistsForAnotherPaymentAsync(Guid userId, int year, int month, Guid paymentId, CancellationToken cancellationToken = default);
     Task AddAsync(MonthlyPayment payment, CancellationToken cancellationToken = default);
-    Task<IReadOnlyCollection<MonthlyPaymentListItem>> GetPaidOrderedAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<MonthlyPaymentListItem>> GetOrderedAsync(bool includeNonPaid, CancellationToken cancellationToken = default);
 }

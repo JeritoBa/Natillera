@@ -16,9 +16,9 @@ public sealed class MonthlyPaymentsController(MonthlyPaymentService monthlyPayme
     [Authorize]
     [ProducesResponseType(typeof(IReadOnlyCollection<MonthlyPaymentListItem>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<MonthlyPaymentListItem>>> Get(CancellationToken cancellationToken) =>
-        Ok(await monthlyPaymentService.GetPaidOrderedAsync(cancellationToken));
+        Ok(await monthlyPaymentService.GetOrderedAsync(User.IsInRole(nameof(UserRole.Admin)), cancellationToken));
 
-    /// <summary>Creates a monthly payment and its backing income transaction atomically.</summary>
+    /// <summary>Creates a pending or paid monthly payment; a paid one also creates its income transaction atomically.</summary>
     [HttpPost]
     [Authorize(Roles = nameof(UserRole.Admin))]
     [ProducesResponseType(typeof(MonthlyPaymentResponse), StatusCodes.Status201Created)]
@@ -66,6 +66,33 @@ public sealed class MonthlyPaymentsController(MonthlyPaymentService monthlyPayme
         catch (DomainException exception) when (exception.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
             return Conflict(new { message = exception.Message });
+        }
+        catch (DomainException exception) when (exception.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound(new { message = exception.Message });
+        }
+        catch (DomainException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    /// <summary>Cancels a monthly payment (never deletes it); a paid one also cancels its transaction.</summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Cancel(Guid id, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            await monthlyPaymentService.CancelAsync(id, userId, cancellationToken);
+            return NoContent();
         }
         catch (DomainException exception) when (exception.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
         {
