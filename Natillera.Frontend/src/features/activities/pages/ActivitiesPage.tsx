@@ -4,13 +4,14 @@ import { cancelActivity, createActivity, getActivities, updateActivity, type Act
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
 import { getFriendlyApiError } from '@/shared/api/apiError'
-import { formatCurrency } from '@/shared/lib/formatters'
+import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
 
 interface ActivityForm { name: string, description: string, quantity: string, unitCost: string, unitSalePrice: string, startDate: string }
 const emptyForm: ActivityForm = { name: '', description: '', quantity: '', unitCost: '', unitSalePrice: '', startDate: '' }
+const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
 
 export function ActivitiesPage() {
   const { session } = useAuth()
@@ -25,6 +26,7 @@ export function ActivitiesPage() {
   const [form, setForm] = useState<ActivityForm>(emptyForm)
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [month, setMonth] = useState<'all' | string>('all')
 
   const load = useCallback(async () => {
     if (!session) return
@@ -83,36 +85,65 @@ export function ActivitiesPage() {
     } catch (requestError) { setError(getFriendlyApiError(requestError)) }
   }
 
-  const headings = ['Actividad', 'Fecha de inicio', 'Unidades asignadas', 'Disponibles', 'Costo total', 'Precio de venta', 'Estado', 'Acciones']
-  const rightHeadings = ['Costo total', 'Precio de venta', 'Acciones']
+  const monthOf = (activity: ActivityListItem) => activity.startDate.slice(0, 7)
+  const monthCounts = new Map<string, number>()
+  activities.forEach(activity => monthCounts.set(monthOf(activity), (monthCounts.get(monthOf(activity)) ?? 0) + 1))
+  const months = [...monthCounts.keys()].sort().reverse()
+  const effectiveMonth = month !== 'all' && monthCounts.has(month) ? month : 'all'
+  const filtered = effectiveMonth === 'all' ? activities : activities.filter(activity => monthOf(activity) === effectiveMonth)
+  const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
+  const columns: [string, string, boolean][] = [
+    ['Actividad', '', false], ['Fecha de inicio', 'hidden sm:table-cell', false], ['Unidades asignadas', '', true], ['Disponibles', 'hidden md:table-cell', false],
+    ['Costo total', '', true], ['Precio de venta', 'hidden md:table-cell', true], ['Estado', '', false], ['Acciones', '', true],
+  ]
+  const iconButton = 'btn-ghost p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
+  const dangerButton = 'btn-danger p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
   const setField = (field: keyof ActivityForm, value: string) => setForm(current => ({ ...current, [field]: value }))
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl">
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
-        <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Actividades</h1><p className="text-[#4e7460] text-sm">Gestiona las actividades de venta de la natillera</p></div>
+        <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Actividades</h1><p className="text-[#4e7460] text-sm">{canManage ? 'Gestiona las actividades de venta de la natillera' : 'Actividades de venta de la natillera'}</p></div>
         {canManage && <button onClick={openCreate} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Nueva actividad</button>}
       </div>
       {success && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
       {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
-      <div className="rounded-xl overflow-hidden" style={{ background: '#fff', border: '1px solid #d6e8dc' }}>
+      {error && activities.length === 0 && !loading && <button onClick={() => { setLoading(true); void load() }} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3 mb-4">Reintentar</button>}
+      {!loading && !error && activities.length > 0 && <div className="rounded-xl p-4 mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3" style={cardStyle}>
+        <div>
+          <label htmlFor="activity-month-filter" className="block text-xs text-[#4e7460] mb-1">Mes de inicio</label>
+          <select id="activity-month-filter" value={effectiveMonth} onChange={event => setMonth(event.target.value)} className="w-full sm:w-64 px-3 py-2.5 rounded-lg text-sm">
+            <option value="all">Todos los meses</option>
+            {months.map(key => <option key={key} value={key}>{`${monthText(key)} (${monthCounts.get(key)})`}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {activities.length} actividades</p>
+          {effectiveMonth !== 'all' && <button onClick={() => setMonth('all')} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Ver todos los meses</button>}
+        </div>
+      </div>}
+      <div className="rounded-xl overflow-hidden" style={cardStyle}>
         <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
-          {headings.map(heading => <th key={heading} className={`px-5 py-3 text-[#4e7460] text-xs font-medium ${rightHeadings.includes(heading) ? 'text-right' : 'text-left'}`}>{heading}</th>)}
+          {columns.map(([heading, visibility, right]) => <th key={heading} className={`px-5 py-3 text-[#4e7460] text-xs font-medium ${right ? 'text-right' : 'text-left'} ${visibility}`}>{heading}</th>)}
         </tr></thead><tbody>
-          {loading && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]">Cargando actividades...</td></tr>}
-          {!loading && activities.length === 0 && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]">No hay actividades registradas</td></tr>}
-          {!loading && activities.map(activity => <tr key={activity.id} className="table-row">
-            <td className="px-5 py-3.5"><span className="font-medium text-[#0c1a12]">{activity.name}</span><p className="text-xs text-[#4e7460] truncate max-w-[220px]">{activity.description}</p></td>
-            <td className="px-4 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap">{formatDateOnly(activity.startDate)}</td>
-            <td className="px-4 py-3.5 mono text-[#4e7460]">{`${activity.assignedQuantity} de ${activity.quantity}`}</td>
-            <td className="px-4 py-3.5 mono text-[#4e7460]">{activity.availableQuantity}</td>
+          {loading && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando actividades…</p></td></tr>}
+          {!loading && !error && activities.length === 0 && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]">{canManage ? 'Aún no hay actividades registradas. Usa «Nueva actividad» para crear la primera.' : 'Aún no hay actividades registradas.'}</td></tr>}
+          {!loading && activities.length > 0 && filtered.length === 0 && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]">
+            <p>No hay actividades que empiecen en {monthText(effectiveMonth)}.</p>
+            <button onClick={() => setMonth('all')} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Ver todos los meses</button>
+          </td></tr>}
+          {!loading && filtered.map(activity => <tr key={activity.id} className="table-row">
+            <td className="px-5 py-3.5"><span className="font-medium text-[#0c1a12]">{activity.name}</span><p className="text-xs text-[#4e7460] truncate max-w-[220px]">{activity.description}</p><p className="text-xs text-[#4e7460] sm:hidden mono">Inicia {formatDateOnly(activity.startDate)}</p></td>
+            <td className="px-4 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap hidden sm:table-cell">{formatDateOnly(activity.startDate)}</td>
+            <td className="px-4 py-3.5 text-right mono text-[#4e7460]">{`${activity.assignedQuantity} de ${activity.quantity}`}</td>
+            <td className="px-4 py-3.5 mono text-[#4e7460] hidden md:table-cell">{activity.availableQuantity}</td>
             <td className="px-4 py-3.5 text-right mono text-[#0c1a12]">{formatCurrency(activity.totalCost)}</td>
-            <td className="px-4 py-3.5 text-right mono text-[#0c1a12]">{formatCurrency(activity.unitSalePrice)}</td>
+            <td className="px-4 py-3.5 text-right mono text-[#0c1a12] hidden md:table-cell">{formatCurrency(activity.unitSalePrice)}</td>
             <td className="px-4 py-3.5"><Badge status={activity.status.toLowerCase()} /></td>
             <td className="px-5 py-3.5 text-right"><div className="flex justify-end gap-1">
-              <button onClick={() => navigate(`/activities/${activity.id}`)} className="btn-ghost p-1.5 rounded-md" aria-label="Ver detalle de la actividad"><Icon.Eye open /></button>
-              {canManage && activity.status !== 'Cancelled' && <button onClick={() => openEdit(activity)} className="btn-ghost p-1.5 rounded-md" aria-label="Editar actividad"><Icon.Edit /></button>}
-              {canManage && activity.status !== 'Cancelled' && activity.assignedQuantity === 0 && <button onClick={() => { if (window.confirm(`¿Anular la actividad "${activity.name}"? La actividad y su egreso quedarán anulados.`)) void cancel(activity) }} className="btn-danger p-1.5 rounded-md" aria-label="Anular actividad"><Icon.Trash /></button>}
+              <button onClick={() => navigate(`/activities/${activity.id}`)} className={iconButton} aria-label={`Ver detalle de ${activity.name}`}><Icon.Eye open /></button>
+              {canManage && activity.status !== 'Cancelled' && <button onClick={() => openEdit(activity)} className={iconButton} aria-label={`Editar ${activity.name}`}><Icon.Edit /></button>}
+              {canManage && activity.status !== 'Cancelled' && activity.assignedQuantity === 0 && <button onClick={() => { if (window.confirm(`¿Anular la actividad "${activity.name}"? La actividad y su egreso quedarán anulados.`)) void cancel(activity) }} className={dangerButton} aria-label={`Anular ${activity.name}`}><Icon.Trash /></button>}
             </div></td>
           </tr>)}
         </tbody></table></div>

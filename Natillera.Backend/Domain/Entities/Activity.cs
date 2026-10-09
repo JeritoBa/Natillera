@@ -111,7 +111,7 @@ public class Activity
         if (Status == ActivityStatus.Cancelled) return;
 
         var active = _assignments.Where(assignment => assignment.Status != AssignmentStatus.Cancelled).ToArray();
-        Status = active.Length > 0 && active.All(assignment => assignment.Status == AssignmentStatus.Paid)
+        Status = AvailableQuantity() == 0 && active.All(assignment => assignment.Status == AssignmentStatus.Paid)
             ? ActivityStatus.Finished
             : ActivityStatus.Pending;
     }
