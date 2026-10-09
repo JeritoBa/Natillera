@@ -46,7 +46,26 @@ public sealed class UserService(IUserRepository userRepository, IPasswordHasher 
     {
         var member = await userRepository.GetMemberByIdAsync(id, cancellationToken)
             ?? throw new DomainException("Member not found.");
-        if (isActive) member.Activate(); else member.Deactivate();
+        if (isActive)
+        {
+            member.Activate();
+        }
+        else
+        {
+            var pending = await userRepository.GetPendingObligationsAsync(id, cancellationToken);
+            if (pending.HasAny)
+            {
+                var details = new List<string>();
+                if (pending.PendingMonthlyPayments > 0) details.Add($"{pending.PendingMonthlyPayments} monthly payment(s)");
+                if (pending.ActiveLoans > 0) details.Add($"{pending.ActiveLoans} active loan(s)");
+                if (pending.PendingInterestPayments > 0) details.Add($"{pending.PendingInterestPayments} interest payment(s)");
+                if (pending.PendingActivityAssignments > 0) details.Add($"{pending.PendingActivityAssignments} activity assignment(s)");
+                throw new DomainException($"Member cannot be deactivated because they have pending: {string.Join(", ", details)}.");
+            }
+
+            member.Deactivate();
+        }
+
         await userRepository.SaveChangesAsync(cancellationToken);
         return AuthenticationService.ToResponse(member);
     }

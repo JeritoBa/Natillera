@@ -1,32 +1,10 @@
 import { useState } from 'react'
-import type { Activity, Loan, Payment, Transaction } from '@/shared/model/types'
-import { activities, loans, payments, transactions } from '@/shared/data/mockData'
+import type { Activity, Payment, Transaction } from '@/shared/model/types'
+import { activities, payments, transactions } from '@/shared/data/mockData'
 import { formatCurrency, formatShortCurrency } from '@/shared/lib/formatters'
 import { CrudPage, type CrudConfig } from '@/shared/components/CrudPage'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
-
-export function LoansPage() {
-  const config: CrudConfig<Loan> = {
-    title: 'Préstamos', subtitle: 'Gestiona los créditos internos de la natillera',
-    summaryStats: [{ label: 'Capital prestado', value: formatShortCurrency(720_000) }, { label: 'Préstamos activos', value: '2' }, { label: 'Vencidos', value: '1' }],
-    emptyItem: { member: '', amount: 0, balance: 0, rate: 2, startDate: '', dueDate: '', status: 'active' },
-    formFields: [
-      { name: 'member', label: 'Miembro', type: 'text' }, { name: 'amount', label: 'Monto ($)', type: 'number' }, { name: 'balance', label: 'Saldo pendiente ($)', type: 'number' },
-      { name: 'rate', label: 'Tasa mensual (%)', type: 'number' }, { name: 'startDate', label: 'Fecha inicio', type: 'date' }, { name: 'dueDate', label: 'Fecha vencimiento', type: 'date' },
-      { name: 'status', label: 'Estado', type: 'select', options: ['active', 'paid', 'overdue'] },
-    ],
-    columns: [
-      { label: 'Miembro', render: row => <span className="font-medium text-[#0c1a12]">{row.member}</span> },
-      { label: 'Monto', render: row => <span className="mono text-[#0c1a12]">{formatCurrency(row.amount)}</span>, align: 'right' },
-      { label: 'Saldo', render: row => <span className={`mono font-semibold ${row.balance > 0 ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{formatCurrency(row.balance)}</span>, align: 'right' },
-      { label: 'Tasa', render: row => <span className="mono text-[#4e7460]">{row.rate}%</span> },
-      { label: 'Vence', render: row => <span className="text-[#4e7460] mono text-xs">{row.dueDate}</span> },
-      { label: 'Estado', render: row => <Badge status={row.status} /> },
-    ],
-  }
-  return <CrudPage data={loans} config={config} />
-}
 
 export function ActivitiesPage() {
   const config: CrudConfig<Activity> = {

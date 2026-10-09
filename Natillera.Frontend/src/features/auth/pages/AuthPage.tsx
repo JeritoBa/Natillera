@@ -47,6 +47,7 @@ export function AuthPage({ setPage }: { setPage: (page: Page) => void }) {
                 <button type="button" onClick={() => authForm.setShowPassword(value => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#4e7460] hover:text-[#0c1a12] transition-colors"><Icon.Eye open={authForm.showPassword} /></button>
               </div>
             </div>
+            {authForm.sessionNotice && !authForm.error && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{authForm.sessionNotice}</p>}
             {authForm.error && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{authForm.error}</p>}
             <div className="flex items-center justify-end pt-1">
               <button type="button" className="text-sm text-[#0c5c38] hover:underline">¿Olvidaste tu contraseña?</button>

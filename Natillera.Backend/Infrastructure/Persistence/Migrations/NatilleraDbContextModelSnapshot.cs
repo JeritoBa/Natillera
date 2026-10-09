@@ -92,7 +92,7 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<Guid>("TransactionId")
+                    b.Property<Guid?>("TransactionId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("UserId")
@@ -172,6 +172,11 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
@@ -303,7 +308,7 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
-                    b.Property<Guid>("TransactionId")
+                    b.Property<Guid?>("TransactionId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -334,6 +339,9 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("IsCancelled")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
@@ -424,8 +432,7 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.HasOne("Natillera.Backend.Domain.Entities.Transaction", "Transaction")
                         .WithOne()
                         .HasForeignKey("Natillera.Backend.Domain.Entities.ActivityAssignment", "TransactionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Natillera.Backend.Domain.Entities.User", "User")
                         .WithMany()
@@ -519,8 +526,7 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.HasOne("Natillera.Backend.Domain.Entities.Transaction", "Transaction")
                         .WithOne()
                         .HasForeignKey("Natillera.Backend.Domain.Entities.Performance", "TransactionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Loan");
 

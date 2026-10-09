@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using System.Globalization;
 using System.Text.Json.Serialization;
@@ -9,6 +10,8 @@ using Natillera.Backend.Application.Authentication;
 using Natillera.Backend.Application.Common;
 using Natillera.Backend.Application.Dashboard;
 using Natillera.Backend.Application.Audit;
+using Natillera.Backend.Application.Activities;
+using Natillera.Backend.Application.Loans;
 using Natillera.Backend.Application.MonthlyPayments;
 using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Application.Security;
@@ -53,7 +56,9 @@ builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IMonthlyPaymentRepository, MonthlyPaymentRepository>();
-builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
+builder.Services.AddScoped<ILoanRepository, LoanRepository>();
+builder.Services.AddScoped<IActivityRepository, ActivityRepository>();
+builder.Services.AddScoped<ITransactionRepository,TransactionRepository>();
 builder.Services.AddScoped<ILogRepository, LogRepository>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
@@ -61,6 +66,8 @@ builder.Services.AddScoped<IMemberDetailRepository, MemberDetailRepository>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<MonthlyPaymentService>();
+builder.Services.AddScoped<LoanService>();
+builder.Services.AddScoped<ActivityService>();
 builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<LogService>();
 builder.Services.AddScoped<UserService>();
@@ -79,6 +86,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtOptions.Audience,
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier)
+                    ?? context.Principal?.FindFirstValue("sub");
+
+                if (!Guid.TryParse(userIdValue, out var userId))
+                {
+                    context.Fail("Invalid user identifier.");
+                    return;
+                }
+
+                var userRepository = context.HttpContext.RequestServices.GetRequiredService<IUserRepository>();
+                if (!await userRepository.IsActiveUserAsync(userId, context.HttpContext.RequestAborted))
+                    context.Fail("The user is inactive or does not exist.");
+            }
         };
     });
 builder.Services.AddAuthorization();

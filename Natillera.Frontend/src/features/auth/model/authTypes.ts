@@ -19,3 +19,5 @@ export interface LoginResponse {
 export interface AuthSession extends LoginResponse {
   remember: false
 }
+
+export const SESSION_EXPIRED_NOTICE_KEY = 'natillera.auth.sessionExpiredNotice'

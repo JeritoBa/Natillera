@@ -4,7 +4,7 @@ public enum LogEntityType
 {
     MonthlyPayment,
     Activity,
-    ActivitySale,
+    ActivityAssignment,
     Loan,
     LoanPayment,
     Performance,

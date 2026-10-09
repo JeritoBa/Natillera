@@ -44,11 +44,11 @@ public sealed class MemberDetailRepository(NatilleraDbContext dbContext) : IMemb
         var userTransactionIds = dbContext.MonthlyPayments.Where(payment => payment.UserId == memberId).Select(payment => payment.TransactionId)
             .Union(dbContext.Loans.Where(loan => loan.BorrowerId == memberId).Select(loan => loan.TransactionId))
             .Union(dbContext.LoanPayments.Where(payment => payment.Loan.BorrowerId == memberId).Select(payment => payment.TransactionId))
-            .Union(dbContext.Performances.Where(performance => performance.Loan.BorrowerId == memberId).Select(performance => performance.TransactionId))
-            .Union(dbContext.ActivityAssignments.Where(assignment => assignment.UserId == memberId).Select(assignment => assignment.TransactionId));
+            .Union(dbContext.Performances.Where(performance => performance.Loan.BorrowerId == memberId && performance.TransactionId != null).Select(performance => performance.TransactionId!.Value))
+            .Union(dbContext.ActivityAssignments.Where(assignment => assignment.UserId == memberId && assignment.TransactionId != null).Select(assignment => assignment.TransactionId!.Value));
 
         var transactions = await dbContext.Transactions.AsNoTracking()
-            .Where(transaction => userTransactionIds.Contains(transaction.Id))
+            .Where(transaction => userTransactionIds.Contains(transaction.Id) && !transaction.IsCancelled)
             .OrderBy(transaction => transaction.OccurredAt)
             .Select(transaction => new MemberTransactionResponse(transaction.Id, transaction.Amount, transaction.Direction,
                 transaction.Type, transaction.OccurredAt, transaction.Description))

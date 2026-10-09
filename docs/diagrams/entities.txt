@@ -25,6 +25,7 @@ Transaction
 - type ENUM('monthly_payment', 'activity', 'activity_sale', 'loan', 'loan_payment', 'performance')
 - occurred_at DATETIME DEFAULT now()
 - description VARCHAR(200)
+- is_cancelled BOOL DEFAULT false
 
 Log
 - id
@@ -58,7 +59,7 @@ ActivityAssignment
 - paid_at DATETIME POSSIBLE NULL
 - activity_id FK WITH Activity
 - user_id FK WITH User
-- transaction_id FK WITH Transaction
+- transaction_id FK WITH Transaction POSSIBLE NULL
 
 Loan
 - id
@@ -77,6 +78,7 @@ LoanPayment
 - amount DECIMAL
 - paid_at DATETIME
 - payment_method ENUM('cash', 'transfer') 
+- status ENUM('paid', 'cancelled') DEFAULT 'paid'
 - loan_id FK WITH Loan
 - transaction_id FK WITH Transaction
 
@@ -87,7 +89,7 @@ Performance
 - status ENUM('pending', 'paid', 'cancelled') DEFAULT 'pending'
 - paid_at DATETIME POSSIBLE NULL
 - created_at DATETIME DEFAULT now()
-- transaction_id FK WITH Transaction
+- transaction_id FK WITH Transaction POSSIBLE NULL
 - loan_id FK WITH Loan
 
 MonthlyPayment

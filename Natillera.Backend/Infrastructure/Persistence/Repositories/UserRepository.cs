@@ -18,6 +18,23 @@ public sealed class UserRepository(NatilleraDbContext dbContext) : IUserReposito
     public Task<bool> EmailExistsAsync(string email, Guid? excludedUserId = null, CancellationToken cancellationToken = default) =>
         dbContext.Users.AnyAsync(user => user.Email == email && (!excludedUserId.HasValue || user.Id != excludedUserId.Value), cancellationToken);
 
+    public Task<bool> IsActiveUserAsync(Guid id, CancellationToken cancellationToken = default) =>
+        dbContext.Users.AnyAsync(user => user.Id == id && user.IsActive, cancellationToken);
+
+    public async Task<MemberPendingObligations> GetPendingObligationsAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var pendingMonthlyPayments = await dbContext.MonthlyPayments
+            .CountAsync(payment => payment.UserId == userId && payment.Status == Domain.Enums.PaymentStatus.Pending, cancellationToken);
+        var activeLoans = await dbContext.Loans
+            .CountAsync(loan => loan.BorrowerId == userId && loan.Status == Domain.Enums.LoanStatus.Active, cancellationToken);
+        var pendingInterestPayments = await dbContext.Performances
+            .CountAsync(performance => performance.Loan.BorrowerId == userId && performance.Status == Domain.Enums.PaymentStatus.Pending, cancellationToken);
+        var pendingActivityAssignments = await dbContext.ActivityAssignments
+            .CountAsync(assignment => assignment.UserId == userId && assignment.Status == Domain.Enums.AssignmentStatus.Pending, cancellationToken);
+
+        return new MemberPendingObligations(pendingMonthlyPayments, activeLoans, pendingInterestPayments, pendingActivityAssignments);
+    }
+
     public Task AddAsync(User user, CancellationToken cancellationToken = default) =>
         dbContext.Users.AddAsync(user, cancellationToken).AsTask();
 

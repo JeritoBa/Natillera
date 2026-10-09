@@ -1,5 +1,7 @@
 import { ApiError } from '@/shared/api/apiError'
 
+export const UNAUTHORIZED_EVENT = 'natillera:unauthorized'
+
 const apiUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
 
 interface ApiRequestOptions extends RequestInit {
@@ -24,6 +26,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 
     const body = await response.json().catch(() => null) as { message?: string } | null
     if (!response.ok) {
+      if (response.status === 401 && token) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
       throw new ApiError(response.status, body?.message ?? '')
     }
 

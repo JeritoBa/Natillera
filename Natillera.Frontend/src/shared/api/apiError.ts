@@ -13,6 +13,7 @@ export class ApiError extends Error {
 
 export function getFriendlyApiError(error: unknown): string {
   if (error instanceof ApiError) {
+    if (error.status === 401 && error.message === 'The user is inactive.') return 'Tu cuenta está desactivada. Contacta al administrador.'
     if (error.status === 401) return 'El correo o la contraseña no son correctos.'
     if (error.status === 403) return 'No tienes permisos para realizar esta acción.'
     if (error.status === 400) return error.message || 'Revisa los datos ingresados.'

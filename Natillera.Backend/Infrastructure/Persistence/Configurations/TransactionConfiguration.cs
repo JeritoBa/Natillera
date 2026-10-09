@@ -15,6 +15,7 @@ public sealed class TransactionConfiguration : IEntityTypeConfiguration<Transact
         builder.Property(transaction => transaction.Direction).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(transaction => transaction.Type).HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(transaction => transaction.Description).HasMaxLength(200).IsRequired();
+        builder.Property(transaction => transaction.IsCancelled).IsRequired();
         builder.HasIndex(transaction => transaction.OccurredAt);
     }
 }

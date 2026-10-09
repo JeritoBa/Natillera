@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { loginRequest } from '@/features/auth/services/authApi'
-import type { AuthSession } from '@/features/auth/model/authTypes'
+import { UNAUTHORIZED_EVENT } from '@/shared/api/apiClient'
+import { SESSION_EXPIRED_NOTICE_KEY, type AuthSession } from '@/features/auth/model/authTypes'
 import { AuthContext } from '@/features/auth/context/authContext'
 
 const SESSION_KEY = 'natillera.auth.session'
@@ -42,6 +43,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem(SESSION_KEY)
     setSession(null)
   }
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      try {
+        sessionStorage.setItem(SESSION_EXPIRED_NOTICE_KEY, '1')
+      } catch {
+        // El aviso es opcional; el cierre de sesión continúa.
+      }
+      sessionStorage.removeItem(SESSION_KEY)
+      setSession(null)
+    }
+
+    window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized)
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized)
+  }, [])
 
   useEffect(() => {
     if (!session) return

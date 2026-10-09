@@ -2,7 +2,7 @@ using Natillera.Backend.Domain.Enums;
 
 namespace Natillera.Backend.Application.Transactions;
 
-public sealed record TransactionDetailResponse(Guid Id, decimal Amount, TransactionDirection Direction, TransactionType Type, DateTime OccurredAt, string Description, TransactionSourceDetail Source);
+public sealed record TransactionDetailResponse(Guid Id, decimal Amount, TransactionDirection Direction, TransactionType Type, DateTime OccurredAt, string Description, TransactionSourceDetail Source, bool IsCancelled);
 
 public sealed class TransactionSourceDetail
 {

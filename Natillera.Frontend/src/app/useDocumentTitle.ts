@@ -9,7 +9,7 @@ const sectionTitles: Record<string, { list: string, detail?: string }> = {
   members: { list: 'Miembros', detail: 'Detalle de miembro' },
   payments: { list: 'Cuotas' },
   activities: { list: 'Actividades' },
-  loans: { list: 'Préstamos' },
+  loans: { list: 'Préstamos', detail: 'Detalle de préstamo' },
   transactions: { list: 'Transacciones', detail: 'Detalle de transacción' },
   logs: { list: 'Logs', detail: 'Detalle de log' },
 }
@@ -18,9 +18,10 @@ export function useDocumentTitle() {
   const { pathname } = useLocation()
 
   useEffect(() => {
-    const [section, id] = pathname.split('/').filter(Boolean)
+    const [section, id, child] = pathname.split('/').filter(Boolean)
     const titles = section ? sectionTitles[section] : undefined
-    const pageTitle = titles ? (id && titles.detail ? titles.detail : titles.list) : null
+    const nestedDetail = section === 'loans' && child ? (child === 'payments' ? 'Detalle de abono' : 'Detalle de interés') : undefined
+    const pageTitle = titles ? (nestedDetail ?? (id && titles.detail ? titles.detail : titles.list)) : null
     document.title = pageTitle ? `${pageTitle} · ${appName}` : appName
   }, [pathname])
 }

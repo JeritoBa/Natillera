@@ -7,7 +7,11 @@ import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
 import { LandingPage } from '@/features/landing/pages/LandingPage'
 import { MembersPage } from '@/features/members/pages/MembersPage'
 import { MemberDetailPage } from '@/features/members/pages/MemberDetailPage'
-import { ActivitiesPage, LoansPage } from '@/features/management/pages/ManagementPages'
+import { ActivitiesPage } from '@/features/management/pages/ManagementPages'
+import { LoansPage } from '@/features/loans/pages/LoansPage'
+import { LoanDetailPage } from '@/features/loans/pages/LoanDetailPage'
+import { LoanPaymentDetailPage } from '@/features/loans/pages/LoanPaymentDetailPage'
+import { InterestPaymentDetailPage } from '@/features/loans/pages/InterestPaymentDetailPage'
 import { MonthlyPaymentsPage } from '@/features/monthlyPayments/pages/MonthlyPaymentsPage'
 import { LogsPage } from '@/features/audit/pages/LogsPage'
 import { LogDetailPage } from '@/features/audit/pages/LogDetailPage'
@@ -60,6 +64,9 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/members" element={<MembersPage />} />
           <Route path="/loans" element={<LoansPage />} />
+          <Route path="/loans/:id" element={<LoanDetailPage />} />
+          <Route path="/loans/:loanId/payments/:paymentId" element={<LoanPaymentDetailPage />} />
+          <Route path="/loans/:loanId/interest-payments/:interestId" element={<InterestPaymentDetailPage />} />
           <Route path="/activities" element={<ActivitiesPage />} />
           <Route path="/payments" element={<MonthlyPaymentsPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />

@@ -23,7 +23,24 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
                 dbContext.MonthlyPayments
                     .Where(payment => payment.TransactionId == transaction.Id)
                     .Select(payment => payment.User.FirstName + " " + payment.User.LastName)
-                    .FirstOrDefault()))
+                    .FirstOrDefault()
+                ?? dbContext.Loans
+                    .Where(loan => loan.TransactionId == transaction.Id)
+                    .Select(loan => loan.Borrower.FirstName + " " + loan.Borrower.LastName)
+                    .FirstOrDefault()
+                ?? dbContext.LoanPayments
+                    .Where(payment => payment.TransactionId == transaction.Id)
+                    .Select(payment => payment.Loan.Borrower.FirstName + " " + payment.Loan.Borrower.LastName)
+                    .FirstOrDefault()
+                ?? dbContext.Performances
+                    .Where(performance => performance.TransactionId == transaction.Id)
+                    .Select(performance => performance.Loan.Borrower.FirstName + " " + performance.Loan.Borrower.LastName)
+                    .FirstOrDefault()
+                ?? dbContext.ActivityAssignments
+                    .Where(a => a.TransactionId == transaction.Id)
+                    .Select(a => a.User.FirstName + " " + a.User.LastName)
+                    .FirstOrDefault(),
+                transaction.IsCancelled))
             .ToListAsync(cancellationToken);
     }
 
@@ -80,5 +97,5 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
         return Build(transaction, new TransactionSourceDetail { Entity = "ActivityAssignment", EntityId = assignment.Id, MemberName = assignment.User.FirstName + " " + assignment.User.LastName, Status = assignment.Status.ToString(), PaidAt = assignment.PaidAt, ActivityName = assignment.Activity.Name, ActivityDescription = assignment.Activity.Description, ActivityQuantity = assignment.Activity.Quantity, QuantityAssigned = assignment.QuantityAssigned, UnitCost = assignment.Activity.UnitCost, UnitSalePrice = assignment.Activity.UnitSalePrice, StartDate = assignment.Activity.StartDate, AssignedAt = assignment.AssignedAt });
     }
 
-    private static TransactionDetailResponse Build(Transaction transaction, TransactionSourceDetail source) => new(transaction.Id, transaction.Amount, transaction.Direction, transaction.Type, transaction.OccurredAt, transaction.Description, source);
+    private static TransactionDetailResponse Build(Transaction transaction, TransactionSourceDetail source) => new(transaction.Id, transaction.Amount, transaction.Direction, transaction.Type, transaction.OccurredAt, transaction.Description, source, transaction.IsCancelled);
 }

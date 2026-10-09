@@ -27,14 +27,26 @@ public class Transaction
     public TransactionType Type { get; private set; }
     public DateTime OccurredAt { get; private set; }
     public string Description { get; private set; } = null!;
+    public bool IsCancelled { get; private set; }
 
     public void Update(decimal amount, TransactionDirection direction, TransactionType type, string description)
     {
+        if (IsCancelled)
+            throw new DomainException("Cancelled transactions cannot be modified.");
+
         Validate(amount, description);
         Amount = amount;
         Direction = direction;
         Type = type;
         Description = description.Trim();
+    }
+
+    public void Cancel()
+    {
+        if (IsCancelled)
+            throw new DomainException("Transaction is already cancelled.");
+
+        IsCancelled = true;
     }
 
     private static void Validate(decimal amount, string description)

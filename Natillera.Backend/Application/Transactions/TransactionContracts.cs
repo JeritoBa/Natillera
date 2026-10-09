@@ -9,4 +9,5 @@ public sealed record TransactionListItem(
     TransactionType Type,
     DateTime OccurredAt,
     string Description,
-    string? MemberName);
+    string? MemberName,
+    bool IsCancelled);
