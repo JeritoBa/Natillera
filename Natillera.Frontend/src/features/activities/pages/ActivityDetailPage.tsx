@@ -229,7 +229,7 @@ export function ActivityDetailPage() {
               <td className="px-4 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap hidden md:table-cell">{assignment.paidAt ? new Date(assignment.paidAt).toLocaleDateString('es-CO') : '—'}</td>
               <td className="px-4 py-3.5 hidden sm:table-cell"><Badge status={assignment.status.toLowerCase()} /></td>
               <td className="px-5 py-3.5 text-right w-px whitespace-nowrap"><div className="flex justify-end gap-1">
-                <button onClick={() => navigate(`/activities/${activity.id}/assignments/${assignment.id}`)} className={`${iconButton} hidden sm:inline-flex`} aria-label={`Ver asignación de ${assignment.memberName}`}><Icon.Eye open /></button>
+                <button onClick={() => navigate(`/activities/${activity.id}/assignments/${assignment.id}`)} className={`btn-ghost p-2 rounded-md min-w-10 min-h-10 hidden sm:inline-flex items-center justify-center`} aria-label={`Ver asignación de ${assignment.memberName}`}><Icon.Eye open /></button>
                 {canManage && !isCancelled && assignment.status === 'Pending' && <button onClick={() => openModal(assignment)} className={iconButton} aria-label={`Editar asignación de ${assignment.memberName}`}><Icon.Edit /></button>}
                 {canManage && !isCancelled && assignment.status !== 'Cancelled' && <button onClick={() => { if (window.confirm(confirmMessage(assignment))) void cancel(assignment) }} className={dangerButton} aria-label={`Anular asignación de ${assignment.memberName}`}><Icon.Trash /></button>}
               </div></td>

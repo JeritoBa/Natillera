@@ -1,4 +1,4 @@
-// The source image is square with wide white margins; object-cover with a ~7:5 box crops those margins.
-export function BrandLogo({ className = 'h-12 w-[68px]' }: { className?: string }) {
-  return <img src="/Logo%20Natillera.png" alt="Gallego Nanclares" className={`${className} object-cover`} />
+// Horizontal logo (snout + name) trimmed to its content with a transparent background; size it by height.
+export function BrandLogo({ className = 'h-8 w-auto' }: { className?: string }) {
+  return <img src="/logo-gallego-nanclares.png" alt="Gallego Nanclares" className={className} />
 }

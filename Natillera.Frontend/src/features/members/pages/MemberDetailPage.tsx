@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { appName } from '@/app/useDocumentTitle'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { getMemberDetail, type MemberDetail } from '@/features/members/api/membersApi'
@@ -134,9 +134,9 @@ export function MemberDetailPage() {
             const date = formatDate(transaction.occurredAt)
             return <tr key={transaction.id} className="table-row">
               <td className="px-5 py-2.5 mono text-xs text-[#4e7460] whitespace-nowrap hidden sm:table-cell">{date}</td>
-              <td className="px-5 py-2.5"><p className="text-[#0c1a12]">{typeLabel[transaction.type]}</p><p className="text-xs text-[#4e7460] truncate max-w-[260px]"><span className="sm:hidden">{date} · </span>{transaction.description}</p></td>
-              <td className={`px-5 py-2.5 text-right mono font-semibold whitespace-nowrap ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{signed(transaction.direction === 'Expense' ? -transaction.amount : transaction.amount)}</td>
-              <td className="px-3 py-2.5 text-right w-12"><button onClick={() => navigate(`/transactions/${transaction.id}`)} className="btn-ghost p-2 rounded-md min-w-10 min-h-10" aria-label={`Ver detalle del movimiento ${typeLabel[transaction.type]} del ${date}`}><Icon.Eye open /></button></td>
+              <td className="px-3 sm:px-5 py-2.5 w-full sm:w-auto max-w-0 sm:max-w-none"><Link to={`/transactions/${transaction.id}`} className="block truncate text-[#0c1a12] sm:pointer-events-none focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{typeLabel[transaction.type]}</Link><p className="text-xs text-[#4e7460] truncate sm:max-w-[260px]"><span className="sm:hidden">{date} · </span>{transaction.description}</p></td>
+              <td className={`px-3 sm:px-5 py-2.5 text-right mono font-semibold whitespace-nowrap ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{signed(transaction.direction === 'Expense' ? -transaction.amount : transaction.amount)}</td>
+              <td className="px-3 py-2.5 text-right w-12 hidden sm:table-cell"><button onClick={() => navigate(`/transactions/${transaction.id}`)} className="btn-ghost p-2 rounded-md min-w-10 min-h-10" aria-label={`Ver detalle del movimiento ${typeLabel[transaction.type]} del ${date}`}><Icon.Eye open /></button></td>
             </tr>
           })}</tbody></table>}
       </section>

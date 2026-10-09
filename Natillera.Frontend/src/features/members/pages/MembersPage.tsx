@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import type { Member, MemberFormValues } from '@/features/members/model/memberTypes'
@@ -56,18 +56,23 @@ export function MembersPage() {
       </div>
       {(error || actionError) && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error ?? actionError}</p>}
       <div className="rounded-xl overflow-hidden" style={{ background: '#fff', border: '1px solid #d6e8dc' }}>
-        <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
-          {['Nombre', 'Correo', 'Teléfono', 'Estado', ...(canManage ? ['Acciones'] : [])].map((heading, index) => <th key={heading} className={`px-5 py-3 text-[#4e7460] text-xs font-medium ${index === 4 ? 'text-right' : 'text-left'}`}>{heading}</th>)}
+        <table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
+          {([['Nombre', 'px-3 sm:px-5'], ['Correo', 'hidden sm:table-cell px-4'], ['Teléfono', 'hidden sm:table-cell px-4'], ['Estado', 'hidden sm:table-cell px-4'], ...(canManage ? [['Acciones', 'px-3 sm:px-5 w-px whitespace-nowrap text-right']] : [])] as const).map(([heading, cls]) => <th key={heading} className={`py-3 text-[#4e7460] text-xs font-medium ${cls.includes('text-right') ? '' : 'text-left'} ${cls}`}>{heading}</th>)}
         </tr></thead><tbody>
           {loading && <tr><td colSpan={canManage ? 5 : 4} className="px-5 py-12 text-center text-[#4e7460]">Cargando miembros...</td></tr>}
           {!loading && members.length === 0 && <tr><td colSpan={canManage ? 5 : 4} className="px-5 py-12 text-center text-[#4e7460]">No hay miembros registrados</td></tr>}
           {!loading && members.map(member => <tr key={member.id} className="table-row">
-            <td className="px-5 py-3.5"><span className="font-medium text-[#0c1a12]">{member.firstName} {member.lastName}</span></td>
-            <td className="px-4 py-3.5 text-[#4e7460]">{member.email}</td><td className="px-4 py-3.5 text-[#4e7460] mono text-xs">{member.phone}</td>
-            <td className="px-4 py-3.5"><Badge status={member.isActive ? 'active' : 'inactive'} /></td>
-            {canManage && <td className="px-5 py-3.5 text-right"><div className="flex justify-end gap-1"><button onClick={() => navigate(`/members/${member.id}`)} className="btn-ghost p-1.5 rounded-md" aria-label="Ver detalle del miembro"><Icon.Eye open /></button><button onClick={() => openEdit(member)} className="btn-ghost p-1.5 rounded-md" aria-label="Editar miembro"><Icon.Edit /></button><button onClick={() => { if (window.confirm(`${member.isActive ? 'Desactivar' : 'Activar'} a ${member.firstName} ${member.lastName}?`)) void toggleStatus(member) }} className={member.isActive ? 'btn-danger p-1.5 rounded-md' : 'btn-ghost p-1.5 rounded-md'} aria-label={member.isActive ? 'Desactivar miembro' : 'Activar miembro'}><Icon.Check /></button></div></td>}
+            <td className="px-3 sm:px-5 py-3.5 max-w-0 sm:max-w-none">
+              {canManage
+                ? <Link to={`/members/${member.id}`} className="sm:pointer-events-none font-medium text-[#0c1a12] hover:underline sm:hover:no-underline focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{member.firstName} {member.lastName}</Link>
+                : <span className="font-medium text-[#0c1a12]">{member.firstName} {member.lastName}</span>}
+              <p className="sm:hidden text-xs text-[#4e7460] mt-0.5 flex items-center gap-1.5 flex-wrap"><span className="truncate max-w-full">{member.email}</span><Badge status={member.isActive ? 'active' : 'inactive'} /></p>
+            </td>
+            <td className="px-4 py-3.5 text-[#4e7460] hidden sm:table-cell">{member.email}</td><td className="px-4 py-3.5 text-[#4e7460] mono text-xs hidden sm:table-cell">{member.phone}</td>
+            <td className="px-4 py-3.5 hidden sm:table-cell"><Badge status={member.isActive ? 'active' : 'inactive'} /></td>
+            {canManage && <td className="px-3 sm:px-5 py-3.5 text-right w-px whitespace-nowrap"><div className="flex justify-end gap-1"><button onClick={() => navigate(`/members/${member.id}`)} className="btn-ghost p-1.5 rounded-md hidden sm:inline-flex" aria-label="Ver detalle del miembro"><Icon.Eye open /></button><button onClick={() => openEdit(member)} className="btn-ghost p-2 sm:p-1.5 rounded-md min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center" aria-label="Editar miembro"><Icon.Edit /></button><button onClick={() => { if (window.confirm(`${member.isActive ? 'Desactivar' : 'Activar'} a ${member.firstName} ${member.lastName}?`)) void toggleStatus(member) }} className={`${member.isActive ? 'btn-danger' : 'btn-ghost'} p-2 sm:p-1.5 rounded-md min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center`} aria-label={member.isActive ? 'Desactivar miembro' : 'Activar miembro'}><Icon.Check /></button></div></td>}
           </tr>)}
-        </tbody></table></div>
+        </tbody></table>
       </div>
       {modal && <Modal title={editing ? 'Editar miembro' : 'Nuevo miembro'} onClose={() => setModal(null)}><div className="space-y-4">
         {([['firstName', 'Nombre'], ['lastName', 'Apellido'], ['email', 'Correo'], ['phone', 'Teléfono']] as const).map(([field, label]) => <div key={field}><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">{label}</label><input type={field === 'email' ? 'email' : 'text'} value={form[field]} onChange={event => setForm(current => ({ ...current, [field]: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>)}

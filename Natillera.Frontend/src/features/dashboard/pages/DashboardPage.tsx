@@ -97,16 +97,16 @@ export function DashboardPage() {
       </section>
 
       <section aria-labelledby="recent-title" aria-busy={loading} className="rounded-xl overflow-hidden" style={cardStyle}>
-        <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: '#eef4f0' }}>
+        <div className="px-5 py-3 border-b flex items-center justify-between gap-3" style={{ borderColor: '#eef4f0' }}>
           <h2 id="recent-title" className="text-sm font-semibold text-[#4e7460]">Movimientos recientes</h2>
-          <Link to="/transactions" className="inline-flex items-center min-h-10 px-2 text-sm text-[#0a6635] underline rounded focus-visible:outline-2 focus-visible:outline-[#0c5c38]">Ver todos los movimientos</Link>
+          <Link to="/transactions" aria-label="Ver todos los movimientos" className="inline-flex items-center min-h-10 px-2 text-sm whitespace-nowrap shrink-0 text-[#0a6635] underline rounded focus-visible:outline-2 focus-visible:outline-[#0c5c38]"><span className="sm:hidden" aria-hidden="true">Ver todos</span><span className="hidden sm:inline" aria-hidden="true">Ver todos los movimientos</span></Link>
         </div>
         {loading ? <p className="px-5 py-10 text-center text-sm text-[#4e7460]">Cargando movimientos...</p>
           : transactions.length === 0 ? <p className="px-5 py-10 text-center text-sm text-[#4e7460]">Aún no hay movimientos registrados</p>
           : <table className="w-full text-sm"><tbody>{transactions.map(transaction => <tr key={transaction.id} className="table-row">
             <td className="px-5 py-2.5 mono text-xs text-[#4e7460] whitespace-nowrap hidden sm:table-cell">{formatDate(transaction.occurredAt)}</td>
-            <td className="px-5 py-2.5"><p className="text-[#0c1a12] truncate max-w-[260px]">{transaction.description}</p><p className="text-xs text-[#4e7460]"><span className="sm:hidden">{formatDate(transaction.occurredAt)}{transaction.memberName ? ' · ' : ''}</span>{transaction.memberName}</p></td>
-            <td className={`px-5 py-2.5 text-right mono font-semibold whitespace-nowrap ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{signed(transaction.direction === 'Expense' ? -transaction.amount : transaction.amount)}</td>
+            <td className="px-3 sm:px-5 py-2.5 w-full sm:w-auto max-w-0 sm:max-w-none"><p className="text-[#0c1a12] truncate sm:max-w-[260px]">{transaction.description}</p><p className="text-xs text-[#4e7460] truncate"><span className="sm:hidden">{formatDate(transaction.occurredAt)}{transaction.memberName ? ' · ' : ''}</span>{transaction.memberName}</p></td>
+            <td className={`px-3 sm:px-5 py-2.5 text-right mono font-semibold whitespace-nowrap ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{signed(transaction.direction === 'Expense' ? -transaction.amount : transaction.amount)}</td>
           </tr>)}</tbody></table>}
       </section>
     </div>}

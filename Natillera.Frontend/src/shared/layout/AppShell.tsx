@@ -101,7 +101,7 @@ export function AppShell({ page, setPage, children }: AppShellProps) {
           <button onClick={() => setSidebarOpen(true)} className="text-[#4e7460]">
             <Icon.Menu />
           </button>
-          <BrandLogo className="h-9 w-[50px]" />
+          <BrandLogo className="h-7 w-auto" />
         </header>
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>

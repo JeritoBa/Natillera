@@ -195,3 +195,7 @@ input::placeholder { color: #9dbdaa; }
 .fade-up-2 { animation: fadeUp 0.35s 0.06s ease forwards; opacity: 0; }
 .fade-up-3 { animation: fadeUp 0.35s 0.12s ease forwards; opacity: 0; }
 .fade-up-4 { animation: fadeUp 0.35s 0.18s ease forwards; opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up, .fade-up-2, .fade-up-3, .fade-up-4 { animation: none; opacity: 1; }
+}

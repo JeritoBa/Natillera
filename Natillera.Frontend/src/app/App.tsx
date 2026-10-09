@@ -30,8 +30,7 @@ const pagePaths: Record<Page, string> = {
 type DashboardPage = Exclude<Page, 'landing' | 'auth'>
 
 function LandingRoute() {
-  const navigate = useNavigate()
-  return <LandingPage setPage={page => navigate(pagePaths[page])} />
+  return <LandingPage />
 }
 
 function LoginRoute() {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { cancelActivity, createActivity, getActivities, updateActivity, type ActivityListItem } from '@/features/activities/api/activitiesApi'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
@@ -93,8 +93,8 @@ export function ActivitiesPage() {
   const filtered = effectiveMonth === 'all' ? activities : activities.filter(activity => monthOf(activity) === effectiveMonth)
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const columns: [string, string, boolean][] = [
-    ['Actividad', '', false], ['Fecha de inicio', 'hidden sm:table-cell', false], ['Unidades asignadas', '', true], ['Disponibles', 'hidden md:table-cell', false],
-    ['Costo total', '', true], ['Precio de venta', 'hidden md:table-cell', true], ['Estado', '', false], ['Acciones', '', true],
+    ['Actividad', '', false], ['Fecha de inicio', 'hidden sm:table-cell', false], ['Unidades asignadas', 'hidden sm:table-cell', true], ['Disponibles', 'hidden md:table-cell', false],
+    ['Costo total', '', true], ['Precio de venta', 'hidden md:table-cell', true], ['Estado', 'hidden sm:table-cell', false], ['Acciones', 'w-px whitespace-nowrap', true],
   ]
   const iconButton = 'btn-ghost p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
   const dangerButton = 'btn-danger p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
@@ -123,8 +123,8 @@ export function ActivitiesPage() {
         </div>
       </div>}
       <div className="rounded-xl overflow-hidden" style={cardStyle}>
-        <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
-          {columns.map(([heading, visibility, right]) => <th key={heading} className={`px-5 py-3 text-[#4e7460] text-xs font-medium ${right ? 'text-right' : 'text-left'} ${visibility}`}>{heading}</th>)}
+        <table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
+          {columns.map(([heading, visibility, right]) => <th key={heading} className={`px-3 sm:px-5 py-3 text-[#4e7460] text-xs font-medium ${right ? 'text-right' : 'text-left'} ${visibility}`}>{heading}</th>)}
         </tr></thead><tbody>
           {loading && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando actividades…</p></td></tr>}
           {!loading && !error && activities.length === 0 && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]">{canManage ? 'Aún no hay actividades registradas. Usa «Nueva actividad» para crear la primera.' : 'Aún no hay actividades registradas.'}</td></tr>}
@@ -133,20 +133,20 @@ export function ActivitiesPage() {
             <button onClick={() => setMonth('all')} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Ver todos los meses</button>
           </td></tr>}
           {!loading && filtered.map(activity => <tr key={activity.id} className="table-row">
-            <td className="px-5 py-3.5"><span className="font-medium text-[#0c1a12]">{activity.name}</span><p className="text-xs text-[#4e7460] truncate max-w-[220px]">{activity.description}</p><p className="text-xs text-[#4e7460] sm:hidden mono">Inicia {formatDateOnly(activity.startDate)}</p></td>
+            <td className="px-3 sm:px-5 py-3.5"><Link to={`/activities/${activity.id}`} className="sm:pointer-events-none font-medium text-[#0c1a12] hover:underline sm:hover:no-underline focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{activity.name}</Link><p className="hidden sm:block text-xs text-[#4e7460] truncate max-w-[220px]">{activity.description}</p><p className="text-xs text-[#4e7460] sm:hidden mt-0.5 flex items-center gap-1.5 flex-wrap"><span className="mono">Inicia {formatDateOnly(activity.startDate)}</span><span className="mono">· {`${activity.assignedQuantity} de ${activity.quantity}`} u.</span><Badge status={activity.status.toLowerCase()} /></p></td>
             <td className="px-4 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap hidden sm:table-cell">{formatDateOnly(activity.startDate)}</td>
-            <td className="px-4 py-3.5 text-right mono text-[#4e7460]">{`${activity.assignedQuantity} de ${activity.quantity}`}</td>
+            <td className="px-4 py-3.5 text-right mono text-[#4e7460] hidden sm:table-cell">{`${activity.assignedQuantity} de ${activity.quantity}`}</td>
             <td className="px-4 py-3.5 mono text-[#4e7460] hidden md:table-cell">{activity.availableQuantity}</td>
-            <td className="px-4 py-3.5 text-right mono text-[#0c1a12]">{formatCurrency(activity.totalCost)}</td>
+            <td className="px-3 sm:px-4 py-3.5 text-right mono text-[#0c1a12] whitespace-nowrap">{formatCurrency(activity.totalCost)}</td>
             <td className="px-4 py-3.5 text-right mono text-[#0c1a12] hidden md:table-cell">{formatCurrency(activity.unitSalePrice)}</td>
-            <td className="px-4 py-3.5"><Badge status={activity.status.toLowerCase()} /></td>
-            <td className="px-5 py-3.5 text-right"><div className="flex justify-end gap-1">
-              <button onClick={() => navigate(`/activities/${activity.id}`)} className={iconButton} aria-label={`Ver detalle de ${activity.name}`}><Icon.Eye open /></button>
+            <td className="px-4 py-3.5 hidden sm:table-cell"><Badge status={activity.status.toLowerCase()} /></td>
+            <td className="px-3 sm:px-5 py-3.5 text-right w-px whitespace-nowrap"><div className="flex justify-end gap-1">
+              <button onClick={() => navigate(`/activities/${activity.id}`)} className={`btn-ghost p-2 rounded-md min-w-10 min-h-10 hidden sm:inline-flex items-center justify-center`} aria-label={`Ver detalle de ${activity.name}`}><Icon.Eye open /></button>
               {canManage && activity.status !== 'Cancelled' && <button onClick={() => openEdit(activity)} className={iconButton} aria-label={`Editar ${activity.name}`}><Icon.Edit /></button>}
               {canManage && activity.status !== 'Cancelled' && activity.assignedQuantity === 0 && <button onClick={() => { if (window.confirm(`¿Anular la actividad "${activity.name}"? La actividad y su egreso quedarán anulados.`)) void cancel(activity) }} className={dangerButton} aria-label={`Anular ${activity.name}`}><Icon.Trash /></button>}
             </div></td>
           </tr>)}
-        </tbody></table></div>
+        </tbody></table>
       </div>
       {modal && <Modal title={editing ? 'Editar actividad' : 'Nueva actividad'} onClose={() => !saving && setModal(null)}><div className="space-y-4">
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Nombre</label><input type="text" maxLength={100} value={form.name} onChange={event => setField('name', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
