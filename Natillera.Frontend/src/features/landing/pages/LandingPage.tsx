@@ -15,12 +15,12 @@ const steps = [
 ]
 
 const memberViews = [
-  { term: 'Cuánto hay disponible', desc: 'La plata que hay hoy en caja, calculada a partir de los movimientos. Nadie la escribe a mano.', preview: <MemberPreview.Available /> },
-  { term: 'Cuánto llevas ahorrado y ganado', desc: 'Tus cuotas pagadas, tu ganancia en actividades y tu parte de los intereses de los préstamos.', preview: <MemberPreview.Saved /> },
-  { term: 'Tus cuotas pendientes', desc: 'Si debes alguna cuota, te aparece un aviso apenas entras.', preview: <MemberPreview.Pending /> },
-  { term: 'Todos los movimientos', desc: 'La lista completa de lo que entra y sale, con el detalle de cada uno.', preview: <MemberPreview.Movements /> },
-  { term: 'Los préstamos', desc: 'Cuánto se prestó, cuánto se ha abonado y qué intereses faltan por pagar.', preview: <MemberPreview.Loans /> },
-  { term: 'Actividades y ranking de ventas', desc: 'Qué se está vendiendo, cuántas unidades tiene cada quien y el top 10 de quienes más han ganado.', preview: <MemberPreview.Ranking /> },
+  { icon: LandingIcon.Caja, term: 'Cuánto hay disponible', desc: 'La plata que hay hoy en caja, calculada a partir de los movimientos. Nadie la escribe a mano.', preview: <MemberPreview.Available /> },
+  { icon: LandingIcon.Ahorro, term: 'Cuánto llevas ahorrado y ganado', desc: 'Tus cuotas pagadas, tu ganancia en actividades y tu parte de los intereses de los préstamos.', preview: <MemberPreview.Saved /> },
+  { icon: LandingIcon.Aviso, term: 'Tus cuotas pendientes', desc: 'Si debes alguna cuota, te aparece un aviso apenas entras.', preview: <MemberPreview.Pending /> },
+  { icon: LandingIcon.Movimientos, term: 'Todos los movimientos', desc: 'La lista completa de lo que entra y sale, con el detalle de cada uno.', preview: <MemberPreview.Movements /> },
+  { icon: LandingIcon.Presta, term: 'Los préstamos', desc: 'Cuánto se prestó, cuánto se ha abonado y qué intereses faltan por pagar.', preview: <MemberPreview.Loans /> },
+  { icon: LandingIcon.Trofeo, term: 'Actividades y ranking de ventas', desc: 'Qué se está vendiendo, cuántas unidades tiene cada quien y el top 10 de quienes más han ganado.', preview: <MemberPreview.Ranking /> },
 ]
 
 const gains = [
@@ -157,7 +157,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section aria-labelledby="miembros-title" className="bg-white border-y border-[#d6e8dc]">
+        <section aria-labelledby="miembros-title" className="bg-[#eef4f0] border-y border-[#d6e8dc]">
           <div className={`${CONTAINER} py-16 md:py-24 grid lg:grid-cols-12 gap-10`}>
             <div className="lg:col-span-5 lg:sticky lg:top-8 self-start">
               <p className={EYEBROW}>Si ya eres parte</p>
@@ -165,7 +165,7 @@ export function LandingPage() {
               <p className={`${BODY} mt-4`}>Tus cuentas, sin tener que preguntarle a nadie.</p>
               <Link to="/login" className={`btn-primary mt-6 inline-flex min-h-11 items-center px-6 rounded-lg text-sm ${FOCUS}`}>Ingresar a mi natillera</Link>
               <p className="mt-3 text-xs text-[#4e7460]">Entras con el correo y la contraseña que te dio el administrador.</p>
-              <div aria-hidden="true" className="mt-10 lg:mt-12 inline-flex items-center justify-center w-28 h-28 md:w-32 md:h-32 rounded-full bg-white border border-[#d6e8dc] shadow-[5px_5px_0_0_#ebf2ed]">
+              <div aria-hidden="true" className="mt-10 lg:mt-12 inline-flex items-center justify-center w-28 h-28 md:w-32 md:h-32 rounded-full bg-white border border-[#d6e8dc] shadow-[5px_5px_0_0_#d6e8dc]">
                 <span className="inline-flex items-center justify-center w-[5.25rem] h-[5.25rem] md:w-24 md:h-24 rounded-full border border-dashed border-[#0c5c38]/35">
                   <img src="/favicon.svg" alt="" className="w-12 h-12 md:w-14 md:h-14 select-none" />
                 </span>
@@ -173,12 +173,12 @@ export function LandingPage() {
             </div>
             <div className="lg:col-span-7">
               <p className="badge-neutral inline-block px-2 py-1 rounded uppercase">Vistas previas · datos ficticios</p>
-              <dl className="mt-4 grid sm:grid-cols-2 gap-x-8">
+              <dl className="mt-4 grid sm:grid-cols-2 gap-5">
                 {memberViews.map(item => (
-                  <div key={item.term} className="py-5 border-t border-[#eef4f0]">
-                    <dt className="font-semibold text-[#0c1a12]">{item.term}</dt>
+                  <div key={item.term} className="flex flex-col rounded-xl border border-[#d6e8dc] bg-white p-5 shadow-[5px_5px_0_0_#d6e8dc]">
+                    <dt className="flex items-center gap-3 font-semibold text-[#0c1a12]"><item.icon className="w-9 h-9 shrink-0 text-[#0c5c38]" />{item.term}</dt>
                     <dd className="text-sm text-[#4e7460] mt-1 leading-relaxed">{item.desc}</dd>
-                    <div aria-hidden="true" className="mt-3 rounded-lg border border-[#eef4f0] bg-[#f8fbf8] p-3">{item.preview}</div>
+                    <div aria-hidden="true" className="mt-auto pt-3"><div className="rounded-lg border border-[#eef4f0] bg-[#f8fbf8] p-3">{item.preview}</div></div>
                   </div>
                 ))}
               </dl>
