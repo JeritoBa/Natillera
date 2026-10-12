@@ -2,7 +2,7 @@
 
 Single entry point for any AI coding agent (Claude Code, Copilot, Cursor, etc.). Read this first, then the documents it links. The owner talks to agents in **Spanish**; all repository documentation and code are in **English**.
 
-Last verified against the code: backend 267 tests and frontend 78 tests passing.
+Last verified against the code: backend 294 tests and frontend 78 tests passing.
 
 ---
 
@@ -46,7 +46,7 @@ Phase: **MVP and more are done; next is testing and deployment.** Hosting is und
 | Dashboard (admin and member variants), member savings/earnings | Implemented |
 | Public landing page, mobile-responsive UI | Implemented |
 | Unit tests (backend and frontend) | Implemented; integration tests pending |
-| **Not implemented** | In-app payments (separate integration project, high risk), member loan requests/approval workflow, `ActivitySale` entity (the assignment covers it), RowVersion concurrency, CI workflow, production deployment |
+| **Not implemented** | In-app payments (separate integration project, high risk), member loan requests/approval workflow, `ActivitySale` entity (the assignment covers it), RowVersion concurrency. CI workflow and deployment config (Render + Neon) are drafted, not yet live |
 
 The old "US-08 blocked" note is resolved: member savings = paid fees + activity earnings + interest share (DASH-04). Specs per feature: [docs/specs/README.md](docs/specs/README.md).
 
@@ -121,7 +121,7 @@ Rebuild after code changes: `docker compose up -d --build backend web`. In `Deve
 **Test.**
 
 ```bash
-dotnet test Natillera.sln          # backend, ~267 tests, no DB/Docker needed
+dotnet test Natillera.sln          # backend, ~294 tests, no DB/Docker needed
 cd Natillera.Frontend && npm test  # Vitest, ~78 tests, pure logic
 cd Natillera.Frontend && npm run lint && npm run build
 ```
@@ -134,7 +134,7 @@ Not covered by automated tests: EF repositories against Postgres, controllers, m
 dotnet ef migrations add <Name> -o Infrastructure/Persistence/Migrations
 ```
 
-Applied automatically **only in Development** at startup. Production migration strategy is an open item. Never edit an applied migration; add a new one. Renaming persisted enum values needs a data migration.
+Applied automatically in Development at startup; in any other environment only when `NATILLERA_APPLY_MIGRATIONS=true` (OPS-01, ADR-019: Render + Neon). Never edit an applied migration; add a new one. Renaming persisted enum values needs a data migration.
 
 **Knowledge graph (graphify).** The repo is indexed with [graphify](https://github.com/Graphify-Labs/graphify) into `graphify-out/` (git-ignored, regenerable). Before exploring code, query the graph instead of grepping or reading whole files:
 
@@ -203,7 +203,7 @@ From now on, **specs and rule IDs come before code**:
 5. **Tests reference rule IDs** in their names or in a comment when practical (e.g. `// MP-04`). Rule IDs are never reused or renumbered.
 6. If code and docs disagree, the owner decides which is right; fix the other and note it.
 
-Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, ACT (activities), DASH (dashboard), TX/AUD (transactions, audit), UI.
+Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, ACT (activities), DASH (dashboard), TX/AUD (transactions, audit), UI, OPS (operations, deployment).
 
 ---
 
@@ -222,8 +222,8 @@ Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, A
 
 ## 8. Known open items and technical debt
 
-- Migrations and admin seeding run only in Development; **production strategy pending**. Hosting undecided (the original Vercel plan must be re-evaluated for the .NET API and PostgreSQL; see ADR-018).
-- **No CI workflow yet.**
+- Migrations and admin seeding run in Development, or elsewhere only with the opt-in flag `NATILLERA_APPLY_MIGRATIONS=true` (OPS-01). Hosting decided: Render + Neon (ADR-019); not yet deployed (first-deploy empty-DB check pending).
+- **CI workflow drafted, not yet live.**
 - **Integration tests pending** (repositories/EF against Postgres, controllers, migrations, JWT middleware, the partial unique index).
 - **Interest rounding question (LOAN-10):** `Loan.CalculateMonthlyInterest` rounds `ToEven`, the per-member interest share rounds `AwayFromZero`; owner has not confirmed it is intentional (a characterization test documents current behavior). The method is not used by any service.
 - **RowVersion optimistic concurrency** pending (FIN-11).

@@ -26,6 +26,7 @@ One spec per feature. Specs describe **what the system must do** (behavior, rule
 | 010 | [Mobile responsive](010-mobile-responsive.md) | Implemented | UI-06 |
 | 011 | [Admin-friendly forms and navigation](011-admin-friendly-forms.md) | Implemented | UI-08..11, UI-03, MEM-04 |
 | 012 | [Available money check](012-available-money-check.md) | Implemented (backend) | FIN-13 |
+| 013 | [Production deployment readiness](013-production-deployment.md) | Implemented (backend) | AUTH-07, OPS-01..04 |
 
 Not specified because not implemented: in-app payments, member loan requests/approval workflow, payment reminders beyond the dashboard notice, production deployment/CI.
 

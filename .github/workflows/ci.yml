@@ -1,0 +1,63 @@
+name: CI
+
+# No workflow-level path filters: every commit must get checks, because Render
+# deploys main only after checks pass (autoDeployTrigger: checksPass).
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: |
+            Natillera.Backend/Natillera.Backend.csproj
+            Natillera.Backend.Tests/*.csproj
+
+      - name: Restore
+        run: dotnet restore Natillera.sln
+
+      - name: Test
+        run: dotnet test Natillera.sln -c Release --no-restore
+
+  frontend:
+    name: Frontend lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Natillera.Frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Natillera.Frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: Build
+        run: npm run build
+        env:
+          # Dummy value: the CI build only checks that the SPA compiles.
+          VITE_API_URL: https://api.example.invalid
