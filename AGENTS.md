@@ -136,6 +136,24 @@ dotnet ef migrations add <Name> -o Infrastructure/Persistence/Migrations
 
 Applied automatically **only in Development** at startup. Production migration strategy is an open item. Never edit an applied migration; add a new one. Renaming persisted enum values needs a data migration.
 
+**Knowledge graph (graphify).** The repo is indexed with [graphify](https://github.com/Graphify-Labs/graphify) into `graphify-out/` (git-ignored, regenerable). Before exploring code, query the graph instead of grepping or reading whole files:
+
+```bash
+graphify query "<question>"       # scoped subgraph for a question
+graphify explain "<concept>"      # a node and its neighbors (e.g. "MonthlyPaymentService")
+graphify path "<A>" "<B>"         # how two concepts connect
+graphify update .                 # after code changes (AST only, no LLM cost)
+```
+
+Rules for agents:
+- For any codebase question, run `graphify query` first (when `graphify-out/graph.json` exists); use `path` for relationships and `explain` for a focused concept. They return a scoped subgraph, much smaller than grep output or `GRAPH_REPORT.md`. Raise `--budget` if the answer is truncated.
+- If `graphify-out/wiki/index.md` exists, use it for broad navigation instead of browsing raw sources.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture reviews or when query/path/explain do not surface enough context.
+- Read raw files only after the graph has oriented you, or to modify/debug specific lines. Include this rule in every subagent prompt that explores code.
+- After modifying code, run `graphify update .` to keep the graph current.
+
+`graphify-out/GRAPH_REPORT.md` summarizes hubs and communities. A Claude Code `PreToolUse` hook (`.claude/settings.json`) reminds agents to use the graph before `Grep`/`Read`. When docs or specs change substantially, rebuild the semantic part with `/graphify . --update`. Exclusions live in `.graphifyignore`. If `graphify-out/` is missing (fresh clone), run `/graphify .` once.
+
 ---
 
 ## 5. Working agreements

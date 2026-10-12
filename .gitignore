@@ -118,3 +118,6 @@ logs/
 *.tmp
 *.temp
 *.cache
+# graphify knowledge graph (regenerable)
+graphify-out/
+.claude

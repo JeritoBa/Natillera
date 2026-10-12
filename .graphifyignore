@@ -1,0 +1,11 @@
+# Generated or binary content that adds noise to the knowledge graph
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+Natillera.Backend/Infrastructure/Persistence/Migrations/*.Designer.cs
+Natillera.Backend/Infrastructure/Persistence/Migrations/NatilleraDbContextModelSnapshot.cs
+Natillera.Frontend/design/
+Natillera.Frontend/public/
+Natillera.Frontend/package-lock.json
+docs/diagrams/ER.mwb
