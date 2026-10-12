@@ -145,8 +145,11 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+if (DatabaseStartupPolicy.ShouldApplyMigrations(
+        app.Environment.EnvironmentName,
+        app.Configuration[DatabaseStartupPolicy.ApplyMigrationsKey]))
 {
+    app.Logger.LogInformation("Applying database migrations and admin seed.");
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<NatilleraDbContext>();
     await dbContext.Database.MigrateAsync();
@@ -154,12 +157,19 @@ if (app.Environment.IsDevelopment())
         dbContext,
         scope.ServiceProvider.GetRequiredService<IPasswordHasher>(),
         app.Configuration);
-
-    app.UseSwagger();
-    app.UseSwaggerUI();
+}
+else
+{
+    app.Logger.LogInformation("Skipping database migrations and admin seed (NATILLERA_APPLY_MIGRATIONS is not true).");
 }
 
-app.UseHttpsRedirection();
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+    app.UseHttpsRedirection();
+}
+
 app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
