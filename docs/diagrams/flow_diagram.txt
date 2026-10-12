@@ -1,4 +1,4 @@
-# Natillera — Business Process Flow Diagrams
+# Natillera - Business Process Flow Diagrams
 
 ## Purpose
 
@@ -6,69 +6,96 @@ These flow diagrams represent the main business processes of the Natillera syste
 
 They focus on **what happens in the business**, not on software classes, controllers, repositories, or database implementation details.
 
+Updated to the current implementation. Rules are cataloged by ID in docs/business-rules.md; features are specified in docs/specs.
+
+Conventions that apply to EVERY flow below:
+
+* Only the Admin performs mutations; Members are read-only (AUTH-01).
+* Each create / update / cancel of a business entity, its Transaction (when it has one) and its Log entry are saved together in one database transaction. If any part fails nothing is saved (FIN-05).
+* "Cancel" never deletes: the entity becomes CANCELLED and its live Transaction is flagged cancelled, so it no longer counts in any balance (FIN-06). A cancelled record cannot be modified or cancelled again (FIN-07).
+* Pending items (monthly payment, loan interest, activity assignment) have NO Transaction. The INCOME Transaction is created when the item is marked PAID, and PAID never goes back to PENDING (FIN-08).
+
 ---
 
-# 1. Register Monthly Payment
+# 1. Register and Pay a Monthly Payment
 
 ## Business objective
 
-Register a member's monthly contribution to the Natillera and record the corresponding financial movement.
+Register a member's monthly contribution (pending or paid) and record the corresponding financial movement only when the money is received.
 
 ## Flow
 
 ```text
 START
   ↓
-Member initiates monthly payment
-  ↓
-Identify member
-  ↓
-Validate member
+Admin selects member, year, month, amount
+and the initial status (PENDING or PAID)
   ↓
 Is the member active?
-  ├── NO → Reject payment → END
+  ├── NO → Reject → END
   │
   └── YES
         ↓
-   Identify payment period
-   (Year + Month)
-        ↓
-   Check whether the member
-   already has a payment
-   for this period
-        ↓
-   Does a payment already exist?
-   ├── YES → Reject duplicate payment → END
+   Is the amount >= the configured minimum?
+   ├── NO → Reject → END
    │
-   └── NO
+   └── YES
          ↓
-      Enter payment amount
-         ↓
-      Validate amount
-         ↓
-      Is the amount valid?
-      ├── NO → Reject payment → END
+      Does a NON-CANCELLED payment already exist
+      for this member + year + month?
+      ├── YES → Reject duplicate (conflict) → END
       │
-      └── YES
+      └── NO
             ↓
-         Register MonthlyPayment
+         Create MonthlyPayment
             ↓
-         Register financial Transaction
-         Direction = INCOME
-         Type = MONTHLY_PAYMENT
-            ↓
-         Confirm payment
-            ↓
-           END
+         Initial status?
+         ├── PENDING → no Transaction yet
+         │              ↓
+         │           Write Log (create) → END
+         │
+         └── PAID → Create Transaction
+                     Direction = INCOME
+                     Type = MONTHLY_PAYMENT
+                     Link it and set PaidAt
+                     ↓
+                  Write Log (create) → END
 ```
+
+## Mark a pending payment as paid (edit)
+
+```text
+Admin edits a PENDING payment and sets status PAID
+  ↓
+Does it already have a live (non-cancelled) Transaction?
+  ├── YES → reuse and update it
+  ├── CANCELLED Transaction → Reject (it cannot be reused) → END
+  └── NONE → create INCOME Transaction (MONTHLY_PAYMENT)
+  ↓
+Set status PAID + PaidAt, write Log (update) → END
+```
+
+Editing a PAID payment updates its amount and Transaction; setting it back to PENDING is rejected.
+
+## Cancel ("Anular")
+
+```text
+Admin cancels a PENDING or PAID payment
+  ↓
+Already cancelled? ── YES → Reject → END
+  ↓ NO
+Status = CANCELLED, cancel its live Transaction (if any)
+  ↓
+Write Log (delete) → END
+```
+
+After cancelling, the same member/period can be registered again.
 
 ## Important business rules
 
-* Only active members can make monthly payments.
-* A member cannot have two monthly payments for the same year and month if the business rule is one contribution per period.
-* The payment amount must satisfy the Natillera's defined amount rules.
-* The monthly payment and its financial transaction must be registered consistently.
-* If the financial transaction cannot be registered, the monthly payment should not be considered successfully completed.
+* MP-01 .. MP-09 and MEM-07 (see business-rules.md).
+* Members only see PAID payments; the Admin sees every status.
+* A member's PENDING payments are the "pending payments" notice shown on the dashboard and block the member's deactivation.
 
 ---
 
@@ -76,131 +103,109 @@ Is the member active?
 
 ## Business objective
 
-Create a loan for an eligible member and register the money disbursement made by the Natillera.
+Create a loan for an active member and register the money disbursement made by the Natillera.
 
 ## Flow
 
 ```text
 START
   ↓
-Member requests loan
+Admin enters borrower, principal amount,
+interest rate and start date
   ↓
-Identify borrower
-  ↓
-Validate borrower
-  ↓
-Is the borrower eligible?
-  ├── NO → Reject loan request → END
+Is the borrower an active member?
+  ├── NO → Reject → END
   │
   └── YES
         ↓
-     Enter loan information
-     - Principal amount
-     - Interest rate
-     - Start date
-        ↓
-     Validate loan information
-        ↓
-     Is the information valid?
-     ├── NO → Reject loan → END
+     Is amount > 0 and interest rate >= 0?
+     ├── NO → Reject → END
      │
      └── YES
            ↓
-        Create Loan
-           ↓
-        Disburse money to borrower
+        Create Loan (status ACTIVE)
            ↓
         Register financial Transaction
         Direction = EXPENSE
         Type = LOAN
            ↓
-        Confirm loan
+        Write Log (create)
            ↓
           END
 ```
 
+## Edit or cancel a loan
+
+```text
+Admin edits or cancels a loan
+  ↓
+Is the loan cancelled? ── YES → Reject → END
+  ↓ NO
+Does it have any NON-CANCELLED payment or interest?
+  ├── YES → Reject (cancel those first) → END
+  │
+  └── NO
+        ↓
+     Edit → update loan and its Transaction amount
+     Cancel → loan = CANCELLED, cancel its Transaction
+        ↓
+     Write Log (update / delete) → END
+```
+
 ## Important business rules
 
-* Only eligible members can receive a loan.
-* The principal amount must be valid according to Natillera rules.
-* The interest rate must be valid.
-* Creating the loan and registering its disbursement should be treated as one consistent financial operation.
+* LOAN-01, LOAN-07, MEM-07.
+* There is no member loan request or approval step: the Admin creates loans directly.
+* A member cannot be deactivated while having an ACTIVE loan.
 
 ---
 
-# 3. Make Loan Payment
+# 3. Make Loan Payment (principal)
 
 ## Business objective
 
-Register a payment made by a borrower toward an existing loan and update the loan's financial state.
+Register a payment made by a borrower toward the principal of an existing loan and update the loan's financial state.
 
 ## Flow
 
 ```text
 START
   ↓
-Borrower makes payment
+Admin selects the loan and enters amount + payment method (CASH or TRANSFER)
   ↓
-Identify loan
-  ↓
-Validate loan
-  ↓
-Does the loan exist?
-  ├── NO → Reject payment → END
+Does the loan exist and is it not cancelled?
+  ├── NO → Reject → END
   │
   └── YES
         ↓
-     Is the loan active?
+     Outstanding principal =
+       initial amount - sum of non-cancelled payments
         ↓
-      ├── NO → Reject payment → END
-      │
-      └── YES
-            ↓
-         Calculate outstanding balance
-         based on registered payments
-            ↓
-         Enter payment amount
-            ↓
-         Is payment amount valid?
-         ├── NO → Reject payment → END
-         │
-         └── YES
-               ↓
-            Is payment greater than
-            outstanding balance?
-               ↓
-            ├── YES → Reject or adjust payment
-            │         according to business rules
-            │         → END
-            │
-            └── NO
-                  ↓
-               Create LoanPayment
-                  ↓
-               Register financial Transaction
-               Direction = INCOME
-               Type = LOAN_PAYMENT
-                  ↓
-               Is loan completely paid and no performance pending?
-                  ↓
-               ├── YES → Change Loan status to PAID
-               │
-               └── NO → Keep Loan status ACTIVE
-                  ↓
-               Confirm payment
-                  ↓
-                 END
+     Is amount > 0 and <= outstanding principal?
+     ├── NO → Reject (a payment can never exceed the principal) → END
+     │
+     └── YES
+           ↓
+        Create LoanPayment (PAID)
+           ↓
+        Register financial Transaction
+        Direction = INCOME
+        Type = LOAN_PAYMENT
+           ↓
+        Refresh loan status:
+          outstanding principal = 0 AND no PENDING interest
+            ├── YES → loan = PAID (set end date)
+            └── NO  → loan = ACTIVE
+           ↓
+        Write Log (create) → END
 ```
+
+Editing a payment is allowed up to (outstanding principal + its previous amount) and updates its Transaction. Cancelling a payment cancels its Transaction, refreshes the loan status (a PAID loan returns to ACTIVE and its end date is cleared) and writes a Log.
 
 ## Important business rules
 
-* The loan must exist.
-* Only an active loan can normally receive payments.
-* The payment must be greater than zero.
-* The payment cannot exceed the outstanding balance unless the business explicitly supports overpayments.
-* Outstanding balance is calculated from the loan principal and its registered payments.
-* When the outstanding balance reaches zero and there isn't any pending performance, the loan becomes `PAID`.
-* The LoanPayment and its Transaction must be registered consistently.
+* LOAN-02 .. LOAN-06.
+* "Total por pagar" = outstanding principal + pending interest (LOAN-08).
 
 ---
 
@@ -208,63 +213,83 @@ Does the loan exist?
 
 ## Business objective
 
-Create an activity financed by Natillera resources and assign a quantity of products or units to a participating member.
+Create an activity financed by Natillera resources, assign quantities of units to members, and record the income when each assignment is paid.
 
-## Flow
+## Flow: create / edit / cancel the activity
 
 ```text
 START
   ↓
-Natillera decides to create activity
+Admin enters name, description, quantity,
+unit cost, unit sale price, start date
   ↓
-Define activity information
-  - Name
-  - Description
-  - Quantity
-  - Unit cost
-  - Unit sale price
-  - Start date
-  ↓
-Validate activity information
-  ↓
-Is the information valid?
-  ├── NO → Reject activity → END
+Are quantity, cost and price > 0 AND price >= cost?
+  ├── NO → Reject → END
   │
   └── YES
         ↓
-     Create Activity
+     Create Activity (status PENDING)
         ↓
-     Identify participating member
+     Register Transaction
+     Direction = EXPENSE, Type = ACTIVITY
+     Amount = quantity x unit cost
         ↓
-     Is the member active?
-     ├── NO → Reject assignment → END
+     Write Log (create) → END
+```
+
+* Editing updates the activity and its EXPENSE amount. Quantity cannot go below the assigned quantity, and the sale price cannot change once an assignment is PAID.
+* Cancelling is rejected while the activity has non-cancelled assignments; otherwise the activity and its EXPENSE Transaction are cancelled.
+
+## Flow: assign units to a member
+
+```text
+Admin selects activity, member and quantity
+  ↓
+Is the activity cancelled? ── YES → Reject → END
+  ↓ NO
+Is the member active? ── NO → Reject → END
+  ↓ YES
+Does the member already have a NON-CANCELLED assignment in this activity?
+  ├── YES → Reject → END
+  │
+  └── NO
+        ↓
+     Is 0 < quantity <= available units?
+     ├── NO → Reject → END
      │
      └── YES
            ↓
-        Define quantity assigned
+        Create ActivityAssignment (PENDING, no Transaction)
            ↓
-        Is quantity available?
-        ├── NO → Reject assignment → END
-        │
-        └── YES
-              ↓
-           Create ActivityAssignment
-              ↓
-           Reduce available activity quantity
-              ↓
-           Confirm assignment
-              ↓
-             END
+        Refresh activity status → Write Log (create) → END
 ```
+
+## Flow: collect an assignment
+
+```text
+Admin marks a PENDING assignment as PAID
+(quantity can only be edited while PENDING)
+  ↓
+Register Transaction
+Direction = INCOME, Type = ACTIVITY_SALE
+Amount = quantity assigned x unit sale price
+  ↓
+Assignment = PAID (PaidAt set)
+  ↓
+Refresh activity status:
+  all units assigned AND all non-cancelled assignments PAID → FINISHED ("Cerrada")
+  otherwise → PENDING
+  ↓
+Write Log (update) → END
+```
+
+Cancelling an assignment (PENDING or PAID) cancels its Transaction if it was paid, refreshes the activity status (a FINISHED activity returns to PENDING) and writes a Log.
 
 ## Important business rules
 
-* An activity must contain valid product and financial information.
-* Only active members can participate.
-* A member cannot be assigned more units than are available.
-* The assignment represents the responsibility of a member for a quantity of units.
-* Individual sales are not tracked in the current model.
-* The member keeps the profit generated from the units they sell according to the Natillera's business rules.
+* ACT-01 .. ACT-12.
+* The assignment is the sale record; there is no separate ActivitySale entity.
+* A member cannot be deactivated with PENDING assignments.
 
 ---
 
@@ -279,205 +304,160 @@ Record an actual financial movement generated by a business operation.
 ```text
 START
   ↓
-Business operation generates
-a financial movement
+A business operation (see flows 1-4 and 6) generates a movement
   ↓
-Identify movement
-  ↓
-Determine amount
-  ↓
-Determine direction
-  - INCOME
-  - EXPENSE
+Determine amount (> 0) and direction
+  - INCOME  = money enters the Natillera
+  - EXPENSE = money leaves the Natillera
   ↓
 Determine transaction type
-  - MONTHLY_PAYMENT
-  - LOAN_PAYMENT
-  - LOAN_DISBURSEMENT
-  - Other valid business types
+  - MONTHLY_PAYMENT (income)
+  - LOAN (expense)
+  - LOAN_PAYMENT (income)
+  - PERFORMANCE = loan interest (income)
+  - ACTIVITY (expense)
+  - ACTIVITY_SALE (income)
   ↓
-Validate transaction information
+Create Transaction inside the SAME database transaction
+as the originating entity and its Log
   ↓
-Is the information valid?
-  ├── NO → Reject transaction → END
-  │
-  └── YES
-        ↓
-     Create Transaction
-        ↓
-     Associate transaction
-     with the originating
-     business operation
-        ↓
-     Confirm financial movement
-        ↓
-       END
+END
 ```
 
 ## Important business rules
 
-* Every transaction represents an actual financial movement.
-* `Direction` describes what happened to the money:
-
-  * `INCOME` = money enters the Natillera.
-  * `EXPENSE` = money leaves the Natillera.
-* `Type` describes the business reason for the movement.
-* A transaction should not exist without a legitimate business reason.
-* A transaction should not be used as a generic container for unrelated business entities.
-* Financial transactions should not be silently modified in ways that compromise financial history.
+* A Transaction is created and changed only by the operation that owns it; there is no endpoint to create or edit one directly.
+* Each business entity has at most one Transaction (1:1); pending items have none yet.
+* Cancelled Transactions stay visible but are excluded from every balance.
+* Available money = sum of INCOME - sum of EXPENSE of non-cancelled Transactions; it is derived, never stored.
 
 ---
 
-# 6. Generate and Pay Loan Performance / Return
+# 6. Register and Pay Loan Interest (Performance)
 
 ## Business objective
 
-Represent the financial return generated by a loan and register the payment when that return is collected.
+Represent the interest generated by a loan and record the income when it is collected. Interest is entered manually by the Admin; it is not generated automatically.
 
-## Phase A — Generate performance
+## Flow
 
 ```text
 START
   ↓
-Loan exists
+Admin enters interest amount (> 0), description
+and status PENDING or PAID for an existing, non-cancelled loan
   ↓
-Loan becomes subject to
-interest / financial return
+Status?
+  ├── PENDING → create Performance, no Transaction
+  └── PAID → create Performance + Transaction
+              Direction = INCOME
+              Type = PERFORMANCE
   ↓
-Determine applicable interest
-rate
+Refresh loan status (pending interest keeps the loan ACTIVE)
   ↓
-Determine period or condition
-used to generate the return
-  ↓
-Calculate generated return
-  ↓
-Is the generated amount valid?
-  ├── NO → Do not generate return → END
-  │
-  └── YES
-        ↓
-     Create Loan Performance
-     / Loan Return
-        ↓
-     Mark return as generated
-     but not yet paid
-        ↓
-       END
+Write Log (create) → END
 ```
 
-## Phase B — Pay generated performance
+## Mark pending interest as paid / cancel
 
 ```text
-START
+Admin edits PENDING interest and sets status PAID
   ↓
-Borrower pays generated return
+Create INCOME Transaction (PERFORMANCE), set PaidAt
   ↓
-Identify Loan Return
-  ↓
-Validate return
-  ↓
-Does the return exist?
-  ├── NO → Reject payment → END
-  │
-  └── YES
-        ↓
-     Is the return still unpaid?
-     ├── NO → Reject duplicate payment → END
-     │
-     └── YES
-           ↓
-        Validate payment amount
-           ↓
-        Is payment valid?
-        ├── NO → Reject payment → END
-        │
-        └── YES
-              ↓
-           Register payment
-              ↓
-           Register financial Transaction
-           Direction = INCOME
-           Type = LOAN_RETURN / LOAN_INTEREST
-              ↓
-           Mark return as paid
-              ↓
-           Confirm payment
-              ↓
-             END
+Refresh loan status, write Log (update) → END
+
+PAID → PENDING is rejected.
+
+Cancel: interest = CANCELLED; if it was PAID its Transaction is cancelled;
+refresh loan status; write Log (delete).
 ```
 
 ## Important business rules
 
-* A loan must exist before a return can be generated.
-* The return must be calculated according to the defined interest/return rules.
-* A generated return and a paid return are different business states.
-* A return should not be paid more than once.
-* When the return is paid, the corresponding financial transaction must record an `INCOME`.
-* The generated return and its payment should remain distinguishable from the loan principal and from the loan repayment itself.
+* LOAN-05, LOAN-06, FIN-08.
+* Paid interest is shared equally among active members (rounded to 2 decimals) in each member's savings (DASH-06).
+* Open question LOAN-10: interest rounding mode.
+
+---
+
+# 7. Deactivate a Member
+
+## Business objective
+
+Remove a member from active participation without losing history, only when they owe nothing.
+
+## Flow
+
+```text
+START
+  ↓
+Admin deactivates a member
+  ↓
+Does the member have any of:
+  - PENDING monthly payments
+  - ACTIVE loans
+  - PENDING loan interest
+  - PENDING activity assignments
+  ├── YES → Reject, listing the counts per kind → END
+  │
+  └── NO
+        ↓
+     is_active = false
+        ↓
+     The member can no longer log in and any open session
+     stops working on its next request (token rejected, HTTP 401)
+        ↓
+       END
+```
+
+Activating a member is always allowed. Member changes do not write Log entries today (open question MEM-08).
+
+---
+
+# 8. Login and Session
+
+## Flow
+
+```text
+START
+  ↓
+User submits email + password
+  ↓
+Valid credentials?
+  ├── NO → generic "invalid email or password" → END
+  │
+  └── YES
+        ↓
+     Is the user active?
+     ├── NO → "inactive user" → END
+     │
+     └── YES → issue JWT (role Admin or Member) → dashboard
+  ↓
+Every later request: token valid AND user still active?
+  ├── NO → HTTP 401 → frontend logs out and shows
+  │        "Tu sesión ya no es válida. Inicia sesión de nuevo."
+  └── YES → continue
+```
 
 ---
 
 # Diagram Relationship Overview
 
-These processes are related but should remain separate diagrams.
+Every financial operation follows the same shape; the entity decides when the Transaction exists.
 
 ```text
-                  ┌─────────────────────┐
-                  │ Monthly Payment     │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                       Financial
-                       Transaction
+ Monthly payment (PENDING → PAID) ─┐
+ Loan interest   (PENDING → PAID) ─┼─→ INCOME Transaction created when marked PAID
+ Activity assignment (PENDING → PAID)┘
 
+ Loan payment ───────────────────────→ INCOME Transaction created with the payment
+ Create Loan ────────────────────────→ EXPENSE Transaction created with the loan
+ Create Activity ────────────────────→ EXPENSE Transaction created with the activity
 
-                  ┌─────────────────────┐
-                  │ Create Loan         │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                       Loan Disbursement
-                             │
-                             ▼
-                       Financial
-                       Transaction
+ Any create / update / cancel ───────→ one Log entry (same database transaction)
+ Any cancel ─────────────────────────→ entity CANCELLED + live Transaction cancelled
 
-
-                  ┌─────────────────────┐
-                  │ Loan Payment        │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                       Financial
-                       Transaction
-
-
-                  ┌─────────────────────┐
-                  │ Activity            │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                  Activity Assignment
-                             │
-                             ▼
-                         Member
-
-
-                  ┌─────────────────────┐
-                  │ Loan Return        │
-                  │ Generation         │
-                  └──────────┬──────────┘
-                             │
-                             ▼
-                    Generated Return
-                             │
-                             ▼
-                    Return Payment
-                             │
-                             ▼
-                       Financial
-                       Transaction
+ Transactions (non-cancelled) ───────→ Available money (derived)
+ Available money + lent + activities → Total natillera balance (dashboard, derived)
 ```
-
-

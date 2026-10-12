@@ -1,41 +1,60 @@
 Entities Properties Guide for AI Agent
 
-Important: 
-- Id it's always primary key and with UUID format
-- All entities are required, except those who are marked with POSSIBLE NULL
+Source of truth: the EF Core model (Natillera.Backend/Domain/Entities and
+Natillera.Backend/Infrastructure/Persistence/Configurations) and its migrations.
+Last verified against migration 20261009154159_MonthlyPaymentPendingAndCancellation.
+Rules live in docs/business-rules.md. Column names below are written in snake_case
+for readability; in the database they are PascalCase (FirstName, TransactionId...).
+
+Important:
+- Id is always the primary key and has UUID (Guid) format
+- All properties are required, except those marked with POSSIBLE NULL
+- Money is DECIMAL(18,2) (never float). The loan interest_rate is DECIMAL(9,4) and is a percentage (e.g. 2.5 = 2.5%)
+- Every ENUM is stored as a VARCHAR holding the member name (e.g. 'Pending', 'MonthlyPayment'), not as a number.
+  Enum values below are written exactly as stored.
+- Foreign keys use ON DELETE RESTRICT: nothing is physically deleted. "Deleting" = status Cancelled
+- Rule: every business entity that moves money has exactly ONE Transaction (1:1, unique transaction_id).
+  Pending items have NO Transaction until they are paid (transaction_id is POSSIBLE NULL there).
 
 User
 - id
 - first_name VARCHAR(45)
 - last_name VARCHAR(45)
-- email VARCHAR(100) UNIQUE
-- password_hash VARCHAR(300)
+- email VARCHAR(100) UNIQUE (stored trimmed, lower-case)
+- password_hash VARCHAR(300) (BCrypt)
 - phone VARCHAR(10)
-- role ENUM('member', 'admin') DEFAULT 'member'
+- role ENUM('Member', 'Admin') DEFAULT 'Member'
 - is_active BOOL DEFAULT true
-- created_at DATETIME DEFAULT now()
+- created_at DATETIME (UTC, set by the domain)
 - updated_at DATETIME POSSIBLE NULL
 
 Technical Entities
 
 Transaction
-- id 
-- amount DECIMAL
-- direction ENUM('income', 'expense')
-- type ENUM('monthly_payment', 'activity', 'activity_sale', 'loan', 'loan_payment', 'performance')
-- occurred_at DATETIME DEFAULT now()
-- description VARCHAR(200)
-- is_cancelled BOOL DEFAULT false
-
-Log
 - id
-- entity_type ENUM('monthly_payment', 'activity', 'activity_sale', 'loan', 'loan_payment', 'performance', 'transaction')
-- entity_id
-- action ENUM ('create', 'update', 'delete')  DEFAULT 'create'
-- occured_at DATETIME
+- amount DECIMAL (always > 0; the sign comes from direction)
+- direction ENUM('Income', 'Expense')
+- type ENUM('MonthlyPayment', 'Activity', 'ActivitySale', 'Loan', 'LoanPayment', 'Performance')
+    MonthlyPayment = Income  (fee paid)
+    Loan           = Expense (money lent)
+    LoanPayment    = Income  (principal payment)
+    Performance    = Income  (loan interest paid)
+    Activity       = Expense (cost of an activity: quantity x unit_cost)
+    ActivitySale   = Income  (paid activity assignment: quantity_assigned x unit_sale_price)
+- occurred_at DATETIME
+- description VARCHAR(200)
+- is_cancelled BOOL DEFAULT false (a cancelled transaction is excluded from every balance but stays visible)
+
+Log (immutable audit record; one per create/update/cancel, written in the same DB transaction as the change)
+- id
+- entity_type ENUM('MonthlyPayment', 'Activity', 'ActivityAssignment', 'Loan', 'LoanPayment', 'Performance', 'Transaction')
+    ('ActivityAssignment' replaced the old 'ActivitySale'. 'Transaction' exists but no service writes it today.)
+- entity_id (UUID of the audited entity; not a database FK)
+- action ENUM('Create', 'Update', 'Delete')   -- 'Delete' means cancellation
+- occurred_at DATETIME
 - old_value DECIMAL POSSIBLE NULL
 - new_value DECIMAL POSSIBLE NULL
-- user_id FK WITH User 
+- user_id FK WITH User (the user who performed the operation, from the JWT)
 
 Business Entities
 
@@ -43,73 +62,91 @@ Activity
 - id
 - name VARCHAR(100)
 - description VARCHAR(200)
-- quantity INT
-- unit_cost DECIMAL
-- unit_sale_price DECIMAL
+- quantity INT (> 0)
+- unit_cost DECIMAL (> 0)
+- unit_sale_price DECIMAL (>= unit_cost)
 - start_date DATE
-- status ENUM('pending', 'finished', 'cancelled') DEFAULT 'pending'
-- created_at DATETIME DEFAULT now()
-- transaction_id FK WITH Transaction
+- status ENUM('Pending', 'Finished', 'Cancelled') DEFAULT 'Pending'
+    Finished/Pending is automatic: Finished only when ALL units are assigned and every non-cancelled assignment is Paid.
+- created_at DATETIME
+- transaction_id FK WITH Transaction (UNIQUE; Expense created together with the activity)
 
-ActivityAssignment
+ActivityAssignment (replaces the planned ActivitySale entity: the assignment is the sale record)
 - id
-- quantity_assigned INT
-- assigned_at DATETIME DEFAULT now()
-- status ENUM('pending', 'paid', 'cancelled')
+- quantity_assigned INT (> 0)
+- assigned_at DATETIME
+- status ENUM('Pending', 'Paid', 'Cancelled') DEFAULT 'Pending'
 - paid_at DATETIME POSSIBLE NULL
 - activity_id FK WITH Activity
 - user_id FK WITH User
-- transaction_id FK WITH Transaction POSSIBLE NULL
+- transaction_id FK WITH Transaction POSSIBLE NULL (UNIQUE; Income created when marked Paid)
+  Rule: one non-cancelled assignment per member per activity (checked in the domain, not by an index).
 
 Loan
 - id
-- initial_amount DECIMAL
-- interest_rate DECIMAL
+- initial_amount DECIMAL (> 0)
+- interest_rate DECIMAL(9,4) (>= 0, percentage)
 - start_date DATE
-- end_date DATE
-- status ENUM('active', 'paid', 'cancelled')
-- created_at DATETIME DEFAULT now()
+- end_date DATE POSSIBLE NULL (set automatically when the loan becomes Paid)
+- status ENUM('Active', 'Paid', 'Cancelled') DEFAULT 'Active'
+    Paid when outstanding principal = 0 and there is no Pending interest; automatic, can revert to Active.
+- created_at DATETIME
 - updated_at DATETIME POSSIBLE NULL
 - borrower_id FK WITH User
-- transaction_id FK WITH Transaction
+- transaction_id FK WITH Transaction (UNIQUE; Expense created together with the loan)
 
-LoanPayment
+LoanPayment (principal payment)
 - id
-- amount DECIMAL
+- amount DECIMAL (> 0, can never exceed the outstanding principal)
 - paid_at DATETIME
-- payment_method ENUM('cash', 'transfer') 
-- status ENUM('paid', 'cancelled') DEFAULT 'paid'
+- payment_method ENUM('Cash', 'Transfer')
+- status ENUM('Paid', 'Cancelled') DEFAULT 'Paid'
 - loan_id FK WITH Loan
-- transaction_id FK WITH Transaction
+- transaction_id FK WITH Transaction (UNIQUE; Income)
 
-Performance
+Performance (loan interest, registered manually by the admin)
 - id
-- amount DECIMAL
+- amount DECIMAL (> 0)
 - description VARCHAR(200)
-- status ENUM('pending', 'paid', 'cancelled') DEFAULT 'pending'
+- status ENUM('Pending', 'Paid', 'Cancelled') DEFAULT 'Pending'
 - paid_at DATETIME POSSIBLE NULL
-- created_at DATETIME DEFAULT now()
-- transaction_id FK WITH Transaction POSSIBLE NULL
+- created_at DATETIME
+- transaction_id FK WITH Transaction POSSIBLE NULL (UNIQUE; Income created when marked Paid)
 - loan_id FK WITH Loan
 
 MonthlyPayment
 - id
-- amount DECIMAL
+- amount DECIMAL (> 0 and >= NATILLERA_MIN_MONTHLY_PAYMENT)
 - paid_at DATETIME POSSIBLE NULL
-- year INT
-- month INT
-- status ENUM('pending', 'paid', 'cancelled')
-- created_at DATETIME DEFAULT now()
-- transaction_id FK WITH Transaction POSSIBLE NULL
+- year INT (>= 1)
+- month INT (1-12)
+- status ENUM('Pending', 'Paid', 'Cancelled')   (created as Pending or Paid; entity default is Pending)
+- created_at DATETIME
+- transaction_id FK WITH Transaction POSSIBLE NULL (UNIQUE; Income created when marked Paid)
 - user_id FK WITH User
 
-Too, create index for the following entities:
+Derived values (never stored)
+- Loan outstanding principal = initial_amount - SUM(non-cancelled LoanPayment.amount)
+- Available money = SUM(Income) - SUM(Expense) over non-cancelled transactions
+- Member savings / earnings: see docs/business-rules.md (DASH-04, DASH-05, DASH-06)
+
+Not in the model (not implemented): ActivitySale, in-app payment records, loan requests/approvals,
+RowVersion concurrency tokens (planned, rule FIN-11).
+
+Indexes (as created by the migrations / configurations):
 - User.email UNIQUE
-- MonthlyPayment(user_id, year, month) UNIQUE WHERE status <> 'cancelled'
+- MonthlyPayment(user_id, year, month) UNIQUE WHERE status <> 'Cancelled'   (partial index)
+- MonthlyPayment.transaction_id UNIQUE
+- Loan.transaction_id UNIQUE
 - LoanPayment.loan_id
+- LoanPayment.transaction_id UNIQUE
 - Performance.loan_id
+- Performance.transaction_id UNIQUE
+- Activity.transaction_id UNIQUE
 - ActivityAssignment.activity_id
 - ActivityAssignment.user_id
+- ActivityAssignment.transaction_id UNIQUE
+- Transaction.occurred_at
+- Log(entity_type, entity_id)
+- Log.occurred_at
 - Log.user_id
-
-

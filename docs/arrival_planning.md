@@ -1,3 +1,13 @@
+> **Historical document - the original plan.** It is kept as written and is no longer maintained. For the current state of the project see [AGENTS.md](../AGENTS.md), the [business rules](business-rules.md), the [feature specs](specs/README.md) and the [architecture decisions](architecture_decisions.md).
+>
+> What changed since this plan:
+> - The MVP and more were built: Loans, loan payments and interest, Performances (as loan interest), Activities and assignments, a redesigned dashboard, a public landing page and a mobile-responsive UI are **implemented** (they were Post-MVP here).
+> - US-08 (saved money + performances) is resolved: member savings = paid fees + activity earnings + interest share (DASH-04); loans never count.
+> - There is no `ActivitySale` entity: the activity assignment is the sale record.
+> - Not implemented: in-app payments and member loan requests/approval.
+> - Records are cancelled, never deleted; pending items have no transaction (see ADR-010, ADR-011).
+> - Current phase: testing and deployment; hosting is undecided (the original plan named Vercel; whether it fits the .NET API and PostgreSQL is still to be evaluated, see ADR-018).
+
 
 # Natillera Planning
 

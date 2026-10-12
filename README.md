@@ -210,7 +210,7 @@ npm run build
 ├── Natillera.Backend/         # ASP.NET Core API (Domain, Application, Infrastructure, Presentation)
 ├── Natillera.Backend.Tests/   # xUnit unit tests
 ├── Natillera.Frontend/        # React SPA
-├── docs/                      # Architecture decisions, planning and data model diagrams
+├── docs/                      # Business rules, feature specs, architecture decisions, planning and data model diagrams
 ├── docker-compose.yml
 ├── Natillera.sln
 └── .env.example
