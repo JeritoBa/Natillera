@@ -24,6 +24,7 @@ One spec per feature. Specs describe **what the system must do** (behavior, rule
 | 008 | [Dashboard](008-dashboard.md) | Implemented | DASH-* |
 | 009 | [Landing page and login UI](009-landing-and-auth-ui.md) | Implemented | UI-07, AUTH-03/04 |
 | 010 | [Mobile responsive](010-mobile-responsive.md) | Implemented | UI-06 |
+| 011 | [Admin-friendly forms and navigation](011-admin-friendly-forms.md) | Implemented | UI-08..11, UI-03, MEM-04 |
 
 Not specified because not implemented: in-app payments, member loan requests/approval workflow, payment reminders beyond the dashboard notice, production deployment/CI.
 

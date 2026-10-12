@@ -13,6 +13,7 @@ import { formatCurrency } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
+import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
 
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
 const rowClass = 'flex justify-between border-t border-[#eef4f0] pt-2'
@@ -252,7 +253,7 @@ export function ActivityDetailPage() {
         ? <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><p className="text-sm text-[#0c1a12]">{editing.memberName}</p></div>
         : <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><select value={userId} onChange={event => setUserId(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un miembro</option>{selectableMembers.map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div>}
       <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input type="number" min="1" step="1" max={available} value={quantity} onChange={event => setQuantity(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /><p className="text-xs text-[#4e7460] mt-1">Unidades disponibles: {available}</p></div>
-      {editing && <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Estado</label><select value={status} onChange={event => setStatus(event.target.value as 'Pending' | 'Paid')} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="Pending">Pendiente</option><option value="Paid">Pagado</option></select></div>}
+      {editing && <StatusRadioGroup name="assignment-status" legend="Estado" value={status} onChange={setStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} />}
       {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
       <div className="flex gap-3 pt-1"><button onClick={() => setModal(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button onClick={() => void save()} disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
     </div></Modal>}

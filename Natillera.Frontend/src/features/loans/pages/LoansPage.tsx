@@ -9,6 +9,8 @@ import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
+import { toMoneyInputValue } from '@/shared/lib/money'
+import { MoneyInput } from '@/shared/ui/MoneyInput'
 
 interface LoanForm { borrowerId: string, initialAmount: string, interestRate: string, startDate: string }
 const emptyForm: LoanForm = { borrowerId: '', initialAmount: '', interestRate: '', startDate: '' }
@@ -47,7 +49,7 @@ export function LoansPage() {
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModalError(null); setSuccess(null); setError(null); setModal('create') }
   const openEdit = (loan: LoanListItem) => {
     setEditing(loan)
-    setForm({ borrowerId: loan.borrowerId, initialAmount: String(loan.initialAmount), interestRate: String(loan.interestRate), startDate: toDateInput(loan.startDate) })
+    setForm({ borrowerId: loan.borrowerId, initialAmount: toMoneyInputValue(loan.initialAmount), interestRate: String(loan.interestRate), startDate: toDateInput(loan.startDate) })
     setModalError(null); setSuccess(null); setError(null); setModal('edit')
   }
 
@@ -145,7 +147,7 @@ export function LoansPage() {
       </div>
       {modal && <Modal title={editing ? 'Editar préstamo' : 'Nuevo préstamo'} onClose={() => !saving && setModal(null)}><div className="space-y-4">
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Deudor</label><select value={form.borrowerId} onChange={event => setForm(current => ({ ...current, borrowerId: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un deudor</option>{borrowers.map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div>
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto inicial</label><input type="number" min="1" step="0.01" value={form.initialAmount} onChange={event => setForm(current => ({ ...current, initialAmount: event.target.value }))} placeholder="500000" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
+        <div><label htmlFor="loan-initial-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto inicial</label><MoneyInput id="loan-initial-amount" value={form.initialAmount} onChange={value => setForm(current => ({ ...current, initialAmount: value }))} placeholder="500000" /></div>
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Tasa de interés (%)</label><input type="number" min="0" max="100" step="0.01" value={form.interestRate} onChange={event => setForm(current => ({ ...current, interestRate: event.target.value }))} placeholder="2" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Fecha de inicio</label><input type="date" value={form.startDate} onChange={event => setForm(current => ({ ...current, startDate: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import type { Page } from '@/shared/model/types'
 import { BrandLogo } from '@/shared/ui/BrandLogo'
@@ -37,7 +38,7 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
         style={{ background: '#fff', borderRight: '1px solid #d6e8dc' }}
       >
         <div className="flex items-center gap-2.5 px-5 py-4 border-b" style={{ borderColor: '#d6e8dc' }}>
-          <BrandLogo />
+          <Link to="/" aria-label="Ir a la página principal de Gallego Nanclares" className="inline-flex rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c5c38]"><BrandLogo /></Link>
         </div>
 
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
@@ -98,10 +99,10 @@ export function AppShell({ page, setPage, children }: AppShellProps) {
           className="flex items-center gap-3 px-4 py-3 border-b lg:hidden"
           style={{ borderColor: '#d6e8dc', background: '#fff' }}
         >
-          <button onClick={() => setSidebarOpen(true)} className="text-[#4e7460]">
+          <button onClick={() => setSidebarOpen(true)} aria-label="Abrir menú" className="text-[#4e7460]">
             <Icon.Menu />
           </button>
-          <BrandLogo className="h-7 w-auto" />
+          <Link to="/" aria-label="Ir a la página principal de Gallego Nanclares" className="inline-flex rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c5c38]"><BrandLogo className="h-7 w-auto" /></Link>
         </header>
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>

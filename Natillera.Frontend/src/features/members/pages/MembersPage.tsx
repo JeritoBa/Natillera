@@ -6,6 +6,7 @@ import type { Member, MemberFormValues } from '@/features/members/model/memberTy
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
+import { MemberStatusModal } from '@/features/members/components/MemberStatusModal'
 
 const emptyForm: MemberFormValues = { firstName: '', lastName: '', email: '', phone: '' }
 
@@ -18,13 +19,16 @@ export function MembersPage() {
   const [editing, setEditing] = useState<Member | null>(null)
   const [form, setForm] = useState<MemberFormValues>(emptyForm)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [statusTarget, setStatusTarget] = useState<Member | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const activeCount = members.filter(member => member.isActive).length
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setActionError(null); setModal('create') }
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setActionError(null); setSuccess(null); setModal('create') }
   const openEdit = (member: Member) => {
     setEditing(member)
     setForm({ firstName: member.firstName, lastName: member.lastName, email: member.email, phone: member.phone })
     setActionError(null)
+    setSuccess(null)
     setModal('edit')
   }
   const save = async () => {
@@ -38,9 +42,13 @@ export function MembersPage() {
       setModal(null)
     } catch { setActionError('No pudimos guardar el miembro. Revisa los datos e intenta nuevamente.') }
   }
-  const toggleStatus = async (member: Member) => {
-    try { await setStatus(member.id, !member.isActive) }
-    catch { setActionError('No pudimos actualizar el estado del miembro. Intenta nuevamente.') }
+  const openStatus = (member: Member) => { setActionError(null); setSuccess(null); setStatusTarget(member) }
+  const confirmStatus = async () => {
+    if (!statusTarget) return
+    const member = statusTarget
+    await setStatus(member.id, !member.isActive)
+    setStatusTarget(null)
+    setSuccess(`${member.firstName} ${member.lastName} quedó ${member.isActive ? 'inactivo' : 'activo'}.`)
   }
 
   return (
@@ -54,6 +62,7 @@ export function MembersPage() {
         <div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Activos</p><p className="text-lg font-bold text-[#0a6635] mono">{activeCount}</p></div>
         <div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Inactivos</p><p className="text-lg font-bold text-[#c0392b] mono">{members.length - activeCount}</p></div>
       </div>
+      {success && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
       {(error || actionError) && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error ?? actionError}</p>}
       <div className="rounded-xl overflow-hidden" style={{ background: '#fff', border: '1px solid #d6e8dc' }}>
         <table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
@@ -70,7 +79,7 @@ export function MembersPage() {
             </td>
             <td className="px-4 py-3.5 text-[#4e7460] hidden sm:table-cell">{member.email}</td><td className="px-4 py-3.5 text-[#4e7460] mono text-xs hidden sm:table-cell">{member.phone}</td>
             <td className="px-4 py-3.5 hidden sm:table-cell"><Badge status={member.isActive ? 'active' : 'inactive'} /></td>
-            {canManage && <td className="px-3 sm:px-5 py-3.5 text-right w-px whitespace-nowrap"><div className="flex justify-end gap-1"><button onClick={() => navigate(`/members/${member.id}`)} className="btn-ghost p-1.5 rounded-md hidden sm:inline-flex" aria-label="Ver detalle del miembro"><Icon.Eye open /></button><button onClick={() => openEdit(member)} className="btn-ghost p-2 sm:p-1.5 rounded-md min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center" aria-label="Editar miembro"><Icon.Edit /></button><button onClick={() => { if (window.confirm(`${member.isActive ? 'Desactivar' : 'Activar'} a ${member.firstName} ${member.lastName}?`)) void toggleStatus(member) }} className={`${member.isActive ? 'btn-danger' : 'btn-ghost'} p-2 sm:p-1.5 rounded-md min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center`} aria-label={member.isActive ? 'Desactivar miembro' : 'Activar miembro'}><Icon.Check /></button></div></td>}
+            {canManage && <td className="px-3 sm:px-5 py-3.5 text-right w-px whitespace-nowrap"><div className="flex justify-end gap-1"><button onClick={() => navigate(`/members/${member.id}`)} className="btn-ghost p-1.5 rounded-md hidden sm:inline-flex" aria-label="Ver detalle del miembro"><Icon.Eye open /></button><button onClick={() => openEdit(member)} className="btn-ghost p-2 sm:p-1.5 rounded-md min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center" aria-label="Editar miembro"><Icon.Edit /></button><button onClick={() => openStatus(member)} className={`${member.isActive ? 'btn-danger' : 'btn-ghost'} p-2 sm:p-1.5 rounded-md min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center`} aria-label={member.isActive ? 'Desactivar miembro' : 'Activar miembro'}><Icon.Check /></button></div></td>}
           </tr>)}
         </tbody></table>
       </div>
@@ -78,6 +87,7 @@ export function MembersPage() {
         {([['firstName', 'Nombre'], ['lastName', 'Apellido'], ['email', 'Correo'], ['phone', 'Teléfono']] as const).map(([field, label]) => <div key={field}><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">{label}</label><input type={field === 'email' ? 'email' : 'text'} value={form[field]} onChange={event => setForm(current => ({ ...current, [field]: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>)}
         <p className="text-xs text-[#4e7460]">El miembro recibirá la contraseña inicial configurada por el administrador.</p><div className="flex gap-3 pt-1"><button onClick={() => setModal(null)} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button onClick={() => void save()} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">Guardar</button></div>
       </div></Modal>}
+      {statusTarget && <MemberStatusModal member={statusTarget} onClose={() => setStatusTarget(null)} onConfirm={confirmStatus} />}
     </div>
   )
 }

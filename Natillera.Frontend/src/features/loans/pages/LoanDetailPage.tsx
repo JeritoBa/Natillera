@@ -13,6 +13,9 @@ import { formatCurrency } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
+import { toMoneyInputValue } from '@/shared/lib/money'
+import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
+import { MoneyInput } from '@/shared/ui/MoneyInput'
 
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
 const rowClass = 'flex justify-between border-t border-[#eef4f0] pt-2'
@@ -115,10 +118,10 @@ export function LoanDetailPage() {
   const hasInterest = summary.interestGenerated > 0
 
   const openPayment = (payment: LoanPaymentResponse | null) => {
-    setEditingPayment(payment); setAmount(payment ? String(payment.amount) : ''); setMethod(payment?.paymentMethod ?? 'Cash'); setModalError(null); setSuccess(null); setActionError(null); setModal('payment')
+    setEditingPayment(payment); setAmount(payment ? toMoneyInputValue(payment.amount) : ''); setMethod(payment?.paymentMethod ?? 'Cash'); setModalError(null); setSuccess(null); setActionError(null); setModal('payment')
   }
   const openInterest = (interest: InterestPaymentResponse | null) => {
-    setEditingInterest(interest); setAmount(interest ? String(interest.amount) : ''); setDescription(interest?.description ?? ''); setInterestStatus(interest?.status === 'Paid' ? 'Paid' : 'Pending'); setModalError(null); setSuccess(null); setActionError(null); setModal('interest')
+    setEditingInterest(interest); setAmount(interest ? toMoneyInputValue(interest.amount) : ''); setDescription(interest?.description ?? ''); setInterestStatus(interest?.status === 'Paid' ? 'Paid' : 'Pending'); setModalError(null); setSuccess(null); setActionError(null); setModal('interest')
   }
   const save = async () => {
     const numericAmount = Number(amount)
@@ -314,13 +317,12 @@ export function LoanDetailPage() {
     </div>
 
     {modal && <Modal title={modal === 'payment' ? (editingPayment ? 'Editar abono' : 'Registrar abono') : (editingInterest ? 'Editar interés' : 'Registrar interés')} onClose={() => !saving && setModal(null)}><div className="space-y-4">
-      <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto</label><input type="number" min="1" step="0.01" value={amount} onChange={event => setAmount(event.target.value)} placeholder="50000" className="w-full px-3 py-2.5 rounded-lg text-sm" />
+      <div><label htmlFor="loan-movement-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto</label><MoneyInput id="loan-movement-amount" value={amount} onChange={setAmount} placeholder="50000" />
         {modal === 'payment' && <p className="text-xs text-[#4e7460] mt-1">Capital pendiente: {formatCurrency(maxPayment)}</p>}</div>
       {modal === 'payment' && <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Método de pago</label><select value={method} onChange={event => setMethod(event.target.value as PaymentMethod)} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="Cash">Efectivo</option><option value="Transfer">Transferencia</option></select></div>}
       {modal === 'interest' && <>
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción</label><input type="text" maxLength={200} value={description} onChange={event => setDescription(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Estado</label><select value={interestStatus} onChange={event => setInterestStatus(event.target.value as 'Pending' | 'Paid')} disabled={editingInterest?.status === 'Paid'} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="Pending">Pendiente</option><option value="Paid">Pagado</option></select>
-          {editingInterest?.status === 'Paid' && <p className="text-xs text-[#4e7460] mt-1">Un interés pagado no puede volver a pendiente.</p>}</div>
+        <StatusRadioGroup name="interest-status" legend="Estado" value={interestStatus} onChange={setInterestStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja', disabled: editingInterest?.status === 'Paid' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} note={editingInterest?.status === 'Paid' ? 'Un interés pagado no puede volver a pendiente.' : undefined} />
       </>}
       {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
       <div className="flex gap-3 pt-1"><button onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button onClick={() => void save()} disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>

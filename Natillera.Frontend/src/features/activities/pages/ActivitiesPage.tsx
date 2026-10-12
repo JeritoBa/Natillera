@@ -8,6 +8,8 @@ import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
+import { toMoneyInputValue } from '@/shared/lib/money'
+import { MoneyInput } from '@/shared/ui/MoneyInput'
 
 interface ActivityForm { name: string, description: string, quantity: string, unitCost: string, unitSalePrice: string, startDate: string }
 const emptyForm: ActivityForm = { name: '', description: '', quantity: '', unitCost: '', unitSalePrice: '', startDate: '' }
@@ -44,8 +46,8 @@ export function ActivitiesPage() {
   const openEdit = (activity: ActivityListItem) => {
     setEditing(activity)
     setForm({
-      name: activity.name, description: activity.description, quantity: String(activity.quantity), unitCost: String(activity.unitCost),
-      unitSalePrice: String(activity.unitSalePrice), startDate: toDateInput(activity.startDate),
+      name: activity.name, description: activity.description, quantity: String(activity.quantity), unitCost: toMoneyInputValue(activity.unitCost),
+      unitSalePrice: toMoneyInputValue(activity.unitSalePrice), startDate: toDateInput(activity.startDate),
     })
     setModalError(null); setSuccess(null); setError(null); setModal('edit')
   }
@@ -152,8 +154,8 @@ export function ActivitiesPage() {
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Nombre</label><input type="text" maxLength={100} value={form.name} onChange={event => setField('name', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción</label><input type="text" maxLength={200} value={form.description} onChange={event => setField('description', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input type="number" min="1" step="1" value={form.quantity} onChange={event => setField('quantity', event.target.value)} placeholder="100" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Costo unitario</label><input type="number" min="0.01" step="0.01" value={form.unitCost} onChange={event => setField('unitCost', event.target.value)} placeholder="5000" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Precio de venta unitario</label><input type="number" min="0.01" step="0.01" value={form.unitSalePrice} onChange={event => setField('unitSalePrice', event.target.value)} placeholder="8000" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
+        <div><label htmlFor="activity-unit-cost" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Costo unitario</label><MoneyInput id="activity-unit-cost" value={form.unitCost} onChange={value => setField('unitCost', value)} placeholder="5000" /></div>
+        <div><label htmlFor="activity-unit-sale-price" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Precio de venta unitario</label><MoneyInput id="activity-unit-sale-price" value={form.unitSalePrice} onChange={value => setField('unitSalePrice', value)} placeholder="8000" /></div>
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Fecha de inicio</label><input type="date" value={form.startDate} onChange={event => setField('startDate', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
         <div className="flex gap-3 pt-1"><button onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button onClick={() => void save()} disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
