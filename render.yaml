@@ -32,7 +32,7 @@ services:
       - key: JWT_EXPIRATION_MINUTES
         value: "60"
       - key: NATILLERA_MIN_MONTHLY_PAYMENT
-        value: "50000"
+        value: "30000"
       # Secrets and personal data: set in the dashboard.
       - key: ConnectionStrings__DefaultConnection
         sync: false
@@ -68,7 +68,7 @@ services:
         value: "22"
       # Build-time: embedded in the bundle. Rebuild the site after changing it.
       - key: VITE_API_URL
-        value: https://natillera-api.onrender.com
+        value: https://natillera-api-owt4.onrender.com
     routes:
       - type: rewrite
         source: /*

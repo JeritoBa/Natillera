@@ -167,7 +167,7 @@ npm run dev        # http://localhost:5173
 | `NATILLERA_ADMIN_LAST_NAME` | Administrator last name | `Administrator` |
 | `NATILLERA_ADMIN_PHONE` | Administrator phone | `0000000000` |
 | `NATILLERA_DEFAULT_MEMBER_PASSWORD` | Initial password assigned to new members | *(choose a strong one)* |
-| `NATILLERA_MIN_MONTHLY_PAYMENT` | Minimum amount accepted for a monthly fee | `50000` |
+| `NATILLERA_MIN_MONTHLY_PAYMENT` | Minimum amount accepted for a monthly fee | `30000` |
 | `JWT_SECRET` | Signing key for access tokens — **at least 32 bytes** | *(long random string)* |
 | `JWT_ISSUER` | Token issuer | `Natillera.Api` |
 | `JWT_AUDIENCE` | Token audience | `Natillera.Client` |
@@ -240,7 +240,7 @@ Secrets are entered only in the Render dashboard (`sync: false` in `render.yaml`
 | `CORS_ORIGINS` | Allowed browser origin: `https://natillera-web.onrender.com` | No | Runtime | `render.yaml` (API) |
 | `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_EXPIRATION_MINUTES` | Token settings | No | Runtime | `render.yaml` (API) |
 | `NATILLERA_MIN_MONTHLY_PAYMENT` | Minimum monthly fee | No | Runtime | `render.yaml` (API) |
-| `VITE_API_URL` | API base URL: `https://natillera-api.onrender.com` | No | **Build** | `render.yaml` (SPA) |
+| `VITE_API_URL` | API base URL: `https://natillera-api-owt4.onrender.com` | No | **Build** | `render.yaml` (SPA) |
 | `NODE_VERSION` | Node version for the SPA build (`22`) | No | Build | `render.yaml` (SPA) |
 
 `RENDER_GIT_COMMIT` is provided by Render and is returned by `/health`.
@@ -263,7 +263,7 @@ Host=<neon-host>;Port=5432;Database=<db>;Username=<user>;Password=<password>;SSL
 1. Create the Neon project (PostgreSQL 18, region `aws-us-east-2`); keep the direct connection string private.
 2. In Render, connect the GitHub repository and create a Blueprint from `render.yaml` (branch `main`).
 3. When prompted, enter the `sync: false` variables listed above. Use the direct Neon string for `ConnectionStrings__DefaultConnection`.
-4. Wait for the API to deploy; it applies migrations and seeds the admin on first start. Check `https://natillera-api.onrender.com/health`.
+4. Wait for the API to deploy; it applies migrations and seeds the admin on first start. Check `https://natillera-api-owt4.onrender.com/health`.
 5. Open `https://natillera-web.onrender.com` and sign in as the admin. If the service URLs differ (name collision), update `VITE_API_URL` and `CORS_ORIGINS` and redeploy.
 6. Set up the keep-alive monitor (below).
 
@@ -284,9 +284,9 @@ Store the file outside the repository (it contains financial data). Neon also of
 
 **Rotate a secret.** Change the value in Render dashboard, `natillera-api`, Environment, and save (Render redeploys). Rotating `JWT_SECRET` signs everyone out. Changing `NATILLERA_ADMIN_PASSWORD` does not change the existing admin's password (the seed only creates a missing admin); change it from the app. To rotate the database password, reset it in Neon and update `ConnectionStrings__DefaultConnection`.
 
-**Logs and deployed version.** Logs: Render dashboard, service, Logs. Deployed commit: `GET https://natillera-api.onrender.com/health` returns `{ "status": "ok", "commit": "<sha>" }`.
+**Logs and deployed version.** Logs: Render dashboard, service, Logs. Deployed commit: `GET https://natillera-api-owt4.onrender.com/health` returns `{ "status": "ok", "commit": "<sha>" }`.
 
-**Keep-alive monitor.** Create a free UptimeRobot HTTP(s) monitor for `https://natillera-api.onrender.com/health` with an interval below 15 minutes (5 minutes is fine). `/health` does not touch the database, so Neon can still scale to zero.
+**Keep-alive monitor.** Create a free UptimeRobot HTTP(s) monitor for `https://natillera-api-owt4.onrender.com/health` with an interval below 15 minutes (5 minutes is fine). `/health` does not touch the database, so Neon can still scale to zero.
 
 **If something fails.** API does not start: check the Render logs (missing variable, migration error, connection string). CORS errors in the browser: `CORS_ORIGINS` must match the SPA origin exactly. SPA calls the wrong API: fix `VITE_API_URL` and redeploy the SPA (build-time variable). Slow first request: the API was asleep or the monitor is down.
 
