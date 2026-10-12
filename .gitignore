@@ -121,3 +121,4 @@ logs/
 # graphify knowledge graph (regenerable)
 graphify-out/
 .claude
+skills-lock.json

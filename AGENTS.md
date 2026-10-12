@@ -163,9 +163,10 @@ Rules for agents:
 ```
 planner (read-only plan) -> owner answers questions / approves -> build -> validator
 UI/UX changes: ux-designer (read-only spec) -> owner -> build -> screenshots / validator
+Infrastructure / CI/CD / deployment: devops (infra map, costs, plan) -> owner approves -> devops implements -> owner approves commit/push/deploy -> devops verifies production
 ```
 
-Agent definitions live in the owner's user folder (`~/.claude/agents`: planner, build, validator, reviewer, ux-designer). Follow the role you were given; `build` implements, `validator` validates independently.
+Agent definitions live in the owner's user folder (`~/.claude/agents`: planner, build, validator, reviewer, ux-designer, devops). Follow the role you were given; `build` implements, `validator` validates independently, `devops` owns infrastructure, CI/CD and deployment (minimum cost without compromising data integrity; never commits, pushes, deploys or changes cloud resources without explicit owner approval; application code changes needed by infrastructure go through `planner`/`build`).
 
 ### Rules for every agent
 
