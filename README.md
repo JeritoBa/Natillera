@@ -172,6 +172,7 @@ npm run dev        # http://localhost:5173
 | `JWT_ISSUER` | Token issuer | `Natillera.Api` |
 | `JWT_AUDIENCE` | Token audience | `Natillera.Client` |
 | `JWT_EXPIRATION_MINUTES` | Token lifetime in minutes | `60` |
+| `NATILLERA_APPLY_MIGRATIONS` | Outside Development, `true` applies migrations and seeds the admin at startup (see Deployment) | (unset locally) |
 
 When running with Docker Compose, the connection string is built from the `POSTGRES_*` variables. Outside Docker the API uses `ConnectionStrings:DefaultConnection` from `appsettings.json` (or the `ConnectionStrings__DefaultConnection` environment variable).
 
@@ -202,6 +203,92 @@ npm run build
 
 - **`Natillera.Backend.Tests`** (xUnit) covers domain invariants (fees, loans, interest, activities, transactions) and application services (fees, loans, activities, member deactivation, interest sharing, authentication) using in-memory fakes.
 - **Frontend tests** (Vitest) cover the financial summaries of loans and activities, currency and date formatting, and API error messages.
+
+## Deployment
+
+Production runs on free tiers at no cost (decision: ADR-019, spec: `docs/specs/013-production-deployment.md`). The infrastructure is described in `render.yaml` and `.github/workflows/ci.yml`.
+
+```text
+dev -> PR -> main --(GitHub Actions: backend tests, frontend lint/test/build)--> Render deploys (checksPass)
+
+Browser -> natillera-web (Render static site, CDN) -> natillera-api (Render Docker web service, :8080)
+                                                     -> Neon PostgreSQL 18 (SSL)
+Keep-alive monitor (UptimeRobot) -> GET natillera-api /health (no database access)
+```
+
+| Piece | Where | Notes |
+|---|---|---|
+| API | Render free web service `natillera-api` (Ohio), built from `Natillera.Backend/Dockerfile` | Sleeps after 15 min without traffic; the monitor keeps it awake. |
+| SPA | Render static site `natillera-web` | `VITE_API_URL` is baked in at build time; SPA rewrite `/*` -> `/index.html`. |
+| Database | Neon free, PostgreSQL 18, `aws-us-east-2` | No automated backups (OPS-04): the owner takes manual backups. |
+| CI/CD | GitHub Actions + Render `autoDeployTrigger: checksPass` on `main` | Each service rebuilds only when its folder changes (`buildFilter`). |
+
+### Production environment variables
+
+Secrets are entered only in the Render dashboard (`sync: false` in `render.yaml`); the repository is public, so never write real values in any file, issue, PR or CI log.
+
+| Name | Purpose | Secret | Build / runtime | Configured in |
+|---|---|---|---|---|
+| `ASPNETCORE_ENVIRONMENT` | `Production` | No | Runtime | `render.yaml` (API) |
+| `PORT` | Port the API listens on (`8080`) | No | Runtime | `render.yaml` (API) |
+| `NATILLERA_APPLY_MIGRATIONS` | `true` applies migrations + admin seed at startup | No | Runtime | `render.yaml` (API) |
+| `ConnectionStrings__DefaultConnection` | Neon connection string, Npgsql key=value format (below) | **Yes** | Runtime | Render dashboard (API) |
+| `JWT_SECRET` | Token signing key, at least 32 bytes | **Yes** | Runtime | Render dashboard (API) |
+| `NATILLERA_ADMIN_PASSWORD` | Password of the seeded admin | **Yes** | Runtime | Render dashboard (API) |
+| `NATILLERA_DEFAULT_MEMBER_PASSWORD` | Initial password for new members | **Yes** | Runtime | Render dashboard (API) |
+| `NATILLERA_ADMIN_EMAIL`, `NATILLERA_ADMIN_FIRST_NAME`, `NATILLERA_ADMIN_LAST_NAME`, `NATILLERA_ADMIN_PHONE` | Seeded admin identity (personal data, kept out of the public repo) | Private | Runtime | Render dashboard (API) |
+| `CORS_ORIGINS` | Allowed browser origin: `https://natillera-web.onrender.com` | No | Runtime | `render.yaml` (API) |
+| `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_EXPIRATION_MINUTES` | Token settings | No | Runtime | `render.yaml` (API) |
+| `NATILLERA_MIN_MONTHLY_PAYMENT` | Minimum monthly fee | No | Runtime | `render.yaml` (API) |
+| `VITE_API_URL` | API base URL: `https://natillera-api.onrender.com` | No | **Build** | `render.yaml` (SPA) |
+| `NODE_VERSION` | Node version for the SPA build (`22`) | No | Build | `render.yaml` (SPA) |
+
+`RENDER_GIT_COMMIT` is provided by Render and is returned by `/health`.
+
+**Connection string.** Npgsql key=value format, not a `postgres://` URL:
+
+```text
+Host=<neon-host>;Port=5432;Database=<db>;Username=<user>;Password=<password>;SSL Mode=Require;Connection Idle Lifetime=60
+```
+
+`Connection Idle Lifetime=60` makes the API drop idle pooled connections after 60 s, before Neon suspends its compute (5 min) and closes them; otherwise the first request after a quiet period can fail with a 500 on a stale connection.
+
+- **Direct** endpoint (host without `-pooler`): **use it for the app** (ADR-019). The API applies migrations at startup and Neon recommends the direct endpoint for schema changes; at this scale a pooler adds nothing. Also use it for `pg_dump`/`psql`.
+- **Pooled** endpoint (host contains `-pooler`): not used.
+- Take the host, database, user and password from the Neon dashboard (Connect) and assemble the string in the format above.
+
+### Runbook
+
+**First deploy (once).**
+1. Create the Neon project (PostgreSQL 18, region `aws-us-east-2`); keep the direct connection string private.
+2. In Render, connect the GitHub repository and create a Blueprint from `render.yaml` (branch `main`).
+3. When prompted, enter the `sync: false` variables listed above. Use the direct Neon string for `ConnectionStrings__DefaultConnection`.
+4. Wait for the API to deploy; it applies migrations and seeds the admin on first start. Check `https://natillera-api.onrender.com/health`.
+5. Open `https://natillera-web.onrender.com` and sign in as the admin. If the service URLs differ (name collision), update `VITE_API_URL` and `CORS_ORIGINS` and redeploy.
+6. Set up the keep-alive monitor (below).
+
+**Normal deploy.** Work on `dev`, push, open a PR to `main`, wait for CI to be green, merge. Render deploys `main` automatically only after checks pass. If the change adds a migration, take a manual backup first (below).
+
+**Rollback.** Render dashboard, service `natillera-api` (or `natillera-web`), Events/Deploys, pick a previous successful deploy and roll back. Rollback restores code only, not the database: an applied migration stays applied, so prefer backward-compatible migrations and never edit an applied migration. To undo a bad migration, restore a backup (below) after owner approval.
+
+**Manual backup (owner-managed, OPS-04).** Use `pg_dump` 18 against the **direct** Neon endpoint, periodically and always before deploying a migration:
+
+```bash
+pg_dump --format=custom --no-owner --file=natillera-$(date +%F).dump \
+  "postgresql://<user>:<password>@<direct-host>/<db>?sslmode=require"
+```
+
+Store the file outside the repository (it contains financial data). Neon also offers a short instant-restore window and one manual snapshot on the free plan; take the snapshot before migrations as an extra safety net.
+
+**Restore test.** Periodically verify that a dump is usable: create a Neon branch (or a local database), run `pg_restore --no-owner --dbname=<target> natillera-<date>.dump`, then check row counts or sign in against it. Never restore over production without explicit owner approval.
+
+**Rotate a secret.** Change the value in Render dashboard, `natillera-api`, Environment, and save (Render redeploys). Rotating `JWT_SECRET` signs everyone out. Changing `NATILLERA_ADMIN_PASSWORD` does not change the existing admin's password (the seed only creates a missing admin); change it from the app. To rotate the database password, reset it in Neon and update `ConnectionStrings__DefaultConnection`.
+
+**Logs and deployed version.** Logs: Render dashboard, service, Logs. Deployed commit: `GET https://natillera-api.onrender.com/health` returns `{ "status": "ok", "commit": "<sha>" }`.
+
+**Keep-alive monitor.** Create a free UptimeRobot HTTP(s) monitor for `https://natillera-api.onrender.com/health` with an interval below 15 minutes (5 minutes is fine). `/health` does not touch the database, so Neon can still scale to zero.
+
+**If something fails.** API does not start: check the Render logs (missing variable, migration error, connection string). CORS errors in the browser: `CORS_ORIGINS` must match the SPA origin exactly. SPA calls the wrong API: fix `VITE_API_URL` and redeploy the SPA (build-time variable). Slow first request: the API was asleep or the monitor is down.
 
 ## Repository structure
 

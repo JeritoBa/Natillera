@@ -23,7 +23,8 @@ Index
 | 015 | Test strategy: xUnit with fakes, Vitest | Accepted (integration tests pending) |
 | 016 | Docker Compose development stack | Accepted |
 | 017 | Enums persisted as strings | Accepted |
-| 018 | Hosting and production strategy | Open |
+| 018 | Hosting and production strategy | Superseded by ADR-019 |
+| 019 | Render (free) + Neon (free) with GitHub Actions CI/CD | Accepted |
 
 ---
 
@@ -148,10 +149,25 @@ Index
 
 ## ADR-018 Hosting and production strategy
 
-- **Status:** Open
+- **Status:** Superseded by ADR-019
 - **Context:** The original plan targeted Vercel's free tier. The frontend is a static SPA, but the backend is a containerized .NET API that also needs a managed PostgreSQL database, so the hosting options must be re-evaluated (not yet verified). Migrations and admin seeding only run in Development today.
 - **Decision:** Not decided. To be resolved in the testing and deployment phase.
 - **Consequences:** Needs: a host for API + Postgres + static SPA, a production migration strategy, secrets management, backups, HTTPS, and a CI workflow (none exists yet).
+
+## ADR-019 Render (free) + Neon (free) with GitHub Actions CI/CD
+
+- **Status:** Accepted (2026-10-12)
+- **Context:** ADR-018 left hosting open. The scale is a family group (tens of users) and the budget is zero. Render's free PostgreSQL expires after 30 days and has no backups, so it is not suitable for financial data. The repository is public. Analysis by the `devops` agent (phase 1) with limits checked against the official Render and Neon docs on 2026-10-12.
+- **Decision:**
+  - **API:** Render free web service built from `Natillera.Backend/Dockerfile` (`PORT=8080`, `ASPNETCORE_ENVIRONMENT=Production`, health check `/health`).
+  - **Frontend:** Render free static site built with Vite (`VITE_API_URL` at build time, SPA rewrite to `/index.html`). The Nginx Dockerfile remains for local use only.
+  - **Database:** Neon free, PostgreSQL 18 (same major as local). The app uses the Npgsql key=value connection string with `SSL Mode=Require`; the **direct** endpoint for the app (it also applies migrations at startup; a pooler adds nothing at this scale) and for manual dumps.
+  - **Migrations and admin seed:** applied at API startup when `NATILLERA_APPLY_MIGRATIONS=true` (OPS-01, spec 013). Render free has no pre-deploy command. Take a manual Neon snapshot/dump before deploying a new migration.
+  - **CI/CD:** GitHub Actions runs backend tests and frontend lint/test/build on every push and PR (no workflow-level path filters, so every commit gets checks). Render deploys `main` only after checks pass (`autoDeployTrigger: checksPass`). Work happens on `dev`, merged to `main` through a PR.
+  - **Cold starts:** an external free monitor pings `/health` (database-free) more often than every 15 minutes, keeping the API awake without waking Neon.
+  - **Backups:** no automated backups. The owner takes manual backups periodically (OPS-04). Neon free only offers a short instant-restore window and one manual snapshot.
+  - **Secrets:** only in the Render dashboard (`sync: false`) and GitHub secrets, never in the repository (it is public; CI logs are public too).
+- **Consequences:** $0/month. Accepted risks: data loss beyond Neon's short restore window if manual backups are not taken; first request after inactivity can be slow if the monitor fails; free-tier quotas (instance hours, build minutes, bandwidth, Neon compute hours/storage) can suspend services. Upgrade path: Neon Launch (usage-based) for longer history, Render Starter for no spin-down and pre-deploy commands.
 
 ---
 
@@ -163,7 +179,7 @@ Original questions with their current resolution.
 |---|---|
 | Which components should an application have if it is a monolith? | **Resolved.** Layers Domain / Application / Infrastructure / Presentation in one project (ADR-008), feature folders in the frontend (ADR-014). |
 | How to define a good MVP? | **Resolved.** The MVP (auth, members, monthly payments, debt/balance, transactions, audit) is done and went beyond: loans, activities, dashboard, landing and responsive UI are implemented too. See AGENTS.md "Current status". |
-| How to make sure of the deployment? | **Open.** See ADR-018. |
+| How to make sure of the deployment? | **Resolved.** ADR-019 (Render + Neon, CI-gated deploys). |
 | How to manage future add-ons that break the current structure (for example payments)? | **Partially resolved.** Spec-driven development: new features start with a spec and rule IDs (docs/specs, docs/business-rules.md). In-app payments remain a separate integration project. |
 | Why choose C# instead of Node.js, Java or Python? | **Resolved.** ADR-004. |
 | Should tests be required to mark a user story as finished? | **Resolved.** Yes: the Definition of Done in AGENTS.md requires happy path, failure paths and business rules tested; tests reference rule IDs when practical. |

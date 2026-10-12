@@ -35,5 +35,7 @@ public static class AdminSeeder
     }
 
     private static string Required(IConfiguration configuration, string key) =>
-        configuration[key] ?? throw new InvalidOperationException($"Missing required environment variable: {key}");
+        !string.IsNullOrWhiteSpace(configuration[key])
+            ? configuration[key]!
+            : throw new InvalidOperationException($"Missing required environment variable: {key}");
 }

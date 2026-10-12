@@ -45,7 +45,7 @@ Single source of truth for the business rules of the Natillera system. Each rule
 | AUTH-04 | Existing JWTs stop working as soon as the user is deactivated: every authenticated request re-checks `IsActive` (`OnTokenValidated`) and fails with 401. The frontend then logs out and shows "Tu sesión ya no es válida. Inicia sesión de nuevo." | Deactivation must take effect immediately, not at token expiry. | `Program.cs` (`JwtBearerEvents.OnTokenValidated`), `Infrastructure/Persistence/Repositories/UserRepository.IsActiveUserAsync`; `shared/api/apiClient.ts`, `features/auth/hooks/useAuthForm.ts` | None | Implemented (untested) |
 | AUTH-05 | JWT configuration is mandatory and validated at startup: `JWT_SECRET` >= 32 bytes, issuer, audience, positive `JWT_EXPIRATION_MINUTES`; clock skew 30 s. `NATILLERA_MIN_MONTHLY_PAYMENT` must be a positive decimal. | Fail fast on insecure config. | `Program.cs` | None | Implemented |
 | AUTH-06 | Passwords are stored only as BCrypt hashes. Passwords set through `POST /api/users` must have 8-128 characters. | Security. | `Infrastructure/Security/BCryptPasswordHasher.cs`, `Application/Users/UserService.cs` | `Application/UserMemberAuthServiceTests.cs`: `CreateAsync_ShortPassword_Throws`, `CreateAsync_Valid_HashesPasswordAndNormalizesEmail` | Implemented |
-| AUTH-07 | Database migrations and the admin account seeding (`NATILLERA_ADMIN_*`) run automatically **only** when `ASPNETCORE_ENVIRONMENT=Development`. | Dev convenience; production strategy not decided. | `Program.cs`, `Infrastructure/Persistence/Seed/AdminSeeder.cs` | None | Implemented (production strategy: open item) |
+| AUTH-07 | Database migrations and the admin account seeding (`NATILLERA_ADMIN_*`) run automatically at startup when `ASPNETCORE_ENVIRONMENT=Development`, and in any other environment **only** when `NATILLERA_APPLY_MIGRATIONS=true` (OPS-01). | Dev convenience; explicit opt-in in production. | `Program.cs`, `Infrastructure/Persistence/DatabaseStartupPolicy.cs`, `Infrastructure/Persistence/Seed/AdminSeeder.cs` | `DatabaseStartupPolicyTests`, `AdminSeederTests` | Implemented |
 
 ---
 
@@ -143,6 +143,17 @@ Single source of truth for the business rules of the Natillera system. Each rule
 | AUD-01 | The audit log is **Admin-only**: list (newest first) and detail with user name/email. Each entry shows entity type, action (Create/Update/Delete=cancel), old value, new value, user, date. | Who did what, when. | `LogsController`, `LogRepository` | Frontend `features/audit/model/labels.test.ts` (labels only) | Implemented |
 | AUD-02 | The log detail enriches the entity summary (member, period, status, amount, transaction) **only for monthly payments**; other entity types show the raw data. | Incremental feature. | `LogRepository.GetDetailAsync` | None | Partial |
 | AUD-03 | The audit feature folder must not be named `logs`/`Logs` (the repo `.gitignore` ignores `**/logs/` and `logs`). The feature uses `audit`. | Avoid silently ignored files. | `.gitignore` | None | Implemented (convention) |
+
+---
+
+## OPS - Operations and deployment
+
+| ID | Rule | Rationale | Enforced in | Tests | Status |
+|---|---|---|---|---|---|
+| OPS-01 | Outside Development, EF migrations and the admin seed run at startup only when `NATILLERA_APPLY_MIGRATIONS` is `true` (case-insensitive). The seed is idempotent. Missing **or blank** `NATILLERA_ADMIN_*` values stop the startup with "Missing required environment variable: X". A failed migration or seed stops the startup. | Fresh production databases become usable without manual SQL, but only by explicit choice. | `Program.cs`, `DatabaseStartupPolicy.cs`, `AdminSeeder.cs` | `DatabaseStartupPolicyTests`, `AdminSeederTests` | **Implemented** |
+| OPS-02 | `GET /health` is anonymous, never queries the database and returns `{ status: "ok", commit }` (`RENDER_GIT_COMMIT` or null). | Platform health checks and keep-alive pings must not wake the database. | `Presentation/Controllers/HealthController.cs` | `HealthControllerTests` | **Implemented** |
+| OPS-03 | HTTPS redirection is applied only in Development; every other environment runs behind a TLS-terminating proxy (Render), so the API does not redirect. | Avoid wrong redirects behind the proxy. | `Program.cs` (`UseHttpsRedirection` inside the Development block) | Manual (Docker, Production env: no redirect) | **Implemented** |
+| OPS-04 | Database backups are manual and owner-managed (no automated backups). Take a manual backup/snapshot before deploying a migration. | Owner decision (budget/learning); accepted risk. | Runbook (README) | None | Accepted risk (ADR-019) |
 
 ---
 

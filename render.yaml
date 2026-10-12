@@ -1,0 +1,75 @@
+# Render Blueprint for Natillera (ADR-019, spec 013).
+# Secrets are never stored here (the repository is public): every `sync: false`
+# variable is entered by hand in the Render dashboard.
+services:
+  # ---------- API (Docker, free) ----------
+  - type: web
+    name: natillera-api
+    runtime: docker
+    plan: free
+    region: ohio
+    branch: main
+    dockerfilePath: ./Natillera.Backend/Dockerfile
+    dockerContext: ./Natillera.Backend
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - Natillera.Backend/**
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: PORT
+        value: "8080"
+      - key: NATILLERA_APPLY_MIGRATIONS
+        value: "true"
+      - key: CORS_ORIGINS
+        value: https://natillera-web.onrender.com
+      - key: JWT_ISSUER
+        value: Natillera.Api
+      - key: JWT_AUDIENCE
+        value: Natillera.Client
+      - key: JWT_EXPIRATION_MINUTES
+        value: "60"
+      - key: NATILLERA_MIN_MONTHLY_PAYMENT
+        value: "50000"
+      # Secrets and personal data: set in the dashboard.
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: NATILLERA_ADMIN_PASSWORD
+        sync: false
+      - key: NATILLERA_DEFAULT_MEMBER_PASSWORD
+        sync: false
+      - key: NATILLERA_ADMIN_EMAIL
+        sync: false
+      - key: NATILLERA_ADMIN_FIRST_NAME
+        sync: false
+      - key: NATILLERA_ADMIN_LAST_NAME
+        sync: false
+      - key: NATILLERA_ADMIN_PHONE
+        sync: false
+
+  # ---------- SPA (static site, free; global CDN, so no region field) ----------
+  - type: web
+    name: natillera-web
+    runtime: static
+    branch: main
+    rootDir: Natillera.Frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - Natillera.Frontend/**
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Build-time: embedded in the bundle. Rebuild the site after changing it.
+      - key: VITE_API_URL
+        value: https://natillera-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
