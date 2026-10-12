@@ -9,6 +9,15 @@
 <p align="center"><em>Familia que ahorra junta, prospera junta.</em></p>
 
 <p align="center">
+  <a href="https://natillera-web.onrender.com"><strong>👉 See the live app: natillera-web.onrender.com</strong></a>
+</p>
+
+<p align="center">
+  <a href="https://natillera-web.onrender.com"><img src="https://img.shields.io/badge/live-natillera--web.onrender.com-0c5c38?logo=render&logoColor=white" alt="Live app on Render" /></a>
+  <a href="https://github.com/JeritoBa/Natillera/actions/workflows/ci.yml"><img src="https://github.com/JeritoBa/Natillera/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white" alt=".NET 10" />
   <img src="https://img.shields.io/badge/C%23-ASP.NET%20Core-239120?logo=csharp&logoColor=white" alt="C# / ASP.NET Core" />
   <img src="https://img.shields.io/badge/EF%20Core-10-6C3483" alt="EF Core 10" />
@@ -32,11 +41,19 @@
 
 > **This is not an open-source project.** The source code is private property of its owner and is shared here only to describe what the application is, how it works and how it is built. No license is granted to use, copy, modify or distribute it. All rights reserved.
 
+## Take a look
+
+The application is live at **[natillera-web.onrender.com](https://natillera-web.onrender.com)**. Anyone can visit the public landing page to learn what a natillera is, how a month works and what members see when they log in (all example figures there are fictitious). Want to join? Use the **"Quiero unirme"** button to write to the natillera on WhatsApp.
+
+Members and the administrator log in with the email and password given by the administrator; real financial data is only visible after logging in.
+
+> Hosted on free tiers (Render + Neon): if nobody has used it for a while, the first visit may take up to a minute while the server wakes up.
+
 ## What is it?
 
 A **natillera** is an informal, community-based savings and lending group, very common in Colombia. Every month each member contributes a fixed fee into a common fund. That money is lent back to members at an agreed interest rate and invested in products that the group sells together. The earnings stay in the group and are shared among its members.
 
-This application replaces the notebook and spreadsheet that the Gallego Nanclares family used to run their natillera. Its core value is **financial data integrity**: every peso that comes in or goes out is recorded, traceable and never silently deleted, and every balance is derived from those records instead of being typed in by hand.
+This application replaces the phone note and the generic money app that the Gallego Nanclares family used to run their natillera, which produced inconsistent balances. Its core value is **financial data integrity**: every peso that comes in or goes out is recorded, traceable and never silently deleted, and every balance is derived from those records instead of being typed in by hand.
 
 ## Features
 
