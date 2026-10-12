@@ -9,6 +9,7 @@ namespace Natillera.Backend.Tests.Application;
 public class ActivityServiceTests
 {
     private static readonly Guid Admin = Guid.NewGuid();
+    private const decimal Cash = 1_000_000_000m;
 
     private readonly FakeUserRepository _users = new();
     private readonly FakeActivityRepository _activities = new();
@@ -19,6 +20,7 @@ public class ActivityServiceTests
     public ActivityServiceTests()
     {
         _service = new ActivityService(_users, _activities, _transactions, _logs, new FakeUnitOfWork());
+        _transactions.SetAvailableMoney(Cash); // FIN-13: default cash so seeding loans/activities is allowed
     }
 
     private static ActivityRequest ActivityReq(int quantity = 10, decimal cost = 1000m, decimal price = 1500m) =>
@@ -266,5 +268,68 @@ public class ActivityServiceTests
             _service.CreateAssignmentAsync(Guid.NewGuid(), AssignReq(member.Id, 1), Admin, default));
 
         Assert.Equal("Activity not found.", ex.Message);
+    }
+
+    // ---- FIN-13: available money check ----
+
+    [Fact]
+    public async Task CreateActivityAsync_OutflowAboveAvailable_ThrowsAndSavesNothing_FIN13()
+    {
+        _transactions.SetAvailableMoney(100_000m);
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            _service.CreateActivityAsync(ActivityReq(10, 20_000m, 30_000m), Admin, default));
+
+        Assert.Equal("Insufficient available money. Available: 100,000; required: 200,000.", ex.Message);
+        Assert.Empty(_transactions.Transactions);
+        Assert.Empty(_activities.Activities);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task CreateActivityAsync_OutflowEqualsAvailable_Succeeds_FIN13()
+    {
+        _transactions.SetAvailableMoney(200_000m);
+
+        await _service.CreateActivityAsync(ActivityReq(10, 20_000m, 30_000m), Admin, default);
+
+        Assert.Equal(0m, _transactions.Available());
+        Assert.Single(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task UpdateActivityAsync_IncreaseAboveAvailable_Throws_FIN13()
+    {
+        var activity = await SeedActivityAsync(10, 1000m, 1500m);
+        _transactions.SetAvailableMoney(5_000m);
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            _service.UpdateActivityAsync(activity.Id, ActivityReq(20, 1000m, 1500m), Admin, default));
+
+        Assert.Equal("Insufficient available money. Available: 5,000; required: 10,000.", ex.Message);
+        Assert.Equal(10_000m, activity.Transaction.Amount);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task UpdateActivityAsync_Decrease_SkipsCheckWithZeroCash_FIN13()
+    {
+        var activity = await SeedActivityAsync(10, 1000m, 1500m);
+        _transactions.SetAvailableMoney(0m);
+
+        await _service.UpdateActivityAsync(activity.Id, ActivityReq(5, 1000m, 1500m), Admin, default);
+
+        Assert.Equal(5_000m, activity.Transaction.Amount);
+    }
+
+    [Fact]
+    public async Task CancelActivityAsync_IsNotCheckedWhenCashGoesNegative_FIN13()
+    {
+        var activity = await SeedActivityAsync(10, 1000m, 1500m);
+        _transactions.SetAvailableMoney(-1m);
+
+        await _service.CancelActivityAsync(activity.Id, Admin, default);
+
+        Assert.True(activity.Transaction.IsCancelled);
     }
 }

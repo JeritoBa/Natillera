@@ -58,6 +58,7 @@ public sealed class ActivityService(
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
+            CashGuard.EnsureAvailable(await transactionRepository.GetAvailableMoneyAsync(ct), activity.TotalCost()); // FIN-13
             await transactionRepository.AddAsync(transaction, ct);
             await activityRepository.AddAsync(activity, ct);
             await logRepository.AddAsync(
@@ -74,9 +75,11 @@ public sealed class ActivityService(
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
+            var available = await transactionRepository.GetAvailableMoneyAsync(ct);
             var oldAmount = activity.TotalCost();
             activity.UpdateDetails(request.Name, request.Description, request.Quantity, request.UnitCost,
                 request.UnitSalePrice, ToUtcDate(request.StartDate));
+            CashGuard.EnsureAvailable(available, activity.TotalCost() - oldAmount); // FIN-13
             activity.Transaction.Update(activity.TotalCost(), TransactionDirection.Expense, TransactionType.Activity,
                 ActivityDescription(activity.Name));
             activity.RefreshStatus();

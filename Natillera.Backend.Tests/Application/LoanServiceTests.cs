@@ -9,6 +9,7 @@ namespace Natillera.Backend.Tests.Application;
 public class LoanServiceTests
 {
     private static readonly Guid Admin = Guid.NewGuid();
+    private const decimal Cash = 1_000_000_000m;
 
     private readonly FakeUserRepository _users = new();
     private readonly FakeLoanRepository _loans = new();
@@ -19,6 +20,7 @@ public class LoanServiceTests
     public LoanServiceTests()
     {
         _service = new LoanService(_users, _loans, _transactions, _logs, new FakeUnitOfWork());
+        _transactions.SetAvailableMoney(Cash); // FIN-13: default cash so seeding loans/activities is allowed
     }
 
     private static LoanRequest LoanReq(Guid borrower, decimal amount = 1000m, decimal rate = 5m) =>
@@ -344,5 +346,157 @@ public class LoanServiceTests
             _service.CreatePaymentAsync(Guid.NewGuid(), PayReq(10m), Admin, default));
 
         Assert.Equal("Loan not found.", ex.Message);
+    }
+
+    // ---- FIN-13: available money check ----
+
+    private const string Insufficient = "Insufficient available money. Available: {0}; required: {1}.";
+
+    [Fact]
+    public async Task CreateLoanAsync_OutflowAboveAvailable_ThrowsAndSavesNothing_FIN13()
+    {
+        var borrower = _users.AddUser();
+        _transactions.SetAvailableMoney(1_000_000m);
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() => _service.CreateLoanAsync(LoanReq(borrower.Id, 1_500_000m), Admin, default));
+
+        Assert.Equal(string.Format(Insufficient, "1,000,000", "1,500,000"), ex.Message);
+        Assert.Empty(_transactions.Transactions);
+        Assert.Empty(_loans.Loans);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task CreateLoanAsync_OutflowEqualsAvailable_Succeeds_FIN13()
+    {
+        var borrower = _users.AddUser();
+        _transactions.SetAvailableMoney(1_000_000m);
+
+        await _service.CreateLoanAsync(LoanReq(borrower.Id, 1_000_000m), Admin, default);
+
+        Assert.Equal(0m, _transactions.Available());
+        Assert.Single(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task UpdateLoanAsync_IncreaseAboveAvailable_Throws_FIN13()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser(), 300_000m);
+        _transactions.SetAvailableMoney(100_000m);
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            _service.UpdateLoanAsync(loan.Id, LoanReq(loan.BorrowerId, 500_000m), Admin, default));
+
+        Assert.Equal(string.Format(Insufficient, "100,000", "200,000"), ex.Message);
+        Assert.Equal(300_000m, loan.Transaction.Amount);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task UpdateLoanAsync_IncreaseWithinAvailable_Succeeds_FIN13()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser(), 300_000m);
+        _transactions.SetAvailableMoney(100_000m);
+
+        await _service.UpdateLoanAsync(loan.Id, LoanReq(loan.BorrowerId, 400_000m), Admin, default);
+
+        Assert.Equal(400_000m, loan.Transaction.Amount);
+        Assert.Equal(0m, _transactions.Available());
+        Assert.Single(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task UpdateLoanAsync_Decrease_SkipsCheckWithZeroCash_FIN13()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser(), 300_000m);
+        _transactions.SetAvailableMoney(0m);
+
+        await _service.UpdateLoanAsync(loan.Id, LoanReq(loan.BorrowerId, 100_000m), Admin, default);
+
+        Assert.Equal(100_000m, loan.Transaction.Amount);
+    }
+
+    [Fact]
+    public async Task UpdatePaymentAsync_DecreaseAboveAvailable_Throws_FIN13()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
+        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(600m), Admin, default);
+        LinkPaymentTransactions(loan);
+        _logs.Logs.Clear();
+        _transactions.SetAvailableMoney(100m);
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            _service.UpdatePaymentAsync(loan.Id, created.Id, PayReq(100m), Admin, default));
+
+        Assert.Equal(string.Format(Insufficient, "100", "500"), ex.Message);
+        Assert.Equal(600m, loan.Payments.Single().Transaction.Amount);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task UpdatePaymentAsync_IncreaseWithZeroCash_Succeeds_FIN13()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
+        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(100m), Admin, default);
+        LinkPaymentTransactions(loan);
+        _transactions.SetAvailableMoney(0m);
+
+        await _service.UpdatePaymentAsync(loan.Id, created.Id, PayReq(300m), Admin, default);
+
+        Assert.Equal(300m, loan.Payments.Single().Transaction.Amount);
+    }
+
+    [Fact]
+    public async Task UpdateInterestAsync_PaidDecreaseAboveAvailable_Throws_FIN13()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 500m), Admin, default);
+        LinkPaymentTransactions(loan);
+        _logs.Logs.Clear();
+        _transactions.SetAvailableMoney(100m);
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Paid, 100m), Admin, default));
+
+        Assert.Equal(string.Format(Insufficient, "100", "400"), ex.Message);
+        Assert.Equal(500m, loan.Performances.Single().Transaction!.Amount);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task UpdateInterestAsync_PendingEditWithZeroCash_SkipsCheck_FIN13()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending, 500m), Admin, default);
+        _transactions.SetAvailableMoney(0m);
+
+        await _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Pending, 100m), Admin, default);
+
+        Assert.Equal(100m, loan.Performances.Single().Amount);
+    }
+
+    [Fact]
+    public async Task CancelLoanAsync_IsNotCheckedWhenCashGoesNegative_FIN13()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
+        _transactions.SetAvailableMoney(0m);
+
+        await _service.CancelLoanAsync(loan.Id, Admin, default);
+
+        Assert.True(loan.Transaction.IsCancelled);
+    }
+
+    [Fact]
+    public async Task CancelPaymentAsync_IsNotCheckedWhenCashGoesNegative_FIN13()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
+        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(600m), Admin, default);
+        LinkPaymentTransactions(loan);
+        _transactions.SetAvailableMoney(100m);
+
+        await _service.CancelPaymentAsync(loan.Id, created.Id, Admin, default);
+
+        Assert.True(loan.Payments.Single().Transaction.IsCancelled);
+        Assert.True(_transactions.Available() < 0m);
     }
 }

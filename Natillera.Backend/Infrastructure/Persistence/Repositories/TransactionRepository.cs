@@ -9,6 +9,12 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
     public Task AddAsync(Transaction transaction, CancellationToken cancellationToken = default) =>
         dbContext.Transactions.AddAsync(transaction, cancellationToken).AsTask();
 
+    public async Task<decimal> GetAvailableMoneyAsync(CancellationToken cancellationToken = default) =>
+        await dbContext.Transactions
+            .Where(transaction => !transaction.IsCancelled)
+            .Select(transaction => transaction.Direction == Domain.Enums.TransactionDirection.Income ? transaction.Amount : -transaction.Amount)
+            .SumAsync(cancellationToken);
+
     public async Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(CancellationToken cancellationToken = default)
     {
         return await dbContext.Transactions

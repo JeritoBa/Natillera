@@ -63,6 +63,7 @@ public sealed class LoanService(
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
+            CashGuard.EnsureAvailable(await transactionRepository.GetAvailableMoneyAsync(ct), loan.InitialAmount); // FIN-13
             await transactionRepository.AddAsync(transaction, ct);
             await loanRepository.AddAsync(loan, ct);
             await logRepository.AddAsync(
@@ -81,8 +82,10 @@ public sealed class LoanService(
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
+            var available = await transactionRepository.GetAvailableMoneyAsync(ct);
             var oldAmount = loan.InitialAmount;
             loan.UpdateDetails(request.InitialAmount, request.InterestRate, ToUtcDate(request.StartDate), request.BorrowerId);
+            CashGuard.EnsureAvailable(available, loan.InitialAmount - oldAmount); // FIN-13
             loan.Transaction.Update(loan.InitialAmount, TransactionDirection.Expense, TransactionType.Loan, $"Loan - {borrowerName}");
             await logRepository.AddAsync(
                 new Log(performedByUserId, LogEntityType.Loan, loan.Id, LogAction.Update, oldAmount, loan.InitialAmount),
@@ -139,8 +142,10 @@ public sealed class LoanService(
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
+            var available = await transactionRepository.GetAvailableMoneyAsync(ct);
             var oldAmount = payment.Amount;
             loan.UpdatePayment(payment, request.Amount, method);
+            CashGuard.EnsureAvailable(available, oldAmount - payment.Amount); // FIN-13
             payment.Transaction.Update(
                 payment.Amount,
                 TransactionDirection.Income,
@@ -208,10 +213,13 @@ public sealed class LoanService(
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
+            var wasPaid = performance.Status == PaymentStatus.Paid;
+            var available = wasPaid ? await transactionRepository.GetAvailableMoneyAsync(ct) : 0m;
             var oldAmount = performance.Amount;
             performance.UpdateDetails(request.Amount, request.Description);
-            if (performance.Status == PaymentStatus.Paid)
+            if (wasPaid)
             {
+                CashGuard.EnsureAvailable(available, oldAmount - performance.Amount); // FIN-13
                 performance.Transaction!.Update(
                     performance.Amount,
                     TransactionDirection.Income,

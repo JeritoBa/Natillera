@@ -9,6 +9,7 @@ namespace Natillera.Backend.Tests.Application;
 public class MonthlyPaymentServiceTests
 {
     private const decimal Minimum = 10_000m;
+    private const decimal Cash = 1_000_000_000m;
     private static readonly Guid Admin = Guid.NewGuid();
 
     private readonly FakeUserRepository _users = new();
@@ -21,6 +22,7 @@ public class MonthlyPaymentServiceTests
     public MonthlyPaymentServiceTests()
     {
         _service = new MonthlyPaymentService(_users, _payments, _transactions, _logs, _uow, new MonthlyPaymentOptions(Minimum));
+        _transactions.SetAvailableMoney(Cash); // FIN-13: default cash
     }
 
     private static CreateMonthlyPaymentRequest CreateRequest(Guid userId, PaymentStatus? status, decimal amount = 50_000m,
@@ -351,5 +353,59 @@ public class MonthlyPaymentServiceTests
     public async Task CancelAsync_NotFound_Throws()
     {
         await Assert.ThrowsAsync<DomainException>(() => _service.CancelAsync(Guid.NewGuid(), Admin, default));
+    }
+
+    // ---- FIN-13: available money check ----
+
+    [Fact]
+    public async Task UpdateAsync_PaidDecreaseAboveAvailable_Throws_FIN13()
+    {
+        var member = _users.AddUser();
+        var payment = await SeedAsync(member.Id, PaymentStatus.Paid);
+        _transactions.SetAvailableMoney(20_000m);
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid, 20_000m), Admin, default));
+
+        Assert.Equal("Insufficient available money. Available: 20,000; required: 30,000.", ex.Message);
+        Assert.Equal(50_000m, payment.Transaction!.Amount);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_PaidIncreaseWithZeroCash_Succeeds_FIN13()
+    {
+        var member = _users.AddUser();
+        var payment = await SeedAsync(member.Id, PaymentStatus.Paid);
+        _transactions.SetAvailableMoney(0m);
+
+        await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid, 70_000m), Admin, default);
+
+        Assert.Equal(70_000m, payment.Transaction!.Amount);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_PendingEditWithZeroCash_SkipsCheck_FIN13()
+    {
+        var member = _users.AddUser();
+        var payment = await SeedAsync(member.Id, PaymentStatus.Pending);
+        _transactions.SetAvailableMoney(0m);
+
+        await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Pending, 20_000m), Admin, default);
+
+        Assert.Equal(20_000m, payment.Amount);
+    }
+
+    [Fact]
+    public async Task CancelAsync_Paid_IsNotCheckedWhenCashGoesNegative_FIN13()
+    {
+        var member = _users.AddUser();
+        var payment = await SeedAsync(member.Id, PaymentStatus.Paid);
+        _transactions.SetAvailableMoney(10_000m);
+
+        await _service.CancelAsync(payment.Id, Admin, default);
+
+        Assert.True(payment.Transaction!.IsCancelled);
+        Assert.True(_transactions.Available() < 0m);
     }
 }

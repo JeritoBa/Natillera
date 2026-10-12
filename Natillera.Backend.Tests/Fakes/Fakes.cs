@@ -7,6 +7,7 @@ using Natillera.Backend.Application.Security;
 using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Application.Users;
 using Natillera.Backend.Domain.Entities;
+using Natillera.Backend.Domain.Enums;
 
 namespace Natillera.Backend.Tests.Fakes;
 
@@ -53,6 +54,20 @@ public sealed class FakeTransactionRepository : ITransactionRepository
 
     public Task<TransactionDetailResponse?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
+
+    public Task<decimal> GetAvailableMoneyAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Available());
+
+    /// <summary>Cash that exists outside the recorded transactions, so tests can seed money without extra Transactions.</summary>
+    public decimal SeededCash { get; private set; }
+
+    /// <summary>Seeded cash plus non-cancelled Income minus Expense (DASH-01).</summary>
+    public decimal Available() => SeededCash + Transactions
+        .Where(t => !t.IsCancelled)
+        .Sum(t => t.Direction == TransactionDirection.Income ? t.Amount : -t.Amount);
+
+    /// <summary>Sets the seeded cash so that the available money equals <paramref name="target"/>.</summary>
+    public void SetAvailableMoney(decimal target) => SeededCash += target - Available();
 }
 
 public sealed class FakeUserRepository : IUserRepository

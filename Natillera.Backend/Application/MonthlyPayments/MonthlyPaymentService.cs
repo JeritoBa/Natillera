@@ -91,10 +91,13 @@ public sealed class MonthlyPaymentService(
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
+            var wasPaid = payment.Status == PaymentStatus.Paid;
+            var available = wasPaid ? await transactionRepository.GetAvailableMoneyAsync(ct) : 0m;
             var oldAmount = payment.Amount;
             payment.UpdateDetails(request.Amount, request.Year, request.Month, request.UserId);
-            if (payment.Status == PaymentStatus.Paid)
+            if (wasPaid)
             {
+                CashGuard.EnsureAvailable(available, oldAmount - payment.Amount); // FIN-13
                 payment.Transaction!.Update(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member));
             }
             else if (status == PaymentStatus.Paid)
