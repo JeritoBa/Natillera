@@ -1,0 +1,16 @@
+/* Stroke-draw wrapper for LandingIcon (storyboard: "Icons"). Vars set inline by DrawIcon. */
+.draw svg * {
+  stroke-dasharray: 120;
+  stroke-dashoffset: var(--draw);
+}
+.draw svg [fill='#dcf5e8'] {
+  fill-opacity: var(--fill);
+}
+.draw svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+* {
+  box-sizing: border-box;
+}
