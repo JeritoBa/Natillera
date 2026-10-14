@@ -27,18 +27,21 @@ export function useMembers() {
   const create = async (values: MemberFormValues) => {
     if (!session) return
     const member = await createMember(session.accessToken, values)
+    if (!member) return // DEMO-04: demo writes resolve without a body
     setMembers(current => [...current, member].sort((a, b) => a.lastName.localeCompare(b.lastName)))
   }
 
   const update = async (id: string, values: MemberFormValues) => {
     if (!session) return
     const member = await updateMember(session.accessToken, id, values)
+    if (!member) return // DEMO-04
     setMembers(current => current.map(item => item.id === id ? member : item))
   }
 
   const setStatus = async (id: string, isActive: boolean) => {
     if (!session) return
     const member = await updateMemberStatus(session.accessToken, id, isActive)
+    if (!member) return // DEMO-04
     setMembers(current => current.map(item => item.id === id ? member : item))
   }
 

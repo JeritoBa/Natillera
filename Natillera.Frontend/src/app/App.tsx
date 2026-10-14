@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AuthPage } from '@/features/auth/pages/AuthPage'
 import { AdminRoute } from '@/features/auth/components/AdminRoute'
@@ -5,6 +6,7 @@ import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
 import { LandingPage } from '@/features/landing/pages/LandingPage'
+import { DemoPage } from '@/features/demo/pages/DemoPage'
 import { MembersPage } from '@/features/members/pages/MembersPage'
 import { MemberDetailPage } from '@/features/members/pages/MemberDetailPage'
 import { ActivitiesPage } from '@/features/activities/pages/ActivitiesPage'
@@ -30,13 +32,17 @@ const pagePaths: Record<Page, string> = {
 type DashboardPage = Exclude<Page, 'landing' | 'auth'>
 
 function LandingRoute() {
+  const { isDemo, exitDemo } = useAuth()
+  // DEMO-05: leaving to the landing (logo link, browser navigation) ends the demo.
+  useEffect(() => { if (isDemo) exitDemo() }, [isDemo, exitDemo])
   return <LandingPage />
 }
 
 function LoginRoute() {
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />
+  const { isAuthenticated, isDemo, exitDemo } = useAuth()
+  useEffect(() => { if (isDemo) exitDemo() }, [isDemo, exitDemo])
+  if (isAuthenticated && !isDemo) return <Navigate to="/dashboard" replace />
   return <AuthPage setPage={page => navigate(pagePaths[page])} />
 }
 
@@ -60,6 +66,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<LandingRoute />} />
       <Route path="/login" element={<LoginRoute />} />
+      <Route path="/demo" element={<DemoPage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />

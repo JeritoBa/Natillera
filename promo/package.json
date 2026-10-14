@@ -1,0 +1,27 @@
+{
+  "name": "natillera-promo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion promo video for Natillera Gallego Nanclares",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts NatilleraPromo out/natillera-promo.mp4 --codec=h264 --crf=18",
+    "still": "remotion still src/index.ts NatilleraPromo out/thumbnail.png --frame=225",
+    "render:square": "remotion render src/index.ts NatilleraPromoSquare out/natillera-promo-square.mp4 --codec=h264 --crf=18",
+    "still:square": "remotion still src/index.ts NatilleraPromoSquare out/thumbnail-square.png --frame=225",
+    "render:square:en": "remotion render src/index.ts NatilleraPromoSquareEn out/natillera-promo-square-en.mp4 --codec=h264 --crf=18",
+    "still:square:en": "remotion still src/index.ts NatilleraPromoSquareEn out/thumbnail-square-en.png --frame=225",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.535",
+    "@remotion/google-fonts": "4.0.535",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "remotion": "4.0.535"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "typescript": "6.0.3"
+  }
+}

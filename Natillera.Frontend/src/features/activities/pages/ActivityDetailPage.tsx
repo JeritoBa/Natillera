@@ -29,7 +29,7 @@ const headings: [string, string, boolean][] = [
 export function ActivityDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { session } = useAuth()
+  const { session, isDemo } = useAuth()
   const { members } = useMembers()
   const canManage = session?.user.role === 'Admin'
   const [activity, setActivity] = useState<ActivityDetail | null>(null)
@@ -169,7 +169,7 @@ export function ActivityDetailPage() {
       <p className="text-[#4e7460] text-sm mt-0.5">Inicia el {longDate(activity.startDate)}</p>
       {isCancelled && <p role="status" className="mt-3 rounded-lg border border-[#d6e8dc] bg-[#eef4f0] px-3 py-2.5 text-sm text-[#4e7460]">Esta actividad está anulada. Su costo ya no cuenta como egreso y no admite cambios.</p>}
     </div>
-    {success && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
+    {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
     {actionError && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{actionError}</p>}
 
     <div className="flex flex-col gap-4 lg:gap-5">

@@ -5,6 +5,7 @@ export const appName = 'Natillera Gallego Nanclares'
 
 const sectionTitles: Record<string, { list: string, detail?: string }> = {
   login: { list: 'Iniciar sesión' },
+  demo: { list: 'Demo' },
   dashboard: { list: 'Dashboard' },
   members: { list: 'Miembros', detail: 'Detalle de miembro' },
   payments: { list: 'Cuotas' },

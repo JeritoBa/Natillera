@@ -122,3 +122,5 @@ logs/
 graphify-out/
 .claude
 skills-lock.json
+# Remotion promo video output
+promo/out/

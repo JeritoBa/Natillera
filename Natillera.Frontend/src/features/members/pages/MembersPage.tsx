@@ -12,7 +12,7 @@ const emptyForm: MemberFormValues = { firstName: '', lastName: '', email: '', ph
 
 export function MembersPage() {
   const { members, loading, error, create, update, setStatus } = useMembers()
-  const { session } = useAuth()
+  const { session, isDemo } = useAuth()
   const navigate = useNavigate()
   const canManage = session?.user.role === 'Admin'
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
@@ -62,7 +62,7 @@ export function MembersPage() {
         <div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Activos</p><p className="text-lg font-bold text-[#0a6635] mono">{activeCount}</p></div>
         <div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Inactivos</p><p className="text-lg font-bold text-[#c0392b] mono">{members.length - activeCount}</p></div>
       </div>
-      {success && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
+      {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
       {(error || actionError) && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error ?? actionError}</p>}
       <div className="rounded-xl overflow-hidden" style={{ background: '#fff', border: '1px solid #d6e8dc' }}>
         <table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>

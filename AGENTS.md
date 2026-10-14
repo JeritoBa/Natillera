@@ -2,7 +2,7 @@
 
 Single entry point for any AI coding agent (Claude Code, Copilot, Cursor, etc.). Read this first, then the documents it links. The owner talks to agents in **Spanish**; all repository documentation and code are in **English**.
 
-Last verified against the code: backend 294 tests and frontend 78 tests passing.
+Last verified against the code: backend 294 tests and frontend 122 tests passing.
 
 ---
 
@@ -31,7 +31,7 @@ The financial rules in short form (full catalogue with IDs: [docs/business-rules
 
 ## 2. Current status
 
-Phase: **MVP and more are done; next is testing and deployment.** Hosting is undecided. The board/owner is the source of truth for status; this section reflects the code.
+Phase: **MVP and more are done and deployed to production** (Render + Neon, ADR-019): SPA at https://natillera-web.onrender.com, API at https://natillera-api-owt4.onrender.com. Next: integration testing and the pending changes in section 8. The board/owner is the source of truth for status; this section reflects the code.
 
 | Area | State |
 |---|---|
@@ -46,7 +46,8 @@ Phase: **MVP and more are done; next is testing and deployment.** Hosting is und
 | Dashboard (admin and member variants), member savings/earnings | Implemented |
 | Public landing page, mobile-responsive UI | Implemented |
 | Unit tests (backend and frontend) | Implemented; integration tests pending |
-| **Not implemented** | In-app payments (separate integration project, high risk), member loan requests/approval workflow, `ActivitySale` entity (the assignment covers it), RowVersion concurrency. CI workflow and deployment config (Render + Neon) are drafted, not yet live |
+| Production deployment (Render API + static SPA, Neon PostgreSQL), GitHub Actions CI, `/health` | Implemented and live (spec 013, ADR-019) |
+| **Not implemented** | In-app payments (separate integration project, high risk), member loan requests/approval workflow, `ActivitySale` entity (the assignment covers it), RowVersion concurrency |
 
 The old "US-08 blocked" note is resolved: member savings = paid fees + activity earnings + interest share (DASH-04). Specs per feature: [docs/specs/README.md](docs/specs/README.md).
 
@@ -94,7 +95,7 @@ Decisions and their rationale: [docs/architecture_decisions.md](docs/architectur
 └── Natillera.Frontend/
     ├── src/app/                   # routing (App.tsx), document title
     ├── src/features/<feature>/    # api/, model/ (pure logic + tests), pages/, components/
-    │   └── auth dashboard members monthlyPayments loans activities transactions audit landing
+    │   └── auth dashboard members monthlyPayments loans activities transactions audit landing demo
     ├── src/shared/                # api client, layout (AppShell), ui primitives, formatters, types
     ├── public/                    # logos
     └── design/                    # original logo files
@@ -122,7 +123,7 @@ Rebuild after code changes: `docker compose up -d --build backend web`. In `Deve
 
 ```bash
 dotnet test Natillera.sln          # backend, ~294 tests, no DB/Docker needed
-cd Natillera.Frontend && npm test  # Vitest, ~78 tests, pure logic
+cd Natillera.Frontend && npm test  # Vitest, ~122 tests, pure logic
 cd Natillera.Frontend && npm run lint && npm run build
 ```
 
@@ -203,7 +204,7 @@ From now on, **specs and rule IDs come before code**:
 5. **Tests reference rule IDs** in their names or in a comment when practical (e.g. `// MP-04`). Rule IDs are never reused or renumbered.
 6. If code and docs disagree, the owner decides which is right; fix the other and note it.
 
-Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, ACT (activities), DASH (dashboard), TX/AUD (transactions, audit), UI, OPS (operations, deployment).
+Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, ACT (activities), DASH (dashboard), TX/AUD (transactions, audit), UI, OPS (operations, deployment), DEMO (public browser-only demo).
 
 ---
 
@@ -222,8 +223,13 @@ Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, A
 
 ## 8. Known open items and technical debt
 
-- Migrations and admin seeding run in Development, or elsewhere only with the opt-in flag `NATILLERA_APPLY_MIGRATIONS=true` (OPS-01). Hosting decided: Render + Neon (ADR-019); not yet deployed (first-deploy empty-DB check pending).
-- **CI workflow drafted, not yet live.**
+### Pending changes
+
+- **MP-09 has no automated test:** list visibility (Admin sees all statuses, a Member sees only `Paid` payments) is enforced in `MonthlyPaymentsController.Get` -> `MonthlyPaymentRepository.GetOrderedAsync(includeNonPaid)` with no test. Add a test (likely as part of the integration tests, since it lives in the controller/repository).
+
+### Other open items
+
+- Migrations and admin seeding run in Development, or elsewhere only with the opt-in flag `NATILLERA_APPLY_MIGRATIONS=true` (OPS-01). Hosting: Render + Neon (ADR-019), deployed and live.
 - **Integration tests pending** (repositories/EF against Postgres, controllers, migrations, JWT middleware, the partial unique index).
 - **Interest rounding question (LOAN-10):** `Loan.CalculateMonthlyInterest` rounds `ToEven`, the per-member interest share rounds `AwayFromZero`; owner has not confirmed it is intentional (a characterization test documents current behavior). The method is not used by any service.
 - **RowVersion optimistic concurrency** pending (FIN-11).
