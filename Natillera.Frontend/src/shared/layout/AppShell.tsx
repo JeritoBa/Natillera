@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { DemoBanner } from '@/features/demo/components/DemoBanner'
+import { DemoWriteToast } from '@/features/demo/components/DemoWriteToast'
 import type { Page } from '@/shared/model/types'
 import { BrandLogo } from '@/shared/ui/BrandLogo'
 import { Icon } from '@/shared/ui/Icon'
@@ -13,7 +15,7 @@ interface SidebarProps {
 }
 
 function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
-  const { logout, session } = useAuth()
+  const { logout, session, isDemo, exitDemo } = useAuth()
   const user = session?.user
   const initials = user ? `${user.firstName[0] ?? ''}${user.lastName[0] ?? ''}`.toUpperCase() : ''
   const roleLabel = user?.role === 'Admin' ? 'Administrador' : 'Miembro'
@@ -38,7 +40,7 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
         style={{ background: '#fff', borderRight: '1px solid #d6e8dc' }}
       >
         <div className="flex items-center gap-2.5 px-5 py-4 border-b" style={{ borderColor: '#d6e8dc' }}>
-          <Link to="/" aria-label="Ir a la página principal de Gallego Nanclares" className="inline-flex rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c5c38]"><BrandLogo /></Link>
+          <Link to="/" onClick={() => { if (isDemo) exitDemo() }} aria-label="Ir a la página principal de Gallego Nanclares" className="inline-flex rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c5c38]"><BrandLogo /></Link>
         </div>
 
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
@@ -70,11 +72,11 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
             </div>
           </div>
           <button
-            onClick={() => { logout(); setPage('auth') }}
+            onClick={() => { if (isDemo) { exitDemo(); setPage('landing') } else { logout(); setPage('auth') } }}
             className="nav-item w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm"
           >
             <Icon.Logout />
-            <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 500 }}>Salir</span>
+            <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 500 }}>{isDemo ? 'Salir de la demo' : 'Salir'}</span>
           </button>
         </div>
       </aside>
@@ -90,11 +92,13 @@ interface AppShellProps {
 
 export function AppShell({ page, setPage, children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { isDemo, exitDemo } = useAuth()
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#f5f7f5' }}>
       <Sidebar page={page} setPage={setPage} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       <div className="flex-1 flex flex-col overflow-hidden">
+        {isDemo && <DemoBanner />}
         <header
           className="flex items-center gap-3 px-4 py-3 border-b lg:hidden"
           style={{ borderColor: '#d6e8dc', background: '#fff' }}
@@ -102,10 +106,11 @@ export function AppShell({ page, setPage, children }: AppShellProps) {
           <button onClick={() => setSidebarOpen(true)} aria-label="Abrir menú" className="text-[#4e7460]">
             <Icon.Menu />
           </button>
-          <Link to="/" aria-label="Ir a la página principal de Gallego Nanclares" className="inline-flex rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c5c38]"><BrandLogo className="h-7 w-auto" /></Link>
+          <Link to="/" onClick={() => { if (isDemo) exitDemo() }} aria-label="Ir a la página principal de Gallego Nanclares" className="inline-flex rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c5c38]"><BrandLogo className="h-7 w-auto" /></Link>
         </header>
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
+      {isDemo && <DemoWriteToast />}
     </div>
   )
 }

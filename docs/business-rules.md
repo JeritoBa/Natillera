@@ -157,6 +157,21 @@ Single source of truth for the business rules of the Natillera system. Each rule
 
 ---
 
+## DEMO - Public demo (read-only replica)
+
+Spec: [014 - Public demo](specs/014-public-demo.md). Frontend only; read-only, no business logic of its own, never an authority over real data.
+
+| ID | Rule | Rationale | Enforced in | Tests | Status |
+|---|---|---|---|---|---|
+| DEMO-01 | The demo is public at `/demo`, linked from the landing navbar ("Demo"); no login. The visitor chooses the Admin or Member view. | Let anyone try the system. | `DemoPage.tsx`, `App.tsx` (`/demo`), `LandingPage.tsx`, `demoSession.ts` | `demoSession.test.ts` | Implemented |
+| DEMO-02 | In demo mode the frontend sends no request to the backend; reads are answered from static fictitious fixtures bundled with the frontend, with the real API's response contracts. | No cost, works while the API sleeps, cannot touch real data. | `apiClient.ts` hook, `demoClient.ts`, `demoFixtures.ts` | `demoClient.test.ts` | Implemented |
+| DEMO-03 | Demo data is fictitious and every demo screen shows a demo banner (fictitious data, no changes saved, role switch, exit). | Privacy (UI-07); avoid confusion with the real app. | `DemoBanner.tsx` (in `AppShell.tsx`), `demoFixtures.ts` | `demoFixtures.test.ts` | Implemented |
+| DEMO-04 | The demo is read-only and contains no business logic: any write request saves nothing; the form or modal closes and an on-screen notice shows "Modo demo: los cambios no se guardan." | Avoid duplicating backend rules in the frontend. | `demoClient.ts`, `DemoWriteToast.tsx`, `useMembers.ts`, pages hiding inline success messages | `demoClient.test.ts` | Implemented |
+| DEMO-05 | Demo mode and a real session never mix: entering the demo ends any real session in the tab; leaving the demo returns to the landing without a session. | Avoid mixing real and fake data. | `AuthProvider.tsx` (`enterDemo`/`exitDemo`), `App.tsx` route guards, `AppShell.tsx` | `demoSession.test.ts`, `demoClient.test.ts` | Implemented |
+| DEMO-06 | The fixtures are consistent with the real rules: one non-cancelled Transaction per paid/active entity, balances and dashboard figures equal to sums of non-cancelled transactions (FIN-09), member responses filtered as MP-09; dates are relative to the current month. | A replica must not show impossible figures. | `demoFixtures.ts` | `demoFixtures.test.ts` | Implemented |
+
+---
+
 ## UI - Frontend conventions that affect behavior
 
 | ID | Rule | Rationale | Enforced in | Tests | Status |

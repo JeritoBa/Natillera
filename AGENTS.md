@@ -2,7 +2,7 @@
 
 Single entry point for any AI coding agent (Claude Code, Copilot, Cursor, etc.). Read this first, then the documents it links. The owner talks to agents in **Spanish**; all repository documentation and code are in **English**.
 
-Last verified against the code: backend 294 tests and frontend 78 tests passing.
+Last verified against the code: backend 294 tests and frontend 122 tests passing.
 
 ---
 
@@ -95,7 +95,7 @@ Decisions and their rationale: [docs/architecture_decisions.md](docs/architectur
 └── Natillera.Frontend/
     ├── src/app/                   # routing (App.tsx), document title
     ├── src/features/<feature>/    # api/, model/ (pure logic + tests), pages/, components/
-    │   └── auth dashboard members monthlyPayments loans activities transactions audit landing
+    │   └── auth dashboard members monthlyPayments loans activities transactions audit landing demo
     ├── src/shared/                # api client, layout (AppShell), ui primitives, formatters, types
     ├── public/                    # logos
     └── design/                    # original logo files
@@ -123,7 +123,7 @@ Rebuild after code changes: `docker compose up -d --build backend web`. In `Deve
 
 ```bash
 dotnet test Natillera.sln          # backend, ~294 tests, no DB/Docker needed
-cd Natillera.Frontend && npm test  # Vitest, ~78 tests, pure logic
+cd Natillera.Frontend && npm test  # Vitest, ~122 tests, pure logic
 cd Natillera.Frontend && npm run lint && npm run build
 ```
 
@@ -204,7 +204,7 @@ From now on, **specs and rule IDs come before code**:
 5. **Tests reference rule IDs** in their names or in a comment when practical (e.g. `// MP-04`). Rule IDs are never reused or renumbered.
 6. If code and docs disagree, the owner decides which is right; fix the other and note it.
 
-Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, ACT (activities), DASH (dashboard), TX/AUD (transactions, audit), UI, OPS (operations, deployment).
+Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, ACT (activities), DASH (dashboard), TX/AUD (transactions, audit), UI, OPS (operations, deployment), DEMO (public browser-only demo).
 
 ---
 

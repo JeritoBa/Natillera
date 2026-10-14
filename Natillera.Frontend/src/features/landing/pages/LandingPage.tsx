@@ -61,6 +61,7 @@ export function LandingPage() {
           <nav aria-label="Principal" className="flex items-center gap-1 md:gap-2">
             <a href="#que-es" className={`hidden md:inline-flex px-3 min-h-11 items-center text-sm text-[#4e7460] hover:text-[#0c1a12] rounded ${FOCUS}`}>Qué es</a>
             <a href="#como-funciona" className={`hidden md:inline-flex px-3 min-h-11 items-center text-sm text-[#4e7460] hover:text-[#0c1a12] rounded ${FOCUS}`}>Cómo funciona</a>
+            <Link to="/demo" className={`inline-flex px-2 sm:px-3 min-h-11 items-center text-sm text-[#4e7460] hover:text-[#0c1a12] rounded ${FOCUS}`}>Demo</Link>
             <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className={`hidden sm:inline-flex btn-ghost px-4 min-h-11 items-center gap-1 rounded-lg text-sm ${FOCUS}`}>Quiero unirme <WhatsAppHint /></a>
             <Link to="/login" className={`btn-primary px-5 min-h-11 inline-flex items-center rounded-lg text-sm ${FOCUS}`}>Ingresar</Link>
           </nav>

@@ -36,7 +36,7 @@ const dot = (color: string, border?: string) => <span aria-hidden="true" classNa
 export function LoanDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { session } = useAuth()
+  const { session, isDemo } = useAuth()
   const canManage = session?.user.role === 'Admin'
   const [loan, setLoan] = useState<LoanDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -190,7 +190,7 @@ export function LoanDetailPage() {
       <p className="text-[#4e7460] text-sm mt-0.5">Préstamo de {formatCurrency(loan.initialAmount)} · inicia el {longDate(loan.startDate)}</p>
       {isCancelled && <p role="status" className="mt-3 rounded-lg border border-[#d6e8dc] bg-[#eef4f0] px-3 py-2.5 text-sm text-[#4e7460]">Este préstamo está anulado. Su desembolso ya no cuenta como egreso y no admite cambios.</p>}
     </div>
-    {success && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
+    {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
     {actionError && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{actionError}</p>}
 
     <div className="flex flex-col gap-4 lg:gap-5">
