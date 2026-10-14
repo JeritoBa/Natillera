@@ -37,6 +37,12 @@
   <img src="https://img.shields.io/badge/license-proprietary-lightgrey" alt="Proprietary" />
 </p>
 
+<p align="center">
+  <img src="docs/app_screenshots/admin-dashboard.png" alt="Admin dashboard: available money, lent money, earnings and top sellers" width="900" />
+  <br />
+  <sub>Admin dashboard: every figure is derived from the transaction ledger, never typed in by hand. Sample data.</sub>
+</p>
+
 ---
 
 > **This is not an open-source project.** The source code is private property of its owner and is shared here only to describe what the application is, how it works and how it is built. No license is granted to use, copy, modify or distribute it. All rights reserved.
@@ -45,9 +51,32 @@
 
 The application is live at **[natillera-web.onrender.com](https://natillera-web.onrender.com)**. Anyone can visit the public landing page to learn what a natillera is, how a month works and what members see when they log in (all example figures there are fictitious). Want to join? Use the **"Quiero unirme"** button to write to the natillera on WhatsApp.
 
+**Try it without an account:** open the **[public demo](https://natillera-web.onrender.com/demo)** and browse the whole system as the administrator or as a member. The demo runs entirely in your browser with fictitious data: it never calls the API, and nothing you do there is saved.
+
 Members and the administrator log in with the email and password given by the administrator; real financial data is only visible after logging in.
 
 > Hosted on free tiers (Render + Neon): if nobody has used it for a while, the first visit may take up to a minute while the server wakes up.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <a href="docs/app_screenshots/member-detail.png"><img src="docs/app_screenshots/member-detail.png" alt="Member detail page" /></a>
+      <p><strong>Member detail</strong><br /><sub>Savings broken down into paid fees, activity earnings and share of loan interest, plus pending fees and the member's movements.</sub></p>
+    </td>
+    <td width="33%" valign="top">
+      <a href="docs/app_screenshots/loan-detail.png"><img src="docs/app_screenshots/loan-detail.png" alt="Loan detail page" /></a>
+      <p><strong>Loan detail</strong><br /><sub>Outstanding principal and interest at a glance; a payment can never exceed what is still owed.</sub></p>
+    </td>
+    <td width="33%" valign="top">
+      <a href="docs/app_screenshots/audit-log.png"><img src="docs/app_screenshots/audit-log.png" alt="Audit log" /></a>
+      <p><strong>Audit log</strong><br /><sub>Every create, update and cancel is recorded with its old and new value and the user who made it.</sub></p>
+    </td>
+  </tr>
+</table>
+
+<sub>All screenshots use sample data from the development environment; no real member data is shown.</sub>
 
 ## What is it?
 
@@ -68,6 +97,7 @@ This application replaces the phone note and the generic money app that the Gall
 | **Transactions** | Complete, filterable ledger of incomes and expenses. Each business entity owns exactly one transaction. |
 | **Audit log** | Admin-only history of every create, update and cancel, with the old and new value and the user who made the change. |
 | **Landing page** | Public page explaining what a natillera is, how a month works and how to join (via WhatsApp). |
+| **Public demo** | Read-only replica of the system at `/demo`, as Admin or Member, with fictitious data served from the browser; no login and no calls to the API. |
 
 ## Business rules at a glance
 
