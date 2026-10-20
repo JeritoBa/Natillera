@@ -24,7 +24,7 @@ Create/edit modals do not submit with Enter, some errors appear behind the modal
    - Computed in the frontend from the already loaded list (`GET /api/monthly-payments` returns all statuses to the Admin). "Agregar cuota" is enabled only when members **and** fees have loaded; the list gets loading ("Cargando cuotas…"), empty ("Aún no hay cuotas registradas.") and error-with-retry states. The backend MP-04 check stays the authority (its 409 message appears in the modal).
 4. **Members search and status filter:** a filter card between the stat cards and the table: search "Buscar miembro" (placeholder "Nombre, correo o teléfono"; matches name, email and phone, case- and accent-insensitive) and status chips "Todos (n)", "Activos (n)", "Inactivos (n)" (`aria-pressed`, min 40 px tall); default "Todos". Counter "Mostrando X de Y miembros" and "Limpiar filtros". Empty result: "No hay miembros que coincidan con la búsqueda." with "Limpiar filtros". Both roles.
 5. **Loans search and responsive table:**
-   - Filter card: search "Buscar deudor" (placeholder "Nombre del deudor") next to the existing "Mes de inicio" select; filters combine (AND); counter "Mostrando X de Y préstamos"; one "Limpiar filtros" replaces "Ver todos los meses". Empty: month only keeps "No hay préstamos que inicien en {Mes Año}."; with search "No hay préstamos que coincidan con los filtros."; both with "Limpiar filtros".
+   - Filter card: search "Buscar deudor" (placeholder "Nombre del deudor") next to the existing "Mes de inicio" select; plus status chips "Todos (n)", "Activos (n)", "Pagados (n)", "Anulados (n)" (`aria-pressed`, min 40 px tall, counts over the whole list; added 2026-10-20); filters combine (AND); counter "Mostrando X de Y préstamos"; one "Limpiar filtros" replaces "Ver todos los meses". Empty: month only keeps "No hay préstamos que inicien en {Mes Año}."; with search or a status "No hay préstamos que coincidan con los filtros."; both with "Limpiar filtros".
    - Table: < 640 px: Deudor (truncated, `title` with full name), "Pendiente", actions (Editar/Anular; eye hidden), subline "Inicia dd/mm/aaaa" + badge. 640-1279 px: Deudor, Capital pendiente, Estado, actions; subline "Prestado $ X · Tasa Y% · Inicia dd/mm/aaaa" (wrapping parts). ≥ 1280 px: all columns, no subline. Header and cell paddings match per column. The table is wrapped in horizontal scroll as a safety net so actions are never clipped.
 6. Shared accent-insensitive normalizer moved to `shared/lib/search.ts` (Logs reuses it).
 
@@ -59,7 +59,7 @@ See Scope. Existing classes and patterns: error box `rounded-lg border border-[#
 6. A member with all 12 months of the entered year taken: Mes disabled with "Sin meses disponibles" and the helper text; saving shows the in-modal error.
 7. "Agregar cuota" is disabled until members and fees have loaded.
 8. On `/members`, typing "gal" or "gál" filters by name, email or phone; "Inactivos" shows only inactive members; the counter updates; "Limpiar filtros" resets both.
-9. On `/loans`, search and month combine; an empty result offers "Limpiar filtros".
+9. On `/loans`, search, month and status (Activos / Pagados / Anulados) combine; an empty result offers "Limpiar filtros", which resets all three.
 10. At 375, 768, 1024 (with sidebar) and 1280 px the loans table never clips the actions, headers align with values, and there is no page-level horizontal scroll.
 11. `npm test`, `npm run lint`, `npm run build` pass; no backend file changes.
 

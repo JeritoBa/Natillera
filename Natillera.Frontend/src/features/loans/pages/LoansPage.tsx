@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { cancelLoan, createLoan, getLoans, updateLoan, type LoanListItem } from '@/features/loans/api/loansApi'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
-import { filterLoans, loanStartMonth } from '@/features/loans/model/loanFilters'
+import { countLoansByStatus, filterLoans, loanStartMonth, type LoanStatusFilter } from '@/features/loans/model/loanFilters'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
@@ -35,6 +35,7 @@ export function LoansPage() {
   const [saving, setSaving] = useState(false)
   const [month, setMonth] = useState<'all' | string>('all')
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<LoanStatusFilter>('all')
 
   const load = useCallback(async () => {
     if (!session) return
@@ -92,9 +93,10 @@ export function LoansPage() {
   loans.forEach(loan => monthCounts.set(loanStartMonth(loan), (monthCounts.get(loanStartMonth(loan)) ?? 0) + 1))
   const months = [...monthCounts.keys()].sort().reverse()
   const effectiveMonth = month !== 'all' && monthCounts.has(month) ? month : 'all'
-  const filtered = filterLoans(loans, search, effectiveMonth)
-  const hasFilters = effectiveMonth !== 'all' || search.trim() !== ''
-  const clearFilters = () => { setMonth('all'); setSearch('') }
+  const filtered = filterLoans(loans, search, effectiveMonth, statusFilter)
+  const statusCounts = countLoansByStatus(loans)
+  const hasFilters = effectiveMonth !== 'all' || search.trim() !== '' || statusFilter !== 'all'
+  const clearFilters = () => { setMonth('all'); setSearch(''); setStatusFilter('all') }
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const columns: { heading: ReactNode, key: string, cls: string, right: boolean }[] = [
     { key: 'borrower', heading: 'Deudor', cls: 'px-3 sm:px-5', right: false },
@@ -130,6 +132,10 @@ export function LoansPage() {
             </select>
           </div>
         </div>
+        <div role="group" aria-label="Filtrar por estado" className="flex gap-1.5 flex-wrap">
+          {([['all', 'Todos'], ['Active', 'Activos'], ['Paid', 'Pagados'], ['Cancelled', 'Anulados']] as const).map(([value, label]) =>
+            <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`px-3 min-h-10 rounded-lg text-xs font-medium transition-all ${statusFilter === value ? 'bg-[#0c5c38] text-white' : 'btn-ghost'}`}>{label} ({statusCounts[value]})</button>)}
+        </div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {loans.length} préstamos</p>
           {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
@@ -142,7 +148,7 @@ export function LoansPage() {
           {loading && <tr><td colSpan={7} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando préstamos…</p></td></tr>}
           {!loading && !error && loans.length === 0 && <tr><td colSpan={7} className="px-5 py-12 text-center text-[#4e7460]">{canManage ? 'Aún no hay préstamos registrados. Usa «Nuevo préstamo» para crear el primero.' : 'Aún no hay préstamos registrados.'}</td></tr>}
           {!loading && loans.length > 0 && filtered.length === 0 && <tr><td colSpan={7} className="px-5 py-12 text-center text-[#4e7460]">
-            <p>{search.trim() ? 'No hay préstamos que coincidan con los filtros.' : `No hay préstamos que inicien en ${monthText(effectiveMonth)}.`}</p>
+            <p>{search.trim() || statusFilter !== 'all' ? 'No hay préstamos que coincidan con los filtros.' : `No hay préstamos que inicien en ${monthText(effectiveMonth)}.`}</p>
             <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>
           </td></tr>}
           {!loading && filtered.map(loan => <tr key={loan.id} className="table-row">
