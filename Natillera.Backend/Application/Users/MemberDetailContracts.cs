@@ -6,7 +6,8 @@ public sealed record MemberDetailResponse(
     MemberInfoResponse Member,
     MemberBalanceResponse Balance,
     IReadOnlyCollection<MemberPendingPaymentResponse> PendingPayments,
-    IReadOnlyCollection<MemberTransactionResponse> Transactions);
+    IReadOnlyCollection<MemberTransactionResponse> Transactions,
+    PendingObligationsResponse PendingObligations);
 
 public sealed record MemberInfoResponse(Guid Id, string FirstName, string LastName, string Email, string Phone,
     UserRole Role, bool IsActive, DateTime CreatedAt, DateTime? UpdatedAt);

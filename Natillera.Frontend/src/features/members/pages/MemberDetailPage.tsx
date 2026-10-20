@@ -3,9 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { appName } from '@/app/useDocumentTitle'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { getMemberDetail, type MemberDetail } from '@/features/members/api/membersApi'
+import { PendingObligationsCard } from '@/features/members/components/PendingObligationsCard'
 import { typeLabel } from '@/features/transactions/model/labels'
 import { ApiError, getFriendlyApiError } from '@/shared/api/apiError'
-import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
+import { formatCurrency } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 
@@ -68,9 +69,8 @@ export function MemberDetailPage() {
     <button onClick={() => void load()} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3">Reintentar</button>
   </div>
 
-  const { member, balance, pendingPayments, transactions } = detail
+  const { member, balance, pendingObligations, transactions } = detail
   const fullName = `${member.firstName} ${member.lastName}`
-  const pendingTotal = pendingPayments.reduce((sum, payment) => sum + payment.amount, 0)
   const sorted = [...transactions].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
   const visible = showAll ? sorted : sorted.slice(0, collapsedCount)
   const info: [string, React.ReactNode][] = [
@@ -109,18 +109,7 @@ export function MemberDetailPage() {
         </section>
 
         <section aria-labelledby="member-pending-title" className="rounded-xl p-5 lg:col-span-2" style={cardStyle}>
-          <h2 id="member-pending-title" className="text-sm font-semibold text-[#0c1a12]">Cuotas pendientes</h2>
-          {pendingPayments.length === 0 ? <>
-            <p className="flex items-center gap-2 mt-3 text-base font-semibold text-[#0a6635]"><span aria-hidden="true" className="w-7 h-7 rounded-full bg-[#dcf5e8] flex items-center justify-center"><Icon.Check /></span>Está al día</p>
-            <p className="text-xs text-[#4e7460]">No tiene cuotas pendientes por pagar.</p>
-          </> : <>
-            <p className="mono text-2xl font-bold text-[#9a6e00] mt-2">Debe {formatCurrency(pendingTotal)}</p>
-            <p className="text-xs text-[#4e7460]">{pendingPayments.length === 1 ? '1 cuota sin pagar' : `${pendingPayments.length} cuotas sin pagar`}</p>
-            <ul className="mt-4 space-y-2 text-sm">{pendingPayments.map(payment => <li key={payment.id} className={rowClass}>
-              <span className="text-[#0c1a12]">{formatMonth(payment.month)} {payment.year}</span>
-              <span className="mono text-[#0c1a12] text-right">{formatCurrency(payment.amount)}</span>
-            </li>)}</ul>
-          </>}
+          <PendingObligationsCard obligations={pendingObligations} audience="admin" titleId="member-pending-title" />
         </section>
       </div>
 

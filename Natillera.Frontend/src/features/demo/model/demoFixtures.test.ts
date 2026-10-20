@@ -93,6 +93,57 @@ describe.each(scenarios)('demo fixtures (%s)', (_label, now) => {
     expect(f.memberSummary.totalNatilleraBalance).toBeNull()
   })
 
+  it('DEMO-06 / MEM-10 / DASH-11: pending obligations are recomputed for every member', () => {
+    const details = Object.values(f.loanDetails)
+    const kindsSeen = new Set<string>()
+    for (const member of f.members) {
+      const o = f.memberDetails[member.id].pendingObligations
+      const fees = f.monthlyPayments.filter(payment => payment.userId === member.id && payment.status === 'Pending')
+      const loans = details.filter(loan => loan.borrowerId === member.id && loan.status === 'Active' && loan.summary.outstandingPrincipal > 0)
+      const interests = details.filter(loan => loan.borrowerId === member.id).flatMap(loan => loan.interestPayments).filter(item => item.status === 'Pending')
+      const sales = assignments.filter(item => item.userId === member.id && item.status === 'Pending')
+
+      expect(o.monthlyPayments.count, member.firstName).toBe(fees.length)
+      expect(o.monthlyPayments.amount, member.firstName).toBe(sum(fees.map(payment => payment.amount)))
+      expect(o.monthlyPayments.items.map(item => item.id)).toEqual(fees.map(payment => payment.id).sort((a, b) => {
+        const left = monthlyPaymentById[a]
+        const right = monthlyPaymentById[b]
+        return left.year - right.year || left.month - right.month
+      }))
+      expect(o.loans.count, member.firstName).toBe(loans.length)
+      expect(o.loans.amount, member.firstName).toBe(sum(loans.map(loan => loan.summary.outstandingPrincipal)))
+      expect(o.loans.items.map(item => item.id)).toEqual(loans.map(loan => loan.id))
+      expect(o.interests.count, member.firstName).toBe(interests.length)
+      expect(o.interests.amount, member.firstName).toBe(sum(interests.map(item => item.amount)))
+      expect(o.interests.items.map(item => item.id)).toEqual(interests.map(item => item.id))
+      expect(o.activitySales.count, member.firstName).toBe(sales.length)
+      expect(o.activitySales.amount, member.firstName).toBe(sum(sales.map(item => item.saleAmount)))
+      expect(o.activitySales.items.map(item => item.id)).toEqual(sales.map(item => item.id))
+      expect(o.total, member.firstName).toBe(o.monthlyPayments.amount + o.loans.amount + o.interests.amount + o.activitySales.amount)
+
+      // Cancelled or Paid records never appear.
+      const listed = [...o.monthlyPayments.items, ...o.loans.items, ...o.interests.items, ...o.activitySales.items].map(item => item.id)
+      const settled = [
+        ...f.monthlyPayments.filter(payment => payment.status !== 'Pending').map(payment => payment.id),
+        ...details.filter(loan => loan.status !== 'Active').map(loan => loan.id),
+        ...details.flatMap(loan => loan.interestPayments).filter(item => item.status !== 'Pending').map(item => item.id),
+        ...assignments.filter(item => item.status !== 'Pending').map(item => item.id),
+      ]
+      for (const id of listed) expect(settled.includes(id), id).toBe(false)
+
+      expect(f.memberDetails[member.id].pendingPayments).toHaveLength(o.monthlyPayments.count)
+      if (o.monthlyPayments.count) kindsSeen.add('fees')
+      if (o.loans.count) kindsSeen.add('loans')
+      if (o.interests.count) kindsSeen.add('interests')
+      if (o.activitySales.count) kindsSeen.add('sales')
+      if (o.total === 0) kindsSeen.add('nothing')
+    }
+    expect([...kindsSeen].sort()).toEqual(['fees', 'interests', 'loans', 'nothing', 'sales'])
+    expect(f.memberSummary.pendingObligations).toEqual(f.memberDetails[f.demoMemberId].pendingObligations)
+    expect(f.memberSummary.pendingPayments).toBe(f.memberSummary.pendingObligations!.monthlyPayments.count)
+    expect(f.adminSummary.pendingObligations).toBeNull()
+  })
+
   it('DEMO-06 / MP-04: one live fee per member and month', () => {
     const seen = new Set<string>()
     for (const payment of f.monthlyPayments.filter(item => item.status !== 'Cancelled')) {

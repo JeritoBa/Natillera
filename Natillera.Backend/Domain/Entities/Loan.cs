@@ -45,7 +45,10 @@ public class Loan
     public decimal PrincipalPaid() =>
         _payments.Where(payment => payment.Status != PaymentStatus.Cancelled).Sum(payment => payment.Amount);
 
-    public decimal OutstandingPrincipal() => Math.Max(0, InitialAmount - PrincipalPaid());
+    public decimal OutstandingPrincipal() => CalculateOutstandingPrincipal(InitialAmount, PrincipalPaid());
+
+    public static decimal CalculateOutstandingPrincipal(decimal initialAmount, decimal principalPaid) =>
+        Math.Max(0m, initialAmount - principalPaid);
 
     public decimal CalculateMonthlyInterest()
     {

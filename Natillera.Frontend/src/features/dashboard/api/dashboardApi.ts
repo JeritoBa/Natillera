@@ -1,3 +1,4 @@
+import type { PendingObligations } from '@/features/members/api/membersApi'
 import { apiRequest } from '@/shared/api/apiClient'
 
 export type DashboardDirection = 'Income' | 'Expense'
@@ -29,6 +30,7 @@ export interface DashboardSummary {
   activityEarnings: number | null
   myActivityEarnings: number | null
   myPerformanceShare: number | null
+  pendingObligations: PendingObligations | null
 }
 
 export interface TopSeller {

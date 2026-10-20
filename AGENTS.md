@@ -2,7 +2,7 @@
 
 Single entry point for any AI coding agent (Claude Code, Copilot, Cursor, etc.). Read this first, then the documents it links. The owner talks to agents in **Spanish**; all repository documentation and code are in **English**.
 
-Last verified against the code: backend 294 tests and frontend 167 tests passing.
+Last verified against the code: backend 310 tests and frontend 173 tests passing.
 
 ---
 
@@ -38,7 +38,7 @@ Phase: **MVP and more are done and deployed to production** (Render + Neon, ADR-
 | Authentication (JWT, roles, inactive users blocked, tokens revoked on deactivation) | Implemented |
 | Members (CRUD, activate/deactivate with obligation check, admin detail page) | Implemented |
 | Monthly payments (Pending/Paid/Cancelled, one live fee per member/month) | Implemented |
-| Debt / pending-payment notices | Implemented (pending fees on dashboard and member detail) |
+| Debt / pending-payment notices | Implemented (all pending obligations, MEM-10, on member detail and member dashboard, spec 016) |
 | Transactions ledger + detail, derived balance | Implemented |
 | Audit log (Admin-only list and detail) | Implemented (detail enrichment only for monthly payments) |
 | Loans, loan payments, loan interest (`Performance`) | **Implemented** (no longer Post-MVP) |
@@ -122,8 +122,8 @@ Rebuild after code changes: `docker compose up -d --build backend web`. In `Deve
 **Test.**
 
 ```bash
-dotnet test Natillera.sln          # backend, ~294 tests, no DB/Docker needed
-cd Natillera.Frontend && npm test  # Vitest, ~167 tests, pure logic
+dotnet test Natillera.sln          # backend, ~310 tests, no DB/Docker needed
+cd Natillera.Frontend && npm test  # Vitest, ~173 tests, pure logic
 cd Natillera.Frontend && npm run lint && npm run build
 ```
 

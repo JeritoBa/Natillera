@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { getDashboardSummary, type DashboardSummary } from '@/features/dashboard/api/dashboardApi'
+import { PendingObligationsCard } from '@/features/members/components/PendingObligationsCard'
+import { hasPendingObligations } from '@/features/members/model/pendingObligations'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
 
@@ -38,7 +40,9 @@ export function DashboardPage() {
       <p className="text-[#4e7460] text-sm">{isAdmin ? 'Cuánto dinero hay y cómo se mueve' : 'Cuánto hay en la natillera y cuánto llevas ahorrado'}</p>
     </div>
     {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
-    {!isAdmin && !loading && (summary?.pendingPayments ?? 0) > 0 && <p role="status" className="mb-4 rounded-lg border border-[#f3dc9a] bg-[#fef6dc] px-3 py-2.5 text-sm text-[#9a6e00]">{summary!.pendingPayments === 1 ? 'Tienes 1 cuota pendiente.' : `Tienes ${summary!.pendingPayments} cuotas pendientes.`}</p>}
+    {!isAdmin && !loading && summary?.pendingObligations && hasPendingObligations(summary.pendingObligations) && <section role="status" aria-labelledby="dashboard-pending-title" className="mb-4 rounded-xl border border-[#f3dc9a] bg-[#fef6dc] p-5">
+      <PendingObligationsCard obligations={summary.pendingObligations} audience="member" titleId="dashboard-pending-title" />
+    </section>}
     {!error && <div className="flex flex-col gap-4 lg:gap-5">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <section aria-labelledby="available-title" aria-busy={loading} className="rounded-xl p-5 lg:p-6 text-white lg:col-span-3" style={{ background: '#0c5c38' }}>

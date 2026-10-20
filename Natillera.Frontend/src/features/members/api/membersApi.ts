@@ -40,11 +40,32 @@ export interface MemberTransaction {
   description: string
 }
 
+export interface PendingObligationGroup<TItem> {
+  count: number
+  amount: number
+  items: TItem[]
+}
+
+export interface PendingMonthlyPaymentItem { id: string; year: number; month: number; amount: number }
+export interface PendingLoanItem { id: string; startDate: string; initialAmount: number; outstandingPrincipal: number }
+export interface PendingInterestItem { id: string; loanId: string; createdAt: string; amount: number }
+export interface PendingActivitySaleItem { id: string; activityId: string; activityName: string; quantity: number; salePrice: number; amount: number }
+
+// MEM-10: everything a member still owes (derived by the backend).
+export interface PendingObligations {
+  total: number
+  monthlyPayments: PendingObligationGroup<PendingMonthlyPaymentItem>
+  loans: PendingObligationGroup<PendingLoanItem>
+  interests: PendingObligationGroup<PendingInterestItem>
+  activitySales: PendingObligationGroup<PendingActivitySaleItem>
+}
+
 export interface MemberDetail {
   member: MemberDetailInfo
   balance: MemberBalance
   pendingPayments: MemberPendingPayment[]
   transactions: MemberTransaction[]
+  pendingObligations: PendingObligations
 }
 
 export const getMemberDetail = (token: string, id: string) =>
