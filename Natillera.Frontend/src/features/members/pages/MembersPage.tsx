@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { countMembersByStatus, filterMembers, type MemberStatusFilter } from '@/features/members/model/memberFilters'
 import type { Member, MemberFormValues } from '@/features/members/model/memberTypes'
+import { getFriendlyApiError } from '@/shared/api/apiError'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
@@ -18,31 +20,42 @@ export function MembersPage() {
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [editing, setEditing] = useState<Member | null>(null)
   const [form, setForm] = useState<MemberFormValues>(emptyForm)
-  const [actionError, setActionError] = useState<string | null>(null)
+  const [modalError, setModalError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<MemberStatusFilter>('all')
   const [statusTarget, setStatusTarget] = useState<Member | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const activeCount = members.filter(member => member.isActive).length
+  const counts = countMembersByStatus(members)
+  const filtered = filterMembers(members, search, statusFilter)
+  const hasFilters = search.trim() !== '' || statusFilter !== 'all'
+  const clearFilters = () => { setSearch(''); setStatusFilter('all') }
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setActionError(null); setSuccess(null); setModal('create') }
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setModalError(null); setSuccess(null); setModal('create') }
   const openEdit = (member: Member) => {
     setEditing(member)
     setForm({ firstName: member.firstName, lastName: member.lastName, email: member.email, phone: member.phone })
-    setActionError(null)
+    setModalError(null)
     setSuccess(null)
     setModal('edit')
   }
   const save = async () => {
+    if (saving) return
+    setModalError(null)
     if (!form.firstName.trim() || !form.lastName.trim() || !/^\S+@\S+\.\S+$/.test(form.email.trim()) || !form.phone.trim()) {
-      setActionError('Completa todos los campos con datos válidos.')
+      setModalError('Completa todos los campos con datos válidos.')
       return
     }
+    setSaving(true)
     try {
       if (editing) await update(editing.id, form)
       else await create(form)
       setModal(null)
-    } catch { setActionError('No pudimos guardar el miembro. Revisa los datos e intenta nuevamente.') }
+    } catch (requestError) { setModalError(getFriendlyApiError(requestError)) }
+    finally { setSaving(false) }
   }
-  const openStatus = (member: Member) => { setActionError(null); setSuccess(null); setStatusTarget(member) }
+  const openStatus = (member: Member) => { setSuccess(null); setStatusTarget(member) }
   const confirmStatus = async () => {
     if (!statusTarget) return
     const member = statusTarget
@@ -63,14 +76,34 @@ export function MembersPage() {
         <div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Inactivos</p><p className="text-lg font-bold text-[#c0392b] mono">{members.length - activeCount}</p></div>
       </div>
       {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
-      {(error || actionError) && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error ?? actionError}</p>}
+      {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
+      {!loading && !error && members.length > 0 && <div className="rounded-xl p-4 mb-4 space-y-3" style={{ background: '#fff', border: '1px solid #d6e8dc' }}>
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="flex-1">
+            <label htmlFor="member-search" className="block text-xs text-[#4e7460] mb-1">Buscar miembro</label>
+            <input id="member-search" type="search" autoComplete="off" value={search} onChange={event => setSearch(event.target.value)} placeholder="Nombre, correo o teléfono" className="w-full px-3 py-2.5 rounded-lg text-sm" />
+          </div>
+          <div role="group" aria-label="Filtrar por estado" className="flex gap-1.5 flex-wrap">
+            {([['all', 'Todos', counts.all], ['active', 'Activos', counts.active], ['inactive', 'Inactivos', counts.inactive]] as const).map(([value, label, count]) =>
+              <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`px-3 min-h-10 rounded-lg text-xs font-medium transition-all ${statusFilter === value ? 'bg-[#0c5c38] text-white' : 'btn-ghost'}`}>{label} ({count})</button>)}
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {members.length} miembros</p>
+          {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
+        </div>
+      </div>}
       <div className="rounded-xl overflow-hidden" style={{ background: '#fff', border: '1px solid #d6e8dc' }}>
         <table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
           {([['Nombre', 'px-3 sm:px-5'], ['Correo', 'hidden sm:table-cell px-4'], ['Teléfono', 'hidden sm:table-cell px-4'], ['Estado', 'hidden sm:table-cell px-4'], ...(canManage ? [['Acciones', 'px-3 sm:px-5 w-px whitespace-nowrap text-right']] : [])] as const).map(([heading, cls]) => <th key={heading} className={`py-3 text-[#4e7460] text-xs font-medium ${cls.includes('text-right') ? '' : 'text-left'} ${cls}`}>{heading}</th>)}
         </tr></thead><tbody>
           {loading && <tr><td colSpan={canManage ? 5 : 4} className="px-5 py-12 text-center text-[#4e7460]">Cargando miembros...</td></tr>}
           {!loading && members.length === 0 && <tr><td colSpan={canManage ? 5 : 4} className="px-5 py-12 text-center text-[#4e7460]">No hay miembros registrados</td></tr>}
-          {!loading && members.map(member => <tr key={member.id} className="table-row">
+          {!loading && members.length > 0 && filtered.length === 0 && <tr><td colSpan={canManage ? 5 : 4} className="px-5 py-12 text-center text-[#4e7460]">
+            <p>No hay miembros que coincidan con la búsqueda.</p>
+            <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>
+          </td></tr>}
+          {!loading && filtered.map(member => <tr key={member.id} className="table-row">
             <td className="px-3 sm:px-5 py-3.5 max-w-0 sm:max-w-none">
               {canManage
                 ? <Link to={`/members/${member.id}`} className="sm:pointer-events-none font-medium text-[#0c1a12] hover:underline sm:hover:no-underline focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{member.firstName} {member.lastName}</Link>
@@ -83,10 +116,12 @@ export function MembersPage() {
           </tr>)}
         </tbody></table>
       </div>
-      {modal && <Modal title={editing ? 'Editar miembro' : 'Nuevo miembro'} onClose={() => setModal(null)}><div className="space-y-4">
+      {modal && <Modal title={editing ? 'Editar miembro' : 'Nuevo miembro'} onClose={() => !saving && setModal(null)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4">
         {([['firstName', 'Nombre'], ['lastName', 'Apellido'], ['email', 'Correo'], ['phone', 'Teléfono']] as const).map(([field, label]) => <div key={field}><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">{label}</label><input type={field === 'email' ? 'email' : 'text'} value={form[field]} onChange={event => setForm(current => ({ ...current, [field]: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>)}
-        <p className="text-xs text-[#4e7460]">El miembro recibirá la contraseña inicial configurada por el administrador.</p><div className="flex gap-3 pt-1"><button onClick={() => setModal(null)} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button onClick={() => void save()} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">Guardar</button></div>
-      </div></Modal>}
+        <p className="text-xs text-[#4e7460]">El miembro recibirá la contraseña inicial configurada por el administrador.</p>
+        {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
+        <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
+      </form></Modal>}
       {statusTarget && <MemberStatusModal member={statusTarget} onClose={() => setStatusTarget(null)} onConfirm={confirmStatus} />}
     </div>
   )
