@@ -6,9 +6,9 @@ import { getLogs, type LogAction, type LogEntityType, type LogListItem } from '@
 import { actionBackground, actionColor, actionLabel, actions, entityBackground, entityColor, entityLabel, entityTypes } from '@/features/audit/model/labels'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
+import { normalizeSearch } from '@/shared/lib/search'
 
 const money = (value: number | null) => value === null ? '—' : formatCurrency(value)
-const normalize = (value: string) => value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
 
 export function LogsPage() {
   const { session } = useAuth()
@@ -35,7 +35,7 @@ export function LogsPage() {
   const filtered = useMemo(() => {
     const fromDate = from ? new Date(`${from}T00:00:00`) : null
     const toDate = to ? new Date(`${to}T23:59:59.999`) : null
-    const term = normalize(search.trim())
+    const term = normalizeSearch(search.trim())
     return logs.filter(log => {
       if (entity !== 'all' && log.entityType !== entity) return false
       if (action !== 'all' && log.action !== action) return false
@@ -43,7 +43,7 @@ export function LogsPage() {
       if (fromDate && occurred < fromDate) return false
       if (toDate && occurred > toDate) return false
       if (!term) return true
-      const haystack = normalize([
+      const haystack = normalizeSearch([
         log.userName, entityLabel[log.entityType], log.entityType, actionLabel[log.action], log.action, log.entityId,
         log.oldValue ?? '', log.newValue ?? '', log.oldValue !== null ? money(log.oldValue) : '', log.newValue !== null ? money(log.newValue) : '',
       ].join(' '))
