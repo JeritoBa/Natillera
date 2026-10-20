@@ -124,6 +124,8 @@ export function LoanDetailPage() {
     setEditingInterest(interest); setAmount(interest ? toMoneyInputValue(interest.amount) : ''); setDescription(interest?.description ?? ''); setInterestStatus(interest?.status === 'Paid' ? 'Paid' : 'Pending'); setModalError(null); setSuccess(null); setActionError(null); setModal('interest')
   }
   const save = async () => {
+    if (saving) return
+    setModalError(null)
     const numericAmount = Number(amount)
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) return setModalError('Ingresa un monto válido.')
     if (modal === 'payment' && numericAmount > maxPayment) return setModalError(`El abono no puede superar el capital pendiente (${formatCurrency(maxPayment)}).`)
@@ -316,7 +318,7 @@ export function LoanDetailPage() {
       </section>
     </div>
 
-    {modal && <Modal title={modal === 'payment' ? (editingPayment ? 'Editar abono' : 'Registrar abono') : (editingInterest ? 'Editar interés' : 'Registrar interés')} onClose={() => !saving && setModal(null)}><div className="space-y-4">
+    {modal && <Modal title={modal === 'payment' ? (editingPayment ? 'Editar abono' : 'Registrar abono') : (editingInterest ? 'Editar interés' : 'Registrar interés')} onClose={() => !saving && setModal(null)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4">
       <div><label htmlFor="loan-movement-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto</label><MoneyInput id="loan-movement-amount" value={amount} onChange={setAmount} placeholder="50000" />
         {modal === 'payment' && <p className="text-xs text-[#4e7460] mt-1">Capital pendiente: {formatCurrency(maxPayment)}</p>}</div>
       {modal === 'payment' && <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Método de pago</label><select value={method} onChange={event => setMethod(event.target.value as PaymentMethod)} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="Cash">Efectivo</option><option value="Transfer">Transferencia</option></select></div>}
@@ -325,7 +327,7 @@ export function LoanDetailPage() {
         <StatusRadioGroup name="interest-status" legend="Estado" value={interestStatus} onChange={setInterestStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja', disabled: editingInterest?.status === 'Paid' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} note={editingInterest?.status === 'Paid' ? 'Un interés pagado no puede volver a pendiente.' : undefined} />
       </>}
       {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
-      <div className="flex gap-3 pt-1"><button onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button onClick={() => void save()} disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
-    </div></Modal>}
+      <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
+    </form></Modal>}
   </div>
 }
