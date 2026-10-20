@@ -78,6 +78,7 @@ Single source of truth for the business rules of the Natillera system. Each rule
 | MP-07 | `Paid -> Pending` is forbidden. Editing a `Paid` payment updates its transaction amount/description. | See FIN-08. | `MonthlyPaymentService.UpdateAsync` | `UpdateAsync_PaidToPending_Throws`, `UpdateAsync_PaidWithNewAmount_UpdatesTransactionAmount` | Implemented |
 | MP-08 | A payment can be cancelled while `Pending` or `Paid`; any live transaction is cancelled with it. A cancelled payment cannot be modified or cancelled again. | See FIN-06, FIN-07. | `MonthlyPaymentService.CancelAsync` | `CancelAsync_Paid_...`, `CancelAsync_PendingWithLiveTransaction_AlsoCancelsTransaction`, `CancelAsync_PendingWithoutTransaction_JustCancels`, `CancelAsync_Twice_Throws`, `UpdateAsync_Cancelled_Throws` | Implemented |
 | MP-09 | List visibility: Admin sees payments in all statuses; a Member sees only `Paid` payments. | Pending/cancelled fees are management data. | `MonthlyPaymentsController.Get` -> `MonthlyPaymentRepository.GetOrderedAsync(includeNonPaid)` | None | Implemented (untested) |
+| MP-10 | The fee form offers, for the selected member and the entered year, only the months without a non-cancelled fee (MP-04: Pending and Paid block, Cancelled does not); editing always offers the fee's own month. Computed in the frontend from the Admin's loaded list; the backend MP-04 check remains the authority. | Avoid duplicate-fee attempts. | `features/monthlyPayments/model/availableMonths.ts`, `MonthlyPaymentsPage.tsx` | `availableMonths.test.ts` | Implemented |
 
 ---
 
