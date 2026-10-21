@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { cancelMonthlyPayment, createMonthlyPayment, getMonthlyPayments, updateMonthlyPayment, type MonthlyPaymentResponse } from '@/features/monthlyPayments/api/monthlyPaymentsApi'
 import { getAvailableMonths, isValidFeeYear, resolveSelectedMonth } from '@/features/monthlyPayments/model/availableMonths'
+import { countPaymentsByStatus, filterPayments, paymentMemberOptions, paymentMonthOptions, type PaymentStatusFilter } from '@/features/monthlyPayments/model/paymentFilters'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth, formatShortCurrency } from '@/shared/lib/formatters'
 import { toMoneyInputValue } from '@/shared/lib/money'
@@ -17,6 +19,9 @@ type MonthlyPaymentRow = {
   paidDate: string | null; status: 'pending' | 'paid' | 'cancelled'
 }
 
+const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
+const statusFilters = ['pending', 'paid', 'cancelled']
+
 const toRow = (payment: MonthlyPaymentResponse): MonthlyPaymentRow => ({
   backendId: payment.id, userId: payment.userId, member: payment.memberName, year: payment.year, monthNumber: payment.month,
   month: `${formatMonth(payment.month).slice(0, 3)} ${payment.year}`, amount: payment.amount,
@@ -26,6 +31,7 @@ const toRow = (payment: MonthlyPaymentResponse): MonthlyPaymentRow => ({
 export function MonthlyPaymentsPage() {
   const { session, isDemo } = useAuth()
   const { members, loading: membersLoading } = useMembers()
+  const [searchParams] = useSearchParams()
   const [payments, setPayments] = useState<MonthlyPaymentRow[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<MonthlyPaymentRow | null>(null)
@@ -40,9 +46,14 @@ export function MonthlyPaymentsPage() {
   const [error, setError] = useState<string | null>(null)
   const [modalError, setModalError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  // Initial filters come from the URL (e.g. the pending fee links) and are read once, not written back.
+  const [filterMember, setFilterMember] = useState(() => searchParams.get('member') ?? 'all')
+  const [filterMonth, setFilterMonth] = useState(() => searchParams.get('month') ?? 'all')
+  const [filterStatus, setFilterStatus] = useState<PaymentStatusFilter>(() => {
+    const value = searchParams.get('status')
+    return value && statusFilters.includes(value) ? value as PaymentStatusFilter : 'all'
+  })
   const activeMembers = members.filter(member => member.isActive)
-  const paid = payments.filter(payment => payment.status === 'paid')
-  const actual = payments.filter(payment => payment.status !== 'cancelled')
 
   const load = useCallback(async () => {
     if (!session) return
@@ -103,12 +114,52 @@ export function MonthlyPaymentsPage() {
   }
 
   const isAdmin = session?.user.role === 'Admin'
+  // MP-09: Members only receive Paid fees, so the status filter is Admin only.
+  const memberOptions = paymentMemberOptions(payments)
+  const monthOptions = paymentMonthOptions(payments)
+  const effectiveMember = filterMember !== 'all' && memberOptions.some(option => option.id === filterMember) ? filterMember : 'all'
+  const effectiveMonth = filterMonth !== 'all' && monthOptions.some(option => option.key === filterMonth) ? filterMonth : 'all'
+  const effectiveStatus = isAdmin ? filterStatus : 'all'
+  const filtered = filterPayments(payments, effectiveMember, effectiveMonth, effectiveStatus)
+  const statusCounts = countPaymentsByStatus(payments)
+  const hasFilters = effectiveMember !== 'all' || effectiveMonth !== 'all' || effectiveStatus !== 'all'
+  const clearFilters = () => { setFilterMember('all'); setFilterMonth('all'); setFilterStatus('all') }
+  const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
+  const paid = filtered.filter(payment => payment.status === 'paid')
+  const actual = filtered.filter(payment => payment.status !== 'cancelled')
+  const filterSuffix = hasFilters ? ' (filtro)' : ''
   return (
     <div className="p-6 lg:p-8 max-w-5xl">
-      <div className="flex items-start justify-between mb-6 gap-4 flex-wrap"><div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Cuotas Mensuales</h1><p className="text-[#4e7460] text-sm">Aportes de cada miembro · Septiembre 2026</p></div>{isAdmin && <button onClick={openCreate} disabled={membersLoading || listLoading || listError !== null || activeMembers.length === 0} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap disabled:opacity-50"><Icon.Plus /> Agregar cuota</button>}</div>
-      <div className="grid grid-cols-3 gap-3 mb-5"><div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Recaudado</p><p className="text-lg font-bold text-[#0c1a12] mono">{formatShortCurrency(paid.reduce((total, payment) => total + payment.amount, 0))}</p></div><div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Pagaron</p><p className="text-lg font-bold text-[#0c1a12] mono">{paid.length}</p></div><div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Cuotas reales</p><p className="text-lg font-bold text-[#0c1a12] mono">{actual.length}</p></div></div>
+      <div className="flex items-start justify-between mb-6 gap-4 flex-wrap"><div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Cuotas Mensuales</h1><p className="text-[#4e7460] text-sm">Aportes de cada miembro</p></div>{isAdmin && <button onClick={openCreate} disabled={membersLoading || listLoading || listError !== null || activeMembers.length === 0} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap disabled:opacity-50"><Icon.Plus /> Agregar cuota</button>}</div>
+      <div className="grid grid-cols-3 gap-3 mb-5"><div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Recaudado{filterSuffix}</p><p className="text-lg font-bold text-[#0c1a12] mono">{formatShortCurrency(paid.reduce((total, payment) => total + payment.amount, 0))}</p></div><div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Cuotas pagadas{filterSuffix}</p><p className="text-lg font-bold text-[#0c1a12] mono">{paid.length}</p></div><div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Cuotas vigentes{filterSuffix}</p><p className="text-lg font-bold text-[#0c1a12] mono">{actual.length}</p></div></div>
       {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}{(listError ?? error) && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{listError ?? error}</p>}{listError && !listLoading && <button onClick={() => { setListLoading(true); void load() }} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3 mb-4">Reintentar</button>}
-      <div className="rounded-xl overflow-hidden" style={{ background: '#fff', border: '1px solid #d6e8dc' }}><table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>{[['Miembro', 'px-3 sm:px-5 text-left'], ['Mes', 'hidden sm:table-cell px-4 text-left'], ['Monto', 'px-1 sm:px-4 text-right'], ['Fecha pago', 'hidden sm:table-cell px-4 text-left'], ['Estado', 'hidden sm:table-cell px-4 text-left'], ...(isAdmin ? [['Acciones', 'px-2 sm:px-5 text-left w-px whitespace-nowrap']] : [])].map(([heading, cls]) => <th key={heading} className={`py-3 text-[#4e7460] text-xs font-medium ${cls}`}>{heading}</th>)}</tr></thead><tbody>{listLoading && <tr><td colSpan={isAdmin ? 6 : 5} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando cuotas…</p></td></tr>}{!listLoading && !listError && payments.length === 0 && <tr><td colSpan={isAdmin ? 6 : 5} className="px-5 py-12 text-center text-[#4e7460]">Aún no hay cuotas registradas.</td></tr>}{payments.map(payment => <tr key={payment.backendId} className="table-row"><td className="px-3 sm:px-5 py-3.5"><span className="font-medium text-[#0c1a12]">{payment.member}</span><p className="sm:hidden text-xs text-[#4e7460] mt-0.5 flex items-center gap-1.5 flex-wrap"><span className="mono">{payment.month}</span><Badge status={payment.status} />{payment.paidDate && <span className="mono">{payment.paidDate}</span>}</p></td><td className="px-4 py-3.5 text-[#4e7460] mono text-xs hidden sm:table-cell">{payment.month}</td><td className="px-1 sm:px-4 py-3.5 text-right mono text-[13px] sm:text-sm text-[#0c1a12] whitespace-nowrap">{formatCurrency(payment.amount)}</td><td className="px-4 py-3.5 text-[#4e7460] mono text-xs hidden sm:table-cell">{payment.paidDate ?? '—'}</td><td className="px-4 py-3.5 hidden sm:table-cell"><Badge status={payment.status} /></td>{isAdmin && <td className="px-2 sm:px-5 py-3.5 text-right w-px whitespace-nowrap">{payment.status !== 'cancelled' && <div className="flex justify-end gap-1"><button onClick={() => openEdit(payment)} className="btn-ghost p-2 sm:p-1.5 rounded-md min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center" aria-label="Editar cuota"><Icon.Edit /></button><button onClick={() => void cancel(payment)} className="btn-danger p-2 sm:p-1.5 rounded-md min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center" aria-label="Anular cuota"><Icon.Trash /></button></div>}</td>}</tr>)}</tbody></table></div>
+      {!listLoading && !listError && payments.length > 0 && <div className="rounded-xl p-4 mb-4 space-y-3" style={cardStyle}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="payment-member-filter" className="block text-xs text-[#4e7460] mb-1">Miembro</label>
+            <select id="payment-member-filter" value={effectiveMember} onChange={event => setFilterMember(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm">
+              <option value="all">Todos los miembros</option>
+              {memberOptions.map(option => <option key={option.id} value={option.id}>{`${option.name} (${option.count})`}</option>)}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="payment-month-filter" className="block text-xs text-[#4e7460] mb-1">Mes de la cuota</label>
+            <select id="payment-month-filter" value={effectiveMonth} onChange={event => setFilterMonth(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm">
+              <option value="all">Todos los meses</option>
+              {monthOptions.map(option => <option key={option.key} value={option.key}>{`${monthText(option.key)} (${option.count})`}</option>)}
+            </select>
+          </div>
+        </div>
+        {isAdmin && <div role="group" aria-label="Filtrar por estado" className="flex gap-1.5 flex-wrap">
+          {([['all', 'Todas'], ['pending', 'Pendientes'], ['paid', 'Pagadas'], ['cancelled', 'Anuladas']] as const).map(([value, label]) =>
+            <button key={value} type="button" aria-pressed={filterStatus === value} onClick={() => setFilterStatus(value)} className={`px-3 min-h-10 rounded-lg text-xs font-medium transition-all ${filterStatus === value ? 'bg-[#0c5c38] text-white' : 'btn-ghost'}`}>{label} ({statusCounts[value]})</button>)}
+        </div>}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {payments.length} cuotas</p>
+          {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
+        </div>
+      </div>}
+      <div className="rounded-xl overflow-hidden" style={cardStyle}><table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>{[['Miembro', 'px-3 sm:px-5 text-left'], ['Mes', 'hidden sm:table-cell px-4 text-left'], ['Monto', 'px-1 sm:px-4 text-right'], ['Fecha pago', 'hidden sm:table-cell px-4 text-left'], ['Estado', 'hidden sm:table-cell px-4 text-left'], ...(isAdmin ? [['Acciones', 'px-2 sm:px-5 text-left w-px whitespace-nowrap']] : [])].map(([heading, cls]) => <th key={heading} className={`py-3 text-[#4e7460] text-xs font-medium ${cls}`}>{heading}</th>)}</tr></thead><tbody>{listLoading && <tr><td colSpan={isAdmin ? 6 : 5} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando cuotas…</p></td></tr>}{!listLoading && !listError && payments.length === 0 && <tr><td colSpan={isAdmin ? 6 : 5} className="px-5 py-12 text-center text-[#4e7460]">Aún no hay cuotas registradas.</td></tr>}{!listLoading && payments.length > 0 && filtered.length === 0 && <tr><td colSpan={isAdmin ? 6 : 5} className="px-5 py-12 text-center text-[#4e7460]"><p>No hay cuotas que coincidan con los filtros.</p><button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button></td></tr>}{filtered.map(payment => <tr key={payment.backendId} className="table-row"><td className="px-3 sm:px-5 py-3.5"><span className="font-medium text-[#0c1a12]">{payment.member}</span><p className="sm:hidden text-xs text-[#4e7460] mt-0.5 flex items-center gap-1.5 flex-wrap"><span className="mono">{payment.month}</span><Badge status={payment.status} />{payment.paidDate && <span className="mono">{payment.paidDate}</span>}</p></td><td className="px-4 py-3.5 text-[#4e7460] mono text-xs hidden sm:table-cell">{payment.month}</td><td className="px-1 sm:px-4 py-3.5 text-right mono text-[13px] sm:text-sm text-[#0c1a12] whitespace-nowrap">{formatCurrency(payment.amount)}</td><td className="px-4 py-3.5 text-[#4e7460] mono text-xs hidden sm:table-cell">{payment.paidDate ?? '—'}</td><td className="px-4 py-3.5 hidden sm:table-cell"><Badge status={payment.status} /></td>{isAdmin && <td className="px-2 sm:px-5 py-3.5 text-right w-px whitespace-nowrap">{payment.status !== 'cancelled' && <div className="flex justify-end gap-1"><button onClick={() => openEdit(payment)} className="btn-ghost p-2 sm:p-1.5 rounded-md min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center" aria-label="Editar cuota"><Icon.Edit /></button><button onClick={() => void cancel(payment)} className="btn-danger p-2 sm:p-1.5 rounded-md min-w-10 min-h-10 sm:min-w-0 sm:min-h-0 inline-flex items-center justify-center" aria-label="Anular cuota"><Icon.Trash /></button></div>}</td>}</tr>)}</tbody></table></div>
       {modalOpen && <Modal title={editing ? 'Editar cuota mensual' : 'Nueva cuota mensual'} onClose={() => !saving && setModalOpen(false)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4"><div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><select value={memberId} onChange={event => setMemberId(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un miembro</option>{members.filter(member => editing ? true : member.isActive).map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div><div className="grid grid-cols-2 gap-3"><div><label htmlFor="payment-month" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Mes</label><select id="payment-month" aria-describedby="payment-month-help" value={selectedMonth ?? ''} onChange={event => setMonth(Number(event.target.value))} disabled={!memberId || !yearValid || availableMonths.length === 0} className="w-full px-3 py-2.5 rounded-lg text-sm">{!memberId ? <option value="">Primero elige un miembro</option> : !yearValid ? <option value="">—</option> : availableMonths.length === 0 ? <option value="">Sin meses disponibles</option> : availableMonths.map(value => <option key={value} value={value}>{formatMonth(value)}</option>)}</select></div><div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Año</label><input type="number" min="1" value={year} onChange={event => setYear(Number(event.target.value))} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div></div><p id="payment-month-help" aria-live="polite" className="text-xs text-[#4e7460] -mt-2">{!memberId || !yearValid ? '' : availableMonths.length === 0 ? `${memberName} ya tiene cuota en todos los meses de ${year}. Prueba con otro año.` : `Solo se muestran los meses de ${year} en que ${memberName} no tiene cuota.`}</p><div><label htmlFor="payment-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto</label><MoneyInput id="payment-amount" value={amount} onChange={setAmount} placeholder="50000" /></div><StatusRadioGroup name="payment-status" legend="Estado" value={status} onChange={setStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja', disabled: editing?.status === 'paid' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} note={editing?.status === 'paid' ? 'Una cuota pagada no puede volver a pendiente.' : undefined} />{modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}<div className="flex gap-3 pt-1"><button type="button" onClick={() => setModalOpen(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : editing ? 'Actualizar cuota' : 'Guardar cuota'}</button></div></form></Modal>}
     </div>
   )
