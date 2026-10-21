@@ -29,15 +29,15 @@ export function LoanPaymentDetailPage() {
   }, [loanId, paymentId, session])
 
   const back = `/loans/${loanId}`
-  if (error) return <div className="p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate(back)} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver</button><p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p></div>
-  if (!payment) return <div className="p-6 lg:p-8 max-w-5xl text-[#4e7460]">Cargando detalle...</div>
+  if (error) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate(back)} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver</button><p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p></div>
+  if (!payment) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl text-[#4e7460]">Cargando detalle...</div>
 
   const fields: [string, ReactNode][] = [
     ['Fecha de pago', new Date(payment.paidAt).toLocaleString('es-CO')], ['Monto', formatCurrency(payment.amount)],
     ['Método de pago', methodLabel[payment.paymentMethod]], ['Estado', <Badge status={payment.status.toLowerCase()} />],
   ]
 
-  return <div className="p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate(back)} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver al préstamo</button><div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Detalle de abono</h1><p className="text-[#4e7460] text-sm">Información del abono a capital</p></div>
+  return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate(back)} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver al préstamo</button><div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Detalle de abono</h1><p className="text-[#4e7460] text-sm">Información del abono a capital</p></div>
     <div className="rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4" style={card}>{fields.map(([label, value]) => cell(label, value))}{cell('Transacción', <Link to={`/transactions/${payment.transactionId}`} className="text-sm text-[#0a6635] underline">Ver transacción</Link>)}</div>
   </div>
 }

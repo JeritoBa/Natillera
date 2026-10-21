@@ -29,8 +29,8 @@ export function LogDetailPage() {
     void load()
   }, [id, session])
 
-  if (error) return <div className="p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate('/logs')} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver</button><p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p></div>
-  if (!log) return <div className="p-6 lg:p-8 max-w-5xl text-[#4e7460]">Cargando detalle...</div>
+  if (error) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate('/logs')} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver</button><p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p></div>
+  if (!log) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl text-[#4e7460]">Cargando detalle...</div>
 
   const summary = log.entitySummary
   const actionBadge = <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: actionBackground[log.action], color: actionColor[log.action] }}>{actionLabel[log.action]}</span>
@@ -46,7 +46,7 @@ export function LogDetailPage() {
     ['Monto actual', summary.amount !== null ? formatCurrency(summary.amount) : null],
   ] as [string, ReactNode][]).filter(([, value]) => value !== null && value !== undefined && value !== '')
 
-  return <div className="p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate('/logs')} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver a logs</button><div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Detalle de log</h1><p className="text-[#4e7460] text-sm">Registro de auditoría de la operación</p></div><div className="rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4" style={card}>{fields.map(([label, value]) => cell(label, value))}</div>
+  return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate('/logs')} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver a logs</button><div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Detalle de log</h1><p className="text-[#4e7460] text-sm">Registro de auditoría de la operación</p></div><div className="rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4" style={card}>{fields.map(([label, value]) => cell(label, value))}</div>
     {(summaryFields.length > 0 || summary.transactionId) && <><h2 className="text-sm font-bold text-[#0c1a12] mt-6 mb-3">Resumen de la entidad afectada</h2><div className="rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4" style={card}>{summaryFields.map(([label, value]) => cell(label, value))}{summary.transactionId && <div className="border-b border-[#eef4f0] pb-3"><p className="text-xs text-[#4e7460] mb-1">Transacción</p><Link to={`/transactions/${summary.transactionId}`} className="text-sm text-[#0a6635] underline">Ver transacción</Link></div>}</div></>}
   </div>
 }

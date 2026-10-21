@@ -12,12 +12,11 @@ import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
+import { cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
 interface LoanForm { borrowerId: string, initialAmount: string, interestRate: string, startDate: string }
 const emptyForm: LoanForm = { borrowerId: '', initialAmount: '', interestRate: '', startDate: '' }
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
-const iconButton = 'btn-ghost p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
-const dangerButton = 'btn-danger p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
 
 export function LoansPage() {
   const { session, isDemo } = useAuth()
@@ -100,17 +99,17 @@ export function LoansPage() {
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const columns: { heading: ReactNode, key: string, cls: string, right: boolean }[] = [
     { key: 'borrower', heading: 'Deudor', cls: 'px-3 sm:px-5', right: false },
-    { key: 'initial', heading: 'Monto inicial', cls: 'px-3 sm:px-4 hidden xl:table-cell', right: true },
-    { key: 'rate', heading: 'Tasa', cls: 'px-3 sm:px-4 hidden xl:table-cell', right: false },
-    { key: 'start', heading: 'Fecha de inicio', cls: 'px-3 sm:px-4 hidden xl:table-cell', right: false },
+    { key: 'initial', heading: 'Monto inicial', cls: `px-3 sm:px-4 ${colDesktop}`, right: true },
+    { key: 'rate', heading: 'Tasa', cls: `px-3 sm:px-4 ${colDesktop}`, right: false },
+    { key: 'start', heading: 'Fecha de inicio', cls: `px-3 sm:px-4 ${colDesktop}`, right: false },
     { key: 'principal', heading: <><span className="sm:hidden">Pendiente</span><span className="hidden sm:inline">Capital pendiente</span></>, cls: 'px-3 sm:px-4 whitespace-nowrap', right: true },
-    { key: 'status', heading: 'Estado', cls: 'px-3 sm:px-4 hidden sm:table-cell', right: false },
+    { key: 'status', heading: 'Estado', cls: `px-3 sm:px-4 ${colTablet}`, right: false },
     { key: 'actions', heading: 'Acciones', cls: 'px-3 sm:px-5 w-px whitespace-nowrap', right: true },
   ]
   const col = (key: string) => columns.find(column => column.key === key)?.cls ?? ''
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Préstamos</h1><p className="text-[#4e7460] text-sm">{canManage ? 'Gestiona los créditos internos de la natillera' : 'Créditos internos de la natillera'}</p></div>
         {canManage && <button onClick={openCreate} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Nuevo préstamo</button>}
@@ -141,9 +140,9 @@ export function LoansPage() {
           {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
         </div>
       </div>}
-      <div className="rounded-xl overflow-hidden" style={cardStyle}><div className="overflow-x-auto">
-        <table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
-          {columns.map(column => <th key={column.key} className={`${column.cls} py-3 text-[#4e7460] text-xs font-medium ${column.right ? 'text-right' : 'text-left'}`}>{column.heading}</th>)}
+      <div className={tableWrap} style={cardStyle}><div className={tableScroll}>
+        <table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+          {columns.map(column => <th key={column.key} className={`${column.cls} ${headCell} ${column.right ? 'text-right' : 'text-left'}`}>{column.heading}</th>)}
         </tr></thead><tbody>
           {loading && <tr><td colSpan={7} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando préstamos…</p></td></tr>}
           {!loading && !error && loans.length === 0 && <tr><td colSpan={7} className="px-5 py-12 text-center text-[#4e7460]">{canManage ? 'Aún no hay préstamos registrados. Usa «Nuevo préstamo» para crear el primero.' : 'Aún no hay préstamos registrados.'}</td></tr>}
@@ -152,10 +151,10 @@ export function LoansPage() {
             <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>
           </td></tr>}
           {!loading && filtered.map(loan => <tr key={loan.id} className="table-row">
-            <td className={`${col('borrower')} py-3.5 max-w-0 sm:max-w-none`}>
-              <Link to={`/loans/${loan.id}`} title={loan.borrowerName} className="block truncate sm:inline sm:whitespace-normal sm:pointer-events-none font-medium text-[#0c1a12] hover:underline sm:hover:no-underline focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{loan.borrowerName}</Link>
-              <p className="sm:hidden text-xs text-[#4e7460] mt-0.5 flex items-center gap-1.5 flex-wrap"><span className="mono">Inicia {formatDateOnly(loan.startDate)}</span><Badge status={loan.status.toLowerCase()} /></p>
-              <p className="hidden sm:flex xl:hidden flex-wrap gap-x-1.5 text-xs text-[#4e7460] mt-0.5"><span className="whitespace-nowrap">Prestado <span className="mono">{formatCurrency(loan.initialAmount)}</span></span><span className="whitespace-nowrap">· Tasa {loan.interestRate}%</span><span className="whitespace-nowrap">· Inicia {formatDateOnly(loan.startDate)}</span></p>
+            <td className={`${col('borrower')} py-3.5 ${cellMain}`}>
+              <Link to={`/loans/${loan.id}`} title={loan.borrowerName} className={mainLink}>{loan.borrowerName}</Link>
+              <p className={subMobile}><span className="mono">Inicia {formatDateOnly(loan.startDate)}</span><Badge status={loan.status.toLowerCase()} /></p>
+              <p className={subTablet}><span className="whitespace-nowrap">Prestado <span className="mono">{formatCurrency(loan.initialAmount)}</span></span><span className="whitespace-nowrap">· Tasa {loan.interestRate}%</span><span className="whitespace-nowrap">· Inicia {formatDateOnly(loan.startDate)}</span></p>
             </td>
             <td className={`${col('initial')} py-3.5 text-right mono text-[#0c1a12]`}>{formatCurrency(loan.initialAmount)}</td>
             <td className={`${col('rate')} py-3.5 mono text-[#4e7460]`}>{loan.interestRate}%</td>
@@ -163,7 +162,7 @@ export function LoansPage() {
             <td className={`${col('principal')} py-3.5 text-right ${loan.status === 'Cancelled' ? 'text-[#4e7460]' : loan.outstandingPrincipal > 0 ? 'mono font-semibold text-[#0c1a12]' : 'mono text-[#4e7460]'}`}>{loan.status === 'Cancelled' ? '—' : formatCurrency(loan.outstandingPrincipal)}</td>
             <td className={`${col('status')} py-3.5`}><Badge status={loan.status.toLowerCase()} /></td>
             <td className={`${col('actions')} py-3.5 text-right`}><div className="flex justify-end gap-1">
-              <button onClick={() => navigate(`/loans/${loan.id}`)} className={`btn-ghost p-2 rounded-md min-w-10 min-h-10 hidden sm:inline-flex items-center justify-center`} aria-label={`Ver préstamo de ${loan.borrowerName}`}><Icon.Eye open /></button>
+              <button onClick={() => navigate(`/loans/${loan.id}`)} className={eyeButton} aria-label={`Ver préstamo de ${loan.borrowerName}`}><Icon.Eye open /></button>
               {canManage && loan.status === 'Active' && loan.outstandingPrincipal === loan.initialAmount && <>
                 <button onClick={() => openEdit(loan)} className={iconButton} aria-label={`Editar préstamo de ${loan.borrowerName}`}><Icon.Edit /></button>
                 <button onClick={() => { if (window.confirm(`¿Anular el préstamo de ${loan.borrowerName} por ${formatCurrency(loan.initialAmount)}? El préstamo y su desembolso quedarán anulados.`)) void cancel(loan) }} className={dangerButton} aria-label={`Anular préstamo de ${loan.borrowerName}`}><Icon.Trash /></button>

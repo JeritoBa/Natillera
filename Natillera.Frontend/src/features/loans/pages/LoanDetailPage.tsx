@@ -16,20 +16,18 @@ import { Modal } from '@/shared/ui/Modal'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
+import { cell, cellActions, cellAmount, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll } from '@/shared/ui/tableStyles'
 
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
 const rowClass = 'flex justify-between border-t border-[#eef4f0] pt-2'
 const statusOrder = { Pending: 0, Paid: 1, Cancelled: 2 }
-const iconButton = 'btn-ghost p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
-const dangerButton = 'btn-danger p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
-const linkClass = 'font-medium text-[#0c1a12] hover:underline focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded'
 const shortDate = (value: string) => new Date(value).toLocaleDateString('es-CO')
 const paymentHeadings: [string, string, boolean][] = [
-  ['Fecha', '', false], ['Monto', '', true], ['Método', 'hidden sm:table-cell', false], ['Estado', 'hidden sm:table-cell', false], ['Acciones', 'w-px whitespace-nowrap', true],
+  ['Fecha', cellFirst, false], ['Monto', cell, true], ['Método', `${cell} ${colTablet}`, false], ['Estado', `${cell} ${colTablet}`, false], ['Acciones', `${cellLast} w-px whitespace-nowrap`, true],
 ]
 const interestHeadings: [string, string, boolean][] = [
-  ['Descripción', '', false], ['Registrado', 'hidden md:table-cell', false], ['Monto', '', true], ['Pagado el', 'hidden md:table-cell', false],
-  ['Estado', 'hidden sm:table-cell', false], ['Acciones', 'w-px whitespace-nowrap', true],
+  ['Descripción', cellFirst, false], ['Registrado', `${cell} ${colDesktop}`, false], ['Monto', cell, true], ['Pagado el', `${cell} ${colDesktop}`, false],
+  ['Estado', `${cell} ${colTablet}`, false], ['Acciones', `${cellLast} w-px whitespace-nowrap`, true],
 ]
 const dot = (color: string, border?: string) => <span aria-hidden="true" className="inline-block w-2 h-2 rounded-full mr-2" style={{ background: color, ...(border ? { border } : {}) }} />
 
@@ -93,15 +91,15 @@ export function LoanDetailPage() {
 
   const back = <button onClick={() => navigate('/loans')} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver a préstamos</button>
 
-  if (loading) return <div className="p-6 lg:p-8 max-w-5xl">{back}<p role="status" className="text-[#4e7460]">Cargando préstamo…</p></div>
-  if (notFound) return <div className="p-6 lg:p-8 max-w-5xl">{back}
+  if (loading) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}<p role="status" className="text-[#4e7460]">Cargando préstamo…</p></div>
+  if (notFound) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}
     <div role="alert" className="rounded-xl p-8 text-center" style={cardStyle}>
       <h1 className="text-lg font-bold text-[#0c1a12]">No se encontró el préstamo</h1>
       <p className="text-sm text-[#4e7460]">Puede que el enlace esté incompleto o que el préstamo no exista.</p>
       <button onClick={() => navigate('/loans')} className="btn-primary px-4 py-2 rounded-lg text-sm mt-4">Ver lista de préstamos</button>
     </div>
   </div>
-  if (error || !loan) return <div className="p-6 lg:p-8 max-w-5xl">{back}
+  if (error || !loan) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}
     <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>
     <button onClick={() => void load()} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3">Reintentar</button>
   </div>
@@ -182,7 +180,7 @@ export function LoanDetailPage() {
     ? `¿Anular el interés pagado «${interest.description}»? El interés y su ingreso quedarán anulados.`
     : `¿Anular el interés «${interest.description}»? El interés quedará anulado.`
 
-  return <div className="p-6 lg:p-8 max-w-5xl">
+  return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
     {back}
     <div className="mb-7">
       <div className="flex items-center gap-2 flex-wrap">
@@ -252,28 +250,28 @@ export function LoanDetailPage() {
             <p>Aún no hay abonos registrados.</p>
             {canManage && !isCancelled && <p>Usa «Registrar abono» para el primero.</p>}
           </div>
-          : <table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
-            {paymentHeadings.map(([heading, visibility, right]) => <th key={heading} className={`px-3 sm:px-5 py-3 text-[#4e7460] text-xs font-medium ${right ? 'text-right' : 'text-left'} ${visibility}`}>{heading}</th>)}
+          : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+            {paymentHeadings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
           </tr></thead><tbody>
             {sortedPayments.map(payment => {
               const date = shortDate(payment.paidAt)
               const canEdit = canManage && !isCancelled && payment.status !== 'Cancelled'
               return <tr key={payment.id} className="table-row">
-                <td className="px-3 sm:px-5 py-3.5">
-                  <Link to={`/loans/${loan.id}/payments/${payment.id}`} aria-label={`Ver abono del ${date}`} className={`${linkClass} mono text-xs`}>{date}</Link>
-                  <p className="sm:hidden text-xs text-[#4e7460] mt-0.5 flex items-center gap-1.5 flex-wrap"><span>{methodLabel[payment.paymentMethod]}</span><Badge status={payment.status.toLowerCase()} /></p>
+                <td className={`${cellFirst} py-3.5 ${cellMain}`}>
+                  <Link to={`/loans/${loan.id}/payments/${payment.id}`} aria-label={`Ver abono del ${date}`} className={`${mainLink} mono text-xs`}>{date}</Link>
+                  <p className={subMobile}><span>{methodLabel[payment.paymentMethod]}</span><Badge status={payment.status.toLowerCase()} /></p>
                 </td>
-                <td className="px-3 sm:px-4 py-3.5 text-right mono text-[#0c1a12] whitespace-nowrap">{formatCurrency(payment.amount)}</td>
-                <td className="px-4 py-3.5 text-[#4e7460] hidden sm:table-cell">{methodLabel[payment.paymentMethod]}</td>
-                <td className="px-4 py-3.5 hidden sm:table-cell"><Badge status={payment.status.toLowerCase()} /></td>
-                <td className="px-3 sm:px-5 py-3.5 text-right w-px whitespace-nowrap"><div className="flex justify-end gap-1">
-                  <button onClick={() => navigate(`/loans/${loan.id}/payments/${payment.id}`)} className={`btn-ghost p-2 rounded-md min-w-10 min-h-10 hidden sm:inline-flex items-center justify-center`} aria-label={`Ver abono del ${date}`}><Icon.Eye open /></button>
+                <td className={`${cell} py-3.5 ${cellAmount} text-[#0c1a12]`}>{formatCurrency(payment.amount)}</td>
+                <td className={`${cell} ${colTablet} py-3.5 text-[#4e7460]`}>{methodLabel[payment.paymentMethod]}</td>
+                <td className={`${cell} ${colTablet} py-3.5`}><Badge status={payment.status.toLowerCase()} /></td>
+                <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
+                  <button onClick={() => navigate(`/loans/${loan.id}/payments/${payment.id}`)} className={eyeButton} aria-label={`Ver abono del ${date}`}><Icon.Eye open /></button>
                   {canEdit && <button onClick={() => openPayment(payment)} className={iconButton} aria-label={`Editar abono del ${date}`}><Icon.Edit /></button>}
                   {canEdit && <button onClick={() => { if (window.confirm(paymentConfirm(payment))) void cancel('payment', payment.id) }} className={dangerButton} aria-label={`Anular abono del ${date}`}><Icon.Trash /></button>}
                 </div></td>
               </tr>
             })}
-          </tbody></table>}
+          </tbody></table></div>}
       </section>
 
       <section aria-labelledby="loan-interests-title" className="rounded-xl overflow-hidden" style={cardStyle}>
@@ -283,29 +281,30 @@ export function LoanDetailPage() {
         </div>
         {sortedInterests.length === 0
           ? <div className="px-5 py-10 text-center text-sm text-[#4e7460]"><p>Aún no hay intereses registrados.</p></div>
-          : <table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
-            {interestHeadings.map(([heading, visibility, right]) => <th key={heading} className={`px-3 sm:px-5 py-3 text-[#4e7460] text-xs font-medium ${right ? 'text-right' : 'text-left'} ${visibility}`}>{heading}</th>)}
+          : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+            {interestHeadings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
           </tr></thead><tbody>
             {sortedInterests.map(interest => {
               const cancelled = interest.status === 'Cancelled'
               const path = `/loans/${loan.id}/interest-payments/${interest.id}`
               return <tr key={interest.id} className="table-row">
-                <td className="px-3 sm:px-5 py-3.5">
-                  <Link to={path} title={interest.description} className={`${linkClass} block truncate max-w-[110px] sm:max-w-[240px]`}>{interest.description}</Link>
-                  <p className="md:hidden text-xs text-[#4e7460] mt-0.5 flex items-center gap-1.5 flex-wrap"><span className="mono">{shortDate(interest.createdAt)}</span><span className="sm:hidden"><Badge status={interest.status.toLowerCase()} /></span></p>
+                <td className={`${cellFirst} py-3.5 ${cellMain}`}>
+                  <Link to={path} title={interest.description} className={mainLink}>{interest.description}</Link>
+                  <p className={subMobile}><span className="mono">{shortDate(interest.createdAt)}</span><Badge status={interest.status.toLowerCase()} /></p>
+                  <p className={subTablet}><span className="whitespace-nowrap">Registrado {shortDate(interest.createdAt)}</span><span className="whitespace-nowrap">· Pagado {interest.paidAt ? shortDate(interest.paidAt) : '—'}</span></p>
                 </td>
-                <td className="px-4 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap hidden md:table-cell">{shortDate(interest.createdAt)}</td>
-                <td className="px-3 sm:px-4 py-3.5 text-right mono text-[#0c1a12] whitespace-nowrap">{formatCurrency(interest.amount)}</td>
-                <td className="px-4 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap hidden md:table-cell">{interest.paidAt ? shortDate(interest.paidAt) : '—'}</td>
-                <td className="px-4 py-3.5 hidden sm:table-cell"><Badge status={interest.status.toLowerCase()} /></td>
-                <td className="px-3 sm:px-5 py-3.5 text-right w-px whitespace-nowrap"><div className="flex justify-end gap-1">
-                  <button onClick={() => navigate(path)} className={`btn-ghost p-2 rounded-md min-w-10 min-h-10 hidden sm:inline-flex items-center justify-center`} aria-label={`Ver interés «${interest.description}»`}><Icon.Eye open /></button>
+                <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{shortDate(interest.createdAt)}</td>
+                <td className={`${cell} py-3.5 ${cellAmount} text-[#0c1a12]`}>{formatCurrency(interest.amount)}</td>
+                <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{interest.paidAt ? shortDate(interest.paidAt) : '—'}</td>
+                <td className={`${cell} ${colTablet} py-3.5`}><Badge status={interest.status.toLowerCase()} /></td>
+                <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
+                  <button onClick={() => navigate(path)} className={eyeButton} aria-label={`Ver interés «${interest.description}»`}><Icon.Eye open /></button>
                   {canManage && !cancelled && !isCancelled && <button onClick={() => openInterest(interest)} className={iconButton} aria-label={`Editar interés «${interest.description}»`}><Icon.Edit /></button>}
                   {canManage && !cancelled && <button onClick={() => { if (window.confirm(interestConfirm(interest))) void cancel('interest', interest.id) }} className={dangerButton} aria-label={`Anular interés «${interest.description}»`}><Icon.Trash /></button>}
                 </div></td>
               </tr>
             })}
-          </tbody></table>}
+          </tbody></table></div>}
       </section>
 
       <section aria-labelledby="loan-info-title" className="rounded-xl overflow-hidden" style={cardStyle}>

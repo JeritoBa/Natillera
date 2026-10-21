@@ -56,15 +56,15 @@ export function MemberDetailPage() {
 
   const back = <button onClick={() => navigate('/members')} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver a miembros</button>
 
-  if (loading) return <div className="p-6 lg:p-8 max-w-5xl">{back}<p role="status" className="text-[#4e7460]">Cargando miembro…</p></div>
-  if (notFound) return <div className="p-6 lg:p-8 max-w-5xl">{back}
+  if (loading) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}<p role="status" className="text-[#4e7460]">Cargando miembro…</p></div>
+  if (notFound) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}
     <div role="alert" className="rounded-xl p-8 text-center" style={cardStyle}>
       <h1 className="text-lg font-bold text-[#0c1a12]">No se encontró el miembro</h1>
       <p className="text-sm text-[#4e7460]">Puede que el enlace esté incompleto o que el miembro no exista.</p>
       <button onClick={() => navigate('/members')} className="btn-primary px-4 py-2 rounded-lg text-sm mt-4">Ver lista de miembros</button>
     </div>
   </div>
-  if (error || !detail) return <div className="p-6 lg:p-8 max-w-5xl">{back}
+  if (error || !detail) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}
     <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>
     <button onClick={() => void load()} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3">Reintentar</button>
   </div>
@@ -83,7 +83,7 @@ export function MemberDetailPage() {
     ['Última actualización', member.updatedAt ? new Date(member.updatedAt).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' }) : 'Sin cambios desde el alta'],
   ]
 
-  return <div className="p-6 lg:p-8 max-w-5xl">
+  return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
     {back}
     <div className="mb-7">
       <div className="flex items-center gap-2 flex-wrap">

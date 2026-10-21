@@ -8,6 +8,8 @@ import { filterTransactions, transactionMonthOptions } from '@/features/transact
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth, formatShortCurrency } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
+import { StatCard } from '@/shared/ui/StatCard'
+import { cell, cellActions, cellAmount, cellFirst, cellLast, colDesktop, colTablet, eyeButton, headCell, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
 const typeLabel: Record<TransactionType, string> = {
   MonthlyPayment: 'Cuota mensual', Activity: 'Actividad', ActivitySale: 'Venta', Loan: 'Préstamo', LoanPayment: 'Pago préstamo', Performance: 'Rendimiento',
@@ -52,9 +54,13 @@ export function TransactionsPage() {
   const { income, expense } = transactionTotals(filtered)
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
       <div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Transacciones</h1><p className="text-[#4e7460] text-sm">Historial real de movimientos</p></div>
-      <div className="grid grid-cols-3 gap-3 mb-5"><div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Ingresos totales{filterSuffix}</p><p className="text-lg font-bold mono text-[#0a6635]">{formatShortCurrency(income)}</p></div><div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Egresos totales{filterSuffix}</p><p className="text-lg font-bold mono text-[#c0392b]">{formatShortCurrency(expense)}</p></div><div className="stat-card rounded-xl p-4"><p className="text-[#4e7460] text-xs mb-1">Movimientos{filterSuffix}</p><p className="text-lg font-bold mono text-[#0c1a12]">{filtered.length}</p></div></div>
+      <dl className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
+        <StatCard label={`Ingresos totales${filterSuffix}`} value={formatShortCurrency(income)} tone="positive" />
+        <StatCard label={`Egresos totales${filterSuffix}`} value={formatShortCurrency(expense)} tone="negative" />
+        <StatCard label={`Movimientos${filterSuffix}`} value={filtered.length} />
+      </dl>
       {!loading && !error && transactions.length > 0 && <div className="rounded-xl p-4 mb-4 space-y-3" style={cardStyle}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -79,12 +85,27 @@ export function TransactionsPage() {
       </div>}
       {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
       {error && !loading && <button onClick={() => { setLoading(true); void load() }} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-4">Reintentar</button>}
-      <div className="rounded-xl overflow-hidden" style={{ background: '#fff', border: '1px solid #d6e8dc' }}><table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>{[['Fecha', 'hidden sm:table-cell px-5 text-left'], ['Descripción', 'px-3 sm:px-4 text-left'], ['Miembro', 'hidden md:table-cell px-4 text-left'], ['Tipo', 'hidden sm:table-cell px-4 text-left'], ['Valor', 'px-3 sm:px-5 text-right'], ['Acciones', 'hidden sm:table-cell px-5 text-right']].map(([heading, cls]) => <th key={heading} className={`py-3 text-[#4e7460] text-xs font-medium ${cls}`}>{heading}</th>)}</tr></thead><tbody>
+      <div className={tableWrap} style={cardStyle}><div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>{[['Fecha', `${cellFirst} ${colTablet} text-left`], ['Descripción', `${cell} text-left`], ['Miembro', `${cell} ${colDesktop} text-left`], ['Tipo', `${cell} ${colTablet} text-left`], ['Valor', `${cell} text-right`], ['Acciones', `${cellLast} ${colTablet} text-right`]].map(([heading, cls]) => <th key={heading} className={`${headCell} ${cls}`}>{heading}</th>)}</tr></thead><tbody>
         {loading && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando transacciones...</p></td></tr>}
         {!loading && !error && transactions.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">No hay transacciones registradas</td></tr>}
         {!loading && transactions.length > 0 && filtered.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p>No hay movimientos que coincidan con los filtros.</p><button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button></td></tr>}
-        {!loading && filtered.map(transaction => <tr key={transaction.id} className="table-row"><td className="px-5 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap hidden sm:table-cell">{new Date(transaction.occurredAt).toLocaleDateString('es-CO')}</td><td className="px-3 sm:px-4 py-3.5 text-[#0c1a12] w-full sm:w-auto max-w-0 sm:max-w-[220px]"><Link to={`/transactions/${transaction.id}`} className="block min-w-0 truncate sm:pointer-events-none focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{transaction.description}</Link><p className="sm:hidden text-xs text-[#4e7460] mt-0.5 flex items-center gap-1.5 overflow-hidden whitespace-nowrap"><span className="mono shrink-0">{new Date(transaction.occurredAt).toLocaleDateString('es-CO')}</span>{transaction.memberName && <span className="truncate min-w-0">· {transaction.memberName}</span>}<span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: typeBackground[transaction.type], color: typeColor[transaction.type] }}>{typeLabel[transaction.type]}</span>{transaction.isCancelled && <Badge status="cancelled" />}</p></td><td className="px-4 py-3.5 text-[#4e7460] hidden md:table-cell">{transaction.memberName ?? '—'}</td><td className="px-4 py-3.5 hidden sm:table-cell"><span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: typeBackground[transaction.type], color: typeColor[transaction.type] }}>{typeLabel[transaction.type]}</span>{transaction.isCancelled && <span className="ml-1.5"><Badge status="cancelled" /></span>}</td><td className={`px-3 sm:px-5 py-3.5 text-right mono font-semibold text-sm whitespace-nowrap ${transaction.isCancelled ? 'text-[#4e7460] line-through' : transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{transaction.direction === 'Expense' ? '−' : '+'}{formatCurrency(transaction.amount)}</td><td className="px-5 py-3.5 text-right hidden sm:table-cell"><div className="flex justify-end gap-1"><button onClick={() => navigate(`/transactions/${transaction.id}`)} className="btn-ghost p-1.5 rounded-md" aria-label="Ver detalle"><Icon.Eye open /></button></div></td></tr>)}
-      </tbody></table></div>
+        {!loading && filtered.map(transaction => {
+          const date = new Date(transaction.occurredAt).toLocaleDateString('es-CO')
+          const typeChip = <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: typeBackground[transaction.type], color: typeColor[transaction.type] }}>{typeLabel[transaction.type]}</span>
+          return <tr key={transaction.id} className="table-row">
+            <td className={`${cellFirst} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap ${colTablet}`}>{date}</td>
+            <td className={`${cell} py-3.5 text-[#0c1a12] w-full sm:w-auto max-w-0 sm:max-w-[220px] xl:max-w-[260px]`}>
+              <Link to={`/transactions/${transaction.id}`} title={transaction.description} className="block min-w-0 truncate sm:pointer-events-none focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{transaction.description}</Link>
+              <p className={subMobile}><span className="mono">{date}</span>{transaction.memberName && <span className="truncate min-w-0">· {transaction.memberName}</span>}{typeChip}{transaction.isCancelled && <Badge status="cancelled" />}</p>
+              {transaction.memberName && <p className={subTablet}><span className="truncate">{transaction.memberName}</span></p>}
+            </td>
+            <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460]`}>{transaction.memberName ?? '—'}</td>
+            <td className={`${cell} ${colTablet} py-3.5`}>{typeChip}{transaction.isCancelled && <span className="ml-1.5"><Badge status="cancelled" /></span>}</td>
+            <td className={`${cell} py-3.5 ${cellAmount} font-semibold text-sm ${transaction.isCancelled ? 'text-[#4e7460] line-through' : transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{transaction.direction === 'Expense' ? '−' : '+'}{formatCurrency(transaction.amount)}</td>
+            <td className={`${cellLast} py-3.5 ${cellActions} ${colTablet}`}><div className="flex justify-end gap-1"><button onClick={() => navigate(`/transactions/${transaction.id}`)} className={eyeButton} aria-label="Ver detalle"><Icon.Eye open /></button></div></td>
+          </tr>
+        })}
+      </tbody></table></div></div>
     </div>
   )
 }
