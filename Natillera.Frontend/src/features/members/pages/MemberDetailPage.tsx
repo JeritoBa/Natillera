@@ -95,8 +95,8 @@ export function MemberDetailPage() {
     </div>
 
     <div className="flex flex-col gap-4 lg:gap-5">
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <section aria-labelledby="member-savings-title" className="stat-card rounded-xl p-5 lg:col-span-3" style={{ border: '1px solid #0c5c38' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <section aria-labelledby="member-savings-title" className="stat-card rounded-xl p-5" style={{ border: '1px solid #0c5c38' }}>
           <h2 id="member-savings-title" className="text-sm font-semibold text-[#0c1a12]">Ahorros de {member.firstName}</h2>
           <p className="mono text-2xl md:text-3xl font-bold text-[#0a6635] mt-2 break-words">{balance.total < 0 ? '−' : ''}{formatCurrency(balance.total)}</p>
           <p className="text-xs text-[#4e7460]">Lo que ha aportado más lo que ha ganado</p>
@@ -108,8 +108,8 @@ export function MemberDetailPage() {
           {balance.total === 0 && <p className="mt-3 text-xs text-[#4e7460]">Aún no tiene cuotas pagadas.</p>}
         </section>
 
-        <section aria-labelledby="member-pending-title" className="rounded-xl p-5 lg:col-span-2" style={cardStyle}>
-          <PendingObligationsCard obligations={pendingObligations} audience="admin" titleId="member-pending-title" />
+        <section aria-labelledby="member-pending-title" className="rounded-xl p-5" style={cardStyle}>
+          <PendingObligationsCard obligations={pendingObligations} audience="admin" titleId="member-pending-title" memberId={member.id} />
         </section>
       </div>
 

@@ -40,7 +40,7 @@ export function DashboardPage() {
       <p className="text-[#4e7460] text-sm">{isAdmin ? 'Cuánto dinero hay y cómo se mueve' : 'Cuánto hay en la natillera y cuánto llevas ahorrado'}</p>
     </div>
     {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
-    {!isAdmin && !loading && summary?.pendingObligations && hasPendingObligations(summary.pendingObligations) && <section role="status" aria-labelledby="dashboard-pending-title" className="mb-4 rounded-xl border border-[#f3dc9a] bg-[#fef6dc] p-5">
+    {!isAdmin && !loading && summary?.pendingObligations && hasPendingObligations(summary.pendingObligations) && <section aria-labelledby="dashboard-pending-title" className="mb-4 rounded-xl border border-[#f3dc9a] bg-[#fef6dc] p-5">
       <PendingObligationsCard obligations={summary.pendingObligations} audience="member" titleId="dashboard-pending-title" />
     </section>}
     {!error && <div className="flex flex-col gap-4 lg:gap-5">

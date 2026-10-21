@@ -18,6 +18,17 @@ export const pendingKinds = (obligations: PendingObligations): PendingKind[] => 
 export const hasPendingObligations = (obligations: PendingObligations | null | undefined) =>
   !!obligations && pendingKinds(obligations).length > 0
 
-export const loanPath = (loanId: string) => `/loans/${loanId}`
+// "Suma de N pagos pendientes": N is the sum of the group counts.
+export const pendingSumLabel = (obligations: PendingObligations) => {
+  const count = pendingKinds(obligations).reduce((sum, kind) => sum + kind.count, 0)
+  return `Suma de ${count} ${count === 1 ? 'pago pendiente' : 'pagos pendientes'}`
+}
+
+export const maxVisibleItems = 3
+
+// Admin fee link: the payments list pre-filtered by member, fee month and Pending status.
+export const feePath = (memberId: string, year: number, month: number) =>
+  `/payments?member=${memberId}&month=${year}-${String(month).padStart(2, '0')}&status=pending`
+export const loanPath =(loanId: string) => `/loans/${loanId}`
 export const interestPath = (loanId: string, interestId: string) => `/loans/${loanId}/interest-payments/${interestId}`
 export const assignmentPath = (activityId: string, assignmentId: string) => `/activities/${activityId}/assignments/${assignmentId}`
