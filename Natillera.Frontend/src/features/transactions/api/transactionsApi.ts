@@ -11,6 +11,7 @@ export interface RealTransaction {
   occurredAt: string
   description: string
   memberName: string | null
+  isCancelled: boolean
 }
 
 export const getTransactions = (token: string) =>

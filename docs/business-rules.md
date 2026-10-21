@@ -141,7 +141,7 @@ Single source of truth for the business rules of the Natillera system. Each rule
 
 | ID | Rule | Rationale | Enforced in | Tests | Status |
 |---|---|---|---|---|---|
-| TX-01 | All authenticated users can list transactions (newest first) and open a transaction detail. The list **includes cancelled transactions**, flagged with `isCancelled`; they are excluded from balances (FIN-06). | Transparency, including what was voided. | `TransactionsController`, `TransactionRepository.GetOrderedAsync` | Frontend `features/transactions/model/labels.test.ts` (labels only); backend: None | Implemented |
+| TX-01 | All authenticated users can list transactions (newest first) and open a transaction detail. The list **includes cancelled transactions**, flagged with `isCancelled`; they are excluded from balances (FIN-06). | Transparency, including what was voided. | `TransactionsController`, `TransactionRepository.GetOrderedAsync`; frontend `TransactionsPage.tsx` (Anulado badge, struck-through amount), `transactionTotals.ts` (cancelled excluded from totals) | Frontend `features/transactions/model/transactionTotals.test.ts`, `labels.test.ts` (labels only); backend: None | Implemented |
 | TX-02 | A transaction detail resolves its source entity by transaction type (monthly payment, loan, loan payment, interest, activity, activity assignment) and the member involved. | Traceability from money to origin. | `TransactionRepository.GetDetailAsync` | None | Implemented (untested) |
 | AUD-01 | The audit log is **Admin-only**: list (newest first) and detail with user name/email. Each entry shows entity type, action (Create/Update/Delete=cancel), old value, new value, user, date. | Who did what, when. | `LogsController`, `LogRepository` | Frontend `features/audit/model/labels.test.ts` (labels only) | Implemented |
 | AUD-02 | The log detail enriches the entity summary (member, period, status, amount, transaction) **only for monthly payments**; other entity types show the raw data. | Incremental feature. | `LogRepository.GetDetailAsync` | None | Partial |
@@ -179,7 +179,7 @@ Spec: [014 - Public demo](specs/014-public-demo.md). Frontend only; read-only, n
 
 | ID | Rule | Rationale | Enforced in | Tests | Status |
 |---|---|---|---|---|---|
-| UI-01 | Cancellation is called **"Anular"** in the UI (never "Eliminar"). A cancelled item stays visible with its status. | Matches FIN-06. | Pages under `features/*/pages` | None | Implemented |
+| UI-01 | Cancellation is called **"Anular"** in the UI (never "Eliminar"). A cancelled item stays visible with its status. | Matches FIN-06. | Pages under `features/*/pages`, `shared/ui/Badge.tsx` (label "Anulado") | None | Implemented |
 | UI-02 | Negative amounts are shown only with a "-" (minus) sign, without red backgrounds. Currency is COP without decimals. | Visual consistency. | `shared/lib/formatters.ts` | `shared/lib/formatters.test.ts` | Implemented |
 | UI-03 | Backend error messages are in English and are shown **as-is** (not translated). Standard HTTP failures map to friendly Spanish messages. | Single place defines business messages. | `shared/api/apiError.ts` | `shared/api/apiError.test.ts` | Implemented |
 | UI-04 | Role-based UI: members never see create/edit/cancel actions or the Logs section; admin-only routes are guarded (`AdminRoute`). The backend remains the authority (AUTH-01). | UX only; not a security boundary. | `features/auth/components/AdminRoute.tsx`, `shared/layout/AppShell.tsx`, `canManage` checks | None | Implemented |

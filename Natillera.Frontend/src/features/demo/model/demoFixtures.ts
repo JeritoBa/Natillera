@@ -12,8 +12,8 @@ import type { Member } from '@/features/members/model/memberTypes'
 import type { MonthlyPaymentResponse, MonthlyPaymentStatus } from '@/features/monthlyPayments/api/monthlyPaymentsApi'
 import type { RealTransaction, TransactionDetail, TransactionSourceDetail } from '@/features/transactions/api/transactionsApi'
 
-export type DemoTransaction = RealTransaction & { isCancelled: boolean }
-export type DemoTransactionDetail = TransactionDetail & { isCancelled: boolean }
+export type DemoTransaction = RealTransaction
+export type DemoTransactionDetail = TransactionDetail
 
 export interface DemoFixtures {
   adminUser: AuthUser
