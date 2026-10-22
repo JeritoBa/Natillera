@@ -13,7 +13,7 @@ A loan has no place for additional information (what it is for, agreements with 
 
 ## Scope
 1. `Loan.Description`: optional text, max **500** characters. It is trimmed; empty or whitespace-only is stored as "no description" (null).
-2. Set on create and editable on edit (Admin only, LOAN-09). It does not move money: the loan's transaction is not affected. The loan update keeps writing its one Log (FIN-05).
+2. Set on create and editable on edit (Admin only, LOAN-09), with the same edit rules as the rest of the loan: only while the loan can be edited (LOAN-07: Active and without payments). The loans list response carries the description so the edit form is pre-filled (the list UI does not show it). It does not move money: the loan's transaction is not affected. The loan update keeps writing its one Log (FIN-05).
 3. The loan detail shows a "Descripción" block, visible to Admin and Members, that keeps the line breaks and wraps long words, so the text never looks collapsed (layout by the ux-designer). When there is no description, the block shows an empty state (Admin) or is hidden (Member), as the ux-designer specifies.
 4. The loan create/edit form gets a textarea "Descripción (opcional)" with a character counter (max 500).
 
@@ -34,6 +34,7 @@ New: LOAN-11. See `../business-rules.md`.
 | POST | `/api/loans` | Admin | + `description` (optional) |
 | PUT | `/api/loans/{id}` | Admin | + `description` (optional; null/empty clears it) |
 | GET | `/api/loans/{id}` | Admin, Member | + `description` (null when none) |
+| GET | `/api/loans` | Admin, Member | + `description` per item (pre-fills the edit form; not shown in the list) |
 
 A description longer than 500 characters returns 400 with an English message.
 
@@ -56,4 +57,4 @@ See Scope 3-4. UI copy and layout specified by the ux-designer.
 - Manual on the Docker stack: criteria 1-7 with "QA ..." data, Admin and Member.
 
 ## Open questions
-None.
+None. Owner decision 2026-10-21 (plan review): option A, the description follows the existing loan edit rules (LOAN-07).
