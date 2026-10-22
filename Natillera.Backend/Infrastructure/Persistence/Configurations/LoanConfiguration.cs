@@ -13,6 +13,7 @@ public sealed class LoanConfiguration : IEntityTypeConfiguration<Loan>
         builder.Property(loan => loan.Id).ValueGeneratedNever();
         builder.Property(loan => loan.InitialAmount).HasPrecision(18, 2).IsRequired();
         builder.Property(loan => loan.InterestRate).HasPrecision(9, 4).IsRequired();
+        builder.Property(loan => loan.Description).HasMaxLength(Loan.DescriptionMaxLength);
         builder.Property(loan => loan.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.HasIndex(loan => loan.TransactionId).IsUnique();
         builder.HasIndex(loan => loan.SavingPeriodId);

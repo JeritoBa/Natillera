@@ -13,9 +13,10 @@ public class Loan
     }
 
     public Loan(decimal initialAmount, decimal interestRate, DateTime startDate, Guid borrowerId,
-        Guid transactionId, SavingPeriod savingPeriod)
+        Guid transactionId, SavingPeriod savingPeriod, string? description = null)
     {
         Validate(initialAmount, interestRate);
+        var normalizedDescription = NormalizeDescription(description); // LOAN-11
         savingPeriod.EnsureContains(startDate); // PER-05
 
         Id = Guid.NewGuid();
@@ -27,12 +28,16 @@ public class Loan
         BorrowerId = borrowerId;
         TransactionId = transactionId;
         SavingPeriodId = savingPeriod.Id;
+        Description = normalizedDescription;
     }
+
+    public const int DescriptionMaxLength = 500;
 
     public Guid Id { get; private set; }
     public decimal InitialAmount { get; private set; }
     public decimal InterestRate { get; private set; }
     public DateTime StartDate { get; private set; }
+    public string? Description { get; private set; }
     public DateTime? EndDate { get; private set; }
     public LoanStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -74,7 +79,7 @@ public class Loan
         || _performances.Any(performance => performance.Status != PaymentStatus.Cancelled);
 
     public void UpdateDetails(decimal initialAmount, decimal interestRate, DateTime startDate, Guid borrowerId,
-        SavingPeriod savingPeriod)
+        SavingPeriod savingPeriod, string? description = null)
     {
         if (Status == LoanStatus.Cancelled)
             throw new DomainException("Cancelled loans cannot be modified.");
@@ -82,12 +87,14 @@ public class Loan
             throw new DomainException("Loan cannot be modified because it has payments.");
 
         Validate(initialAmount, interestRate);
+        var normalizedDescription = NormalizeDescription(description); // LOAN-11
         EnsureSamePeriod(savingPeriod);
         savingPeriod.EnsureContains(startDate); // PER-05
         InitialAmount = initialAmount;
         InterestRate = interestRate;
         StartDate = startDate.Date;
         BorrowerId = borrowerId;
+        Description = normalizedDescription;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -152,6 +159,16 @@ public class Loan
     {
         if (savingPeriod.Id != SavingPeriodId)
             throw new DomainException("A loan cannot move to another saving period.");
+    }
+
+    private static string? NormalizeDescription(string? description)
+    {
+        var trimmed = description?.Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            return null;
+        if (trimmed.Length > DescriptionMaxLength)
+            throw new DomainException($"Loan description cannot exceed {DescriptionMaxLength} characters.");
+        return trimmed;
     }
 
     private static void Validate(decimal initialAmount, decimal interestRate)
