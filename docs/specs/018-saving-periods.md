@@ -1,6 +1,6 @@
 # 018 - Saving periods
 
-- **Status:** Approved (2026-10-21)
+- **Status:** Implemented (2026-10-21)
 - **Owner decision date / reference:** 2026-10-21 (branch `v1.1.0`; target model in `../diagrams/entities.txt`, lines marked `[018]`)
 - **Related rules:** PER-01..08 (new), MP-02, MP-04, MP-10, MP-11 (new), FIN-09, FIN-13, MEM-04, MEM-10, DASH-*, TX-01, AUD-*
 
