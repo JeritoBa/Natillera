@@ -9,31 +9,32 @@ public class MonthlyPayment
     {
     }
 
-    public MonthlyPayment(decimal amount, int year, int month, Guid userId)
+    public MonthlyPayment(decimal amount, int month, Guid userId, Guid savingPeriodId)
     {
-        ValidatePeriod(year, month);
+        ValidatePeriod(month);
         ValidateAmount(amount);
         Id = Guid.NewGuid();
         Amount = amount;
-        Year = year;
         Month = month;
         Status = PaymentStatus.Pending;
         PaidAt = null;
         CreatedAt = DateTime.UtcNow;
         TransactionId = null;
         UserId = userId;
+        SavingPeriodId = savingPeriodId;
     }
 
     public Guid Id { get; private set; }
     public decimal Amount { get; private set; }
     public DateTime? PaidAt { get; private set; }
-    public int Year { get; private set; }
     public int Month { get; private set; }
     public PaymentStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public Guid? TransactionId { get; private set; }
     public Guid UserId { get; private set; }
     public User User { get; private set; } = null!;
+    public Guid SavingPeriodId { get; private set; }
+    public SavingPeriod SavingPeriod { get; private set; } = null!;
     public Transaction? Transaction { get; private set; }
 
     public void MarkAsPaid(Guid transactionId)
@@ -46,15 +47,14 @@ public class MonthlyPayment
         TransactionId = transactionId;
     }
 
-    public void UpdateDetails(decimal amount, int year, int month, Guid userId)
+    public void UpdateDetails(decimal amount, int month, Guid userId)
     {
         if (Status == PaymentStatus.Cancelled)
             throw new DomainException("Cancelled monthly payments cannot be modified.");
 
-        ValidatePeriod(year, month);
+        ValidatePeriod(month);
         ValidateAmount(amount);
         Amount = amount;
-        Year = year;
         Month = month;
         UserId = userId;
     }
@@ -73,9 +73,9 @@ public class MonthlyPayment
             throw new DomainException("Monthly payment amount must be greater than zero.");
     }
 
-    private static void ValidatePeriod(int year, int month)
+    private static void ValidatePeriod(int month)
     {
-        if (year < 1 || month is < 1 or > 12)
-            throw new DomainException("Monthly payment must have a valid year and month.");
+        if (month is < 1 or > 12)
+            throw new DomainException("Monthly payment must have a valid month.");
     }
 }

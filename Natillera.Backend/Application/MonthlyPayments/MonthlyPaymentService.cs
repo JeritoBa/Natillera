@@ -36,10 +36,10 @@ public sealed class MonthlyPaymentService(
         if (!member.IsActive)
             throw new DomainException("Only active members can receive a monthly payment.");
 
-        if (await paymentRepository.ExistsAsync(request.UserId, request.Year, request.Month, cancellationToken))
+        if (await paymentRepository.ExistsAsync(request.UserId, TempPeriodId, request.Month, cancellationToken))
             throw new DomainException("A monthly payment already exists for this member and period.");
 
-        var payment = new MonthlyPayment(request.Amount, request.Year, request.Month, request.UserId);
+        var payment = new MonthlyPayment(request.Amount, request.Month, request.UserId, TempPeriodId);
 
         try
         {
@@ -48,7 +48,7 @@ public sealed class MonthlyPaymentService(
                 await paymentRepository.AddAsync(payment, ct);
                 if (status == PaymentStatus.Paid)
                 {
-                    var transaction = NewTransaction(payment, member);
+                    var transaction = NewTransaction(payment, member, request.Year);
                     await transactionRepository.AddAsync(transaction, ct);
                     payment.MarkAsPaid(transaction.Id);
                 }
@@ -63,7 +63,7 @@ public sealed class MonthlyPaymentService(
             throw new DomainException("A monthly payment already exists for this member and period.");
         }
 
-        return ToResponse(payment, member);
+        return ToResponse(payment, member, request.Year);
     }
 
     public async Task<MonthlyPaymentResponse> UpdateAsync(Guid paymentId, UpdateMonthlyPaymentRequest request, Guid performedByUserId, CancellationToken cancellationToken)
@@ -86,7 +86,7 @@ public sealed class MonthlyPaymentService(
 
         if (!member.IsActive)
             throw new DomainException("Only active members can receive a monthly payment.");
-        if (await paymentRepository.ExistsForAnotherPaymentAsync(request.UserId, request.Year, request.Month, paymentId, cancellationToken))
+        if (await paymentRepository.ExistsForAnotherPaymentAsync(request.UserId, payment.SavingPeriodId, request.Month, paymentId, cancellationToken))
             throw new DomainException("A monthly payment already exists for this member and period.");
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
@@ -94,11 +94,11 @@ public sealed class MonthlyPaymentService(
             var wasPaid = payment.Status == PaymentStatus.Paid;
             var available = wasPaid ? await transactionRepository.GetAvailableMoneyAsync(ct) : 0m;
             var oldAmount = payment.Amount;
-            payment.UpdateDetails(request.Amount, request.Year, request.Month, request.UserId);
+            payment.UpdateDetails(request.Amount, request.Month, request.UserId);
             if (wasPaid)
             {
                 CashGuard.EnsureAvailable(available, oldAmount - payment.Amount); // FIN-13
-                payment.Transaction!.Update(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member));
+                payment.Transaction!.Update(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member, request.Year));
             }
             else if (status == PaymentStatus.Paid)
             {
@@ -107,12 +107,12 @@ public sealed class MonthlyPaymentService(
                     if (existing.IsCancelled)
                         throw new DomainException("Monthly payment transaction is cancelled and cannot be reused.");
 
-                    existing.Update(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member));
+                    existing.Update(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member, request.Year));
                     payment.MarkAsPaid(existing.Id);
                 }
                 else
                 {
-                    var transaction = NewTransaction(payment, member);
+                    var transaction = NewTransaction(payment, member, request.Year);
                     await transactionRepository.AddAsync(transaction, ct);
                     payment.MarkAsPaid(transaction.Id);
                 }
@@ -123,7 +123,7 @@ public sealed class MonthlyPaymentService(
                 ct);
         }, cancellationToken);
 
-        return ToResponse(payment, member);
+        return ToResponse(payment, member, request.Year);
     }
 
     public async Task CancelAsync(Guid paymentId, Guid performedByUserId, CancellationToken cancellationToken)
@@ -151,13 +151,16 @@ public sealed class MonthlyPaymentService(
         return status;
     }
 
-    private static string Description(MonthlyPayment payment, User member) =>
-        $"Monthly payment - {payment.Month:00}/{payment.Year} - {member.FirstName} {member.LastName}";
+    // TODO 018-D2: replace with the period of X-Saving-Id (PER-04); the FK fails until then.
+    private static readonly Guid TempPeriodId = Guid.Empty;
 
-    private static Transaction NewTransaction(MonthlyPayment payment, User member) =>
-        new(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member));
+    private static string Description(MonthlyPayment payment, User member, int year) =>
+        $"Monthly payment - {payment.Month:00}/{year} - {member.FirstName} {member.LastName}";
 
-    private static MonthlyPaymentResponse ToResponse(MonthlyPayment payment, User member) =>
-        new(payment.Id, payment.UserId, payment.TransactionId, payment.Amount, payment.Year, payment.Month,
+    private static Transaction NewTransaction(MonthlyPayment payment, User member, int year) =>
+        new(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member, year));
+
+    private static MonthlyPaymentResponse ToResponse(MonthlyPayment payment, User member, int year) =>
+        new(payment.Id, payment.UserId, payment.TransactionId, payment.Amount, year, payment.Month,
             payment.PaidAt, payment.Status, member.FirstName + " " + member.LastName);
 }

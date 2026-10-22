@@ -41,4 +41,6 @@ public class Log
     public decimal? NewValue { get; private set; }
     public Guid UserId { get; private set; }
     public User User { get; private set; } = null!;
+    public Guid SavingPeriodId { get; private set; }
+    public SavingPeriod SavingPeriod { get; private set; } = null!;
 }

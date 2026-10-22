@@ -35,8 +35,8 @@ public sealed class MemberDetailRepository(NatilleraDbContext dbContext) : IMemb
 
         var pendingPayments = await dbContext.MonthlyPayments.AsNoTracking()
             .Where(payment => payment.UserId == memberId && payment.Status == PaymentStatus.Pending)
-            .OrderBy(payment => payment.Year).ThenBy(payment => payment.Month).ThenBy(payment => payment.CreatedAt)
-            .Select(payment => new MemberPendingPaymentResponse(payment.Id, payment.Year, payment.Month, payment.Amount,
+            .OrderBy(payment => payment.SavingPeriod.Year).ThenBy(payment => payment.Month).ThenBy(payment => payment.CreatedAt)
+            .Select(payment => new MemberPendingPaymentResponse(payment.Id, payment.SavingPeriod.Year, payment.Month, payment.Amount,
                 payment.Status, payment.CreatedAt, payment.TransactionId))
             .ToArrayAsync(cancellationToken);
 

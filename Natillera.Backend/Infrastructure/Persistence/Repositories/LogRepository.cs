@@ -44,7 +44,7 @@ public sealed class LogRepository(NatilleraDbContext dbContext) : ILogRepository
                 .Where(item => item.Id == log.EntityId)
                 .Select(item => new LogEntitySummary(
                     item.User.FirstName + " " + item.User.LastName,
-                    item.Year,
+                    item.SavingPeriod.Year,
                     item.Month,
                     item.Status.ToString(),
                     item.Amount,

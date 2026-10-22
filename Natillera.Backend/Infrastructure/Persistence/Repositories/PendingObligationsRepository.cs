@@ -14,7 +14,7 @@ public sealed class PendingObligationsRepository(NatilleraDbContext dbContext) :
     {
         var fees = await dbContext.MonthlyPayments.AsNoTracking()
             .Where(p => p.UserId == memberId)
-            .Select(p => new FeeObligationRow(p.Id, p.Year, p.Month, p.Amount, p.Status, p.CreatedAt))
+            .Select(p => new FeeObligationRow(p.Id, p.SavingPeriod.Year, p.Month, p.Amount, p.Status, p.CreatedAt))
             .ToListAsync(cancellationToken);
 
         var loans = await dbContext.Loans.AsNoTracking()

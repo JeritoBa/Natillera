@@ -38,6 +38,8 @@ public class Activity
     public ActivityStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public Guid TransactionId { get; private set; }
+    public Guid SavingPeriodId { get; private set; }
+    public SavingPeriod SavingPeriod { get; private set; } = null!;
     public Transaction Transaction { get; private set; } = null!;
     public IReadOnlyCollection<ActivityAssignment> Assignments => _assignments;
 

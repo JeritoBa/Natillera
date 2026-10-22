@@ -6,9 +6,9 @@ namespace Natillera.Backend.Infrastructure.Persistence.Repositories;
 
 public sealed class MonthlyPaymentRepository(NatilleraDbContext dbContext) : IMonthlyPaymentRepository
 {
-    public Task<bool> ExistsAsync(Guid userId, int year, int month, CancellationToken cancellationToken = default) =>
+    public Task<bool> ExistsAsync(Guid userId, Guid savingPeriodId, int month, CancellationToken cancellationToken = default) =>
         dbContext.MonthlyPayments.AnyAsync(payment =>
-            payment.UserId == userId && payment.Year == year && payment.Month == month
+            payment.UserId == userId && payment.SavingPeriodId == savingPeriodId && payment.Month == month
             && payment.Status != Domain.Enums.PaymentStatus.Cancelled,
             cancellationToken);
 
@@ -16,8 +16,8 @@ public sealed class MonthlyPaymentRepository(NatilleraDbContext dbContext) : IMo
         dbContext.MonthlyPayments.Include(payment => payment.Transaction)
             .SingleOrDefaultAsync(payment => payment.Id == id, cancellationToken);
 
-    public Task<bool> ExistsForAnotherPaymentAsync(Guid userId, int year, int month, Guid paymentId, CancellationToken cancellationToken = default) =>
-        dbContext.MonthlyPayments.AnyAsync(payment => payment.UserId == userId && payment.Year == year && payment.Month == month && payment.Id != paymentId
+    public Task<bool> ExistsForAnotherPaymentAsync(Guid userId, Guid savingPeriodId, int month, Guid paymentId, CancellationToken cancellationToken = default) =>
+        dbContext.MonthlyPayments.AnyAsync(payment => payment.UserId == userId && payment.SavingPeriodId == savingPeriodId && payment.Month == month && payment.Id != paymentId
             && payment.Status != Domain.Enums.PaymentStatus.Cancelled, cancellationToken);
 
     public Task AddAsync(MonthlyPayment payment, CancellationToken cancellationToken = default) =>
@@ -33,7 +33,7 @@ public sealed class MonthlyPaymentRepository(NatilleraDbContext dbContext) : IMo
                 payment.UserId,
                 payment.TransactionId,
                 payment.Amount,
-                payment.Year,
+                payment.SavingPeriod.Year,
                 payment.Month,
                 payment.PaidAt,
                 payment.Status,

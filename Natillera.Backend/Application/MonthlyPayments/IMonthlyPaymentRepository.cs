@@ -4,9 +4,9 @@ namespace Natillera.Backend.Application.MonthlyPayments;
 
 public interface IMonthlyPaymentRepository
 {
-    Task<bool> ExistsAsync(Guid userId, int year, int month, CancellationToken cancellationToken = default);
+    Task<bool> ExistsAsync(Guid userId, Guid savingPeriodId, int month, CancellationToken cancellationToken = default);
     Task<MonthlyPayment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<bool> ExistsForAnotherPaymentAsync(Guid userId, int year, int month, Guid paymentId, CancellationToken cancellationToken = default);
+    Task<bool> ExistsForAnotherPaymentAsync(Guid userId, Guid savingPeriodId, int month, Guid paymentId, CancellationToken cancellationToken = default);
     Task AddAsync(MonthlyPayment payment, CancellationToken cancellationToken = default);
     Task<IReadOnlyCollection<MonthlyPaymentListItem>> GetOrderedAsync(bool includeNonPaid, CancellationToken cancellationToken = default);
 }

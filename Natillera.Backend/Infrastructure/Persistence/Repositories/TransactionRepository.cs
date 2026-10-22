@@ -69,8 +69,8 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
 
     private async Task<TransactionDetailResponse> GetMonthlyPaymentDetailAsync(Transaction transaction, CancellationToken cancellationToken)
     {
-        var payment = await dbContext.MonthlyPayments.Include(item => item.User).SingleAsync(item => item.TransactionId == transaction.Id, cancellationToken);
-        return Build(transaction, new TransactionSourceDetail { Entity = "MonthlyPayment", EntityId = payment.Id, MemberName = payment.User.FirstName + " " + payment.User.LastName, Year = payment.Year, Month = payment.Month, Status = payment.Status.ToString(), PaidAt = payment.PaidAt });
+        var payment = await dbContext.MonthlyPayments.Include(item => item.User).Include(item => item.SavingPeriod).SingleAsync(item => item.TransactionId == transaction.Id, cancellationToken);
+        return Build(transaction, new TransactionSourceDetail { Entity = "MonthlyPayment", EntityId = payment.Id, MemberName = payment.User.FirstName + " " + payment.User.LastName, Year = payment.SavingPeriod.Year, Month = payment.Month, Status = payment.Status.ToString(), PaidAt = payment.PaidAt });
     }
 
     private async Task<TransactionDetailResponse> GetLoanDetailAsync(Transaction transaction, CancellationToken cancellationToken)

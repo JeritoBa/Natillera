@@ -28,6 +28,8 @@ public class Transaction
     public DateTime OccurredAt { get; private set; }
     public string Description { get; private set; } = null!;
     public bool IsCancelled { get; private set; }
+    public Guid SavingPeriodId { get; private set; }
+    public SavingPeriod SavingPeriod { get; private set; } = null!;
 
     public void Update(decimal amount, TransactionDirection direction, TransactionType type, string description)
     {

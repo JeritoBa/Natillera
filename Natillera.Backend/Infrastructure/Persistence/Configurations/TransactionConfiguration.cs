@@ -17,5 +17,8 @@ public sealed class TransactionConfiguration : IEntityTypeConfiguration<Transact
         builder.Property(transaction => transaction.Description).HasMaxLength(200).IsRequired();
         builder.Property(transaction => transaction.IsCancelled).IsRequired();
         builder.HasIndex(transaction => transaction.OccurredAt);
+        builder.HasIndex(transaction => transaction.SavingPeriodId);
+        builder.HasOne(transaction => transaction.SavingPeriod).WithMany()
+            .HasForeignKey(transaction => transaction.SavingPeriodId).OnDelete(DeleteBehavior.Restrict);
     }
 }

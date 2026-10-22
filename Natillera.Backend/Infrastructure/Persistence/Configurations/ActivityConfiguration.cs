@@ -17,6 +17,9 @@ public sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
         builder.Property(activity => activity.UnitSalePrice).HasPrecision(18, 2).IsRequired();
         builder.Property(activity => activity.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.HasIndex(activity => activity.TransactionId).IsUnique();
+        builder.HasIndex(activity => activity.SavingPeriodId);
+        builder.HasOne(activity => activity.SavingPeriod).WithMany()
+            .HasForeignKey(activity => activity.SavingPeriodId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(activity => activity.Transaction).WithOne()
             .HasForeignKey<Activity>(activity => activity.TransactionId).OnDelete(DeleteBehavior.Restrict);
     }

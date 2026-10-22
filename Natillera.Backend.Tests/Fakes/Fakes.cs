@@ -119,15 +119,15 @@ public sealed class FakeMonthlyPaymentRepository : IMonthlyPaymentRepository
 {
     public List<MonthlyPayment> Payments { get; } = [];
 
-    public Task<bool> ExistsAsync(Guid userId, int year, int month, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Payments.Any(p => p.UserId == userId && p.Year == year && p.Month == month
+    public Task<bool> ExistsAsync(Guid userId, Guid savingPeriodId, int month, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Payments.Any(p => p.UserId == userId && p.SavingPeriodId == savingPeriodId && p.Month == month
             && p.Status != Natillera.Backend.Domain.Enums.PaymentStatus.Cancelled));
 
     public Task<MonthlyPayment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Payments.FirstOrDefault(p => p.Id == id));
 
-    public Task<bool> ExistsForAnotherPaymentAsync(Guid userId, int year, int month, Guid paymentId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Payments.Any(p => p.UserId == userId && p.Year == year && p.Month == month && p.Id != paymentId
+    public Task<bool> ExistsForAnotherPaymentAsync(Guid userId, Guid savingPeriodId, int month, Guid paymentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Payments.Any(p => p.UserId == userId && p.SavingPeriodId == savingPeriodId && p.Month == month && p.Id != paymentId
             && p.Status != Natillera.Backend.Domain.Enums.PaymentStatus.Cancelled));
 
     public Task AddAsync(MonthlyPayment payment, CancellationToken cancellationToken = default)

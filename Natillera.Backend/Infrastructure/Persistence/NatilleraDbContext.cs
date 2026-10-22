@@ -14,6 +14,7 @@ public class NatilleraDbContext(DbContextOptions<NatilleraDbContext> options) : 
     public DbSet<Activity> Activities => Set<Activity>();
     public DbSet<ActivityAssignment> ActivityAssignments => Set<ActivityAssignment>();
     public DbSet<Log> Logs => Set<Log>();
+    public DbSet<SavingPeriod> SavingPeriods => Set<SavingPeriod>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
