@@ -10,6 +10,7 @@ import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
+import { cell, cellActions, cellAmount, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
 interface ActivityForm { name: string, description: string, quantity: string, unitCost: string, unitSalePrice: string, startDate: string }
 const emptyForm: ActivityForm = { name: '', description: '', quantity: '', unitCost: '', unitSalePrice: '', startDate: '' }
@@ -53,6 +54,8 @@ export function ActivitiesPage() {
   }
 
   const save = async () => {
+    if (saving) return
+    setModalError(null)
     const quantity = Number(form.quantity)
     const unitCost = Number(form.unitCost)
     const unitSalePrice = Number(form.unitSalePrice)
@@ -95,15 +98,13 @@ export function ActivitiesPage() {
   const filtered = effectiveMonth === 'all' ? activities : activities.filter(activity => monthOf(activity) === effectiveMonth)
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const columns: [string, string, boolean][] = [
-    ['Actividad', '', false], ['Fecha de inicio', 'hidden sm:table-cell', false], ['Unidades asignadas', 'hidden sm:table-cell', true], ['Disponibles', 'hidden md:table-cell', false],
-    ['Costo total', '', true], ['Precio de venta', 'hidden md:table-cell', true], ['Estado', 'hidden sm:table-cell', false], ['Acciones', 'w-px whitespace-nowrap', true],
+    ['Actividad', cellFirst, false], ['Fecha de inicio', `${cell} ${colDesktop}`, false], ['Unidades asignadas', `${cell} ${colTablet}`, true], ['Disponibles', `${cell} ${colDesktop}`, false],
+    ['Costo total', cell, true], ['Precio de venta', `${cell} ${colDesktop}`, true], ['Estado', `${cell} ${colTablet}`, false], ['Acciones', `${cellLast} w-px whitespace-nowrap`, true],
   ]
-  const iconButton = 'btn-ghost p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
-  const dangerButton = 'btn-danger p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
   const setField = (field: keyof ActivityForm, value: string) => setForm(current => ({ ...current, [field]: value }))
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Actividades</h1><p className="text-[#4e7460] text-sm">{canManage ? 'Gestiona las actividades de venta de la natillera' : 'Actividades de venta de la natillera'}</p></div>
         {canManage && <button onClick={openCreate} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Nueva actividad</button>}
@@ -124,9 +125,9 @@ export function ActivitiesPage() {
           {effectiveMonth !== 'all' && <button onClick={() => setMonth('all')} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Ver todos los meses</button>}
         </div>
       </div>}
-      <div className="rounded-xl overflow-hidden" style={cardStyle}>
-        <table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
-          {columns.map(([heading, visibility, right]) => <th key={heading} className={`px-3 sm:px-5 py-3 text-[#4e7460] text-xs font-medium ${right ? 'text-right' : 'text-left'} ${visibility}`}>{heading}</th>)}
+      <div className={tableWrap} style={cardStyle}><div className={tableScroll}>
+        <table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+          {columns.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
         </tr></thead><tbody>
           {loading && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando actividades…</p></td></tr>}
           {!loading && !error && activities.length === 0 && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]">{canManage ? 'Aún no hay actividades registradas. Usa «Nueva actividad» para crear la primera.' : 'Aún no hay actividades registradas.'}</td></tr>}
@@ -135,22 +136,26 @@ export function ActivitiesPage() {
             <button onClick={() => setMonth('all')} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Ver todos los meses</button>
           </td></tr>}
           {!loading && filtered.map(activity => <tr key={activity.id} className="table-row">
-            <td className="px-3 sm:px-5 py-3.5"><Link to={`/activities/${activity.id}`} className="sm:pointer-events-none font-medium text-[#0c1a12] hover:underline sm:hover:no-underline focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{activity.name}</Link><p className="hidden sm:block text-xs text-[#4e7460] truncate max-w-[220px]">{activity.description}</p><p className="text-xs text-[#4e7460] sm:hidden mt-0.5 flex items-center gap-1.5 flex-wrap"><span className="mono">Inicia {formatDateOnly(activity.startDate)}</span><span className="mono">· {`${activity.assignedQuantity} de ${activity.quantity}`} u.</span><Badge status={activity.status.toLowerCase()} /></p></td>
-            <td className="px-4 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap hidden sm:table-cell">{formatDateOnly(activity.startDate)}</td>
-            <td className="px-4 py-3.5 text-right mono text-[#4e7460] hidden sm:table-cell">{`${activity.assignedQuantity} de ${activity.quantity}`}</td>
-            <td className="px-4 py-3.5 mono text-[#4e7460] hidden md:table-cell">{activity.availableQuantity}</td>
-            <td className="px-3 sm:px-4 py-3.5 text-right mono text-[#0c1a12] whitespace-nowrap">{formatCurrency(activity.totalCost)}</td>
-            <td className="px-4 py-3.5 text-right mono text-[#0c1a12] hidden md:table-cell">{formatCurrency(activity.unitSalePrice)}</td>
-            <td className="px-4 py-3.5 hidden sm:table-cell"><Badge status={activity.status.toLowerCase()} /></td>
-            <td className="px-3 sm:px-5 py-3.5 text-right w-px whitespace-nowrap"><div className="flex justify-end gap-1">
-              <button onClick={() => navigate(`/activities/${activity.id}`)} className={`btn-ghost p-2 rounded-md min-w-10 min-h-10 hidden sm:inline-flex items-center justify-center`} aria-label={`Ver detalle de ${activity.name}`}><Icon.Eye open /></button>
+            <td className={`${cellFirst} py-3.5 ${cellMain}`}>
+              <Link to={`/activities/${activity.id}`} title={activity.name} className={mainLink}>{activity.name}</Link>
+              <p className={subMobile}><span className="mono">Inicia {formatDateOnly(activity.startDate)}</span><span className="mono">· {`${activity.assignedQuantity} de ${activity.quantity}`} u.</span><Badge status={activity.status.toLowerCase()} /></p>
+              <p className={subTablet}><span className="whitespace-nowrap">Inicia {formatDateOnly(activity.startDate)}</span><span className="whitespace-nowrap">· Precio <span className="mono">{formatCurrency(activity.unitSalePrice)}</span></span><span className="whitespace-nowrap">· {activity.availableQuantity} disponibles</span></p>
+            </td>
+            <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{formatDateOnly(activity.startDate)}</td>
+            <td className={`${cell} ${colTablet} py-3.5 text-right mono text-[#4e7460] whitespace-nowrap`}>{`${activity.assignedQuantity} de ${activity.quantity}`}</td>
+            <td className={`${cell} ${colDesktop} py-3.5 mono text-[#4e7460]`}>{activity.availableQuantity}</td>
+            <td className={`${cell} py-3.5 ${cellAmount} text-[#0c1a12]`}>{formatCurrency(activity.totalCost)}</td>
+            <td className={`${cell} ${colDesktop} py-3.5 text-right mono text-[#0c1a12]`}>{formatCurrency(activity.unitSalePrice)}</td>
+            <td className={`${cell} ${colTablet} py-3.5`}><Badge status={activity.status.toLowerCase()} /></td>
+            <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
+              <button onClick={() => navigate(`/activities/${activity.id}`)} className={eyeButton} aria-label={`Ver detalle de ${activity.name}`}><Icon.Eye open /></button>
               {canManage && activity.status !== 'Cancelled' && <button onClick={() => openEdit(activity)} className={iconButton} aria-label={`Editar ${activity.name}`}><Icon.Edit /></button>}
               {canManage && activity.status !== 'Cancelled' && activity.assignedQuantity === 0 && <button onClick={() => { if (window.confirm(`¿Anular la actividad "${activity.name}"? La actividad y su egreso quedarán anulados.`)) void cancel(activity) }} className={dangerButton} aria-label={`Anular ${activity.name}`}><Icon.Trash /></button>}
             </div></td>
           </tr>)}
         </tbody></table>
-      </div>
-      {modal && <Modal title={editing ? 'Editar actividad' : 'Nueva actividad'} onClose={() => !saving && setModal(null)}><div className="space-y-4">
+      </div></div>
+      {modal && <Modal title={editing ? 'Editar actividad' : 'Nueva actividad'} onClose={() => !saving && setModal(null)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4">
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Nombre</label><input type="text" maxLength={100} value={form.name} onChange={event => setField('name', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción</label><input type="text" maxLength={200} value={form.description} onChange={event => setField('description', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input type="number" min="1" step="1" value={form.quantity} onChange={event => setField('quantity', event.target.value)} placeholder="100" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
@@ -158,8 +163,8 @@ export function ActivitiesPage() {
         <div><label htmlFor="activity-unit-sale-price" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Precio de venta unitario</label><MoneyInput id="activity-unit-sale-price" value={form.unitSalePrice} onChange={value => setField('unitSalePrice', value)} placeholder="8000" /></div>
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Fecha de inicio</label><input type="date" value={form.startDate} onChange={event => setField('startDate', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
-        <div className="flex gap-3 pt-1"><button onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button onClick={() => void save()} disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
-      </div></Modal>}
+        <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
+      </form></Modal>}
     </div>
   )
 }

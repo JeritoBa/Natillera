@@ -28,8 +28,8 @@ export function ActivityAssignmentDetailPage() {
   }, [activityId, assignmentId, session])
 
   const back = `/activities/${activityId}`
-  if (error) return <div className="p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate(back)} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver</button><p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p></div>
-  if (!assignment) return <div className="p-6 lg:p-8 max-w-5xl text-[#4e7460]">Cargando detalle...</div>
+  if (error) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate(back)} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver</button><p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p></div>
+  if (!assignment) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl text-[#4e7460]">Cargando detalle...</div>
 
   const fields: [string, ReactNode][] = [
     ['Miembro', assignment.memberName], ['Cantidad asignada', assignment.quantityAssigned], ['Valor de venta', formatCurrency(assignment.saleAmount)],
@@ -37,7 +37,7 @@ export function ActivityAssignmentDetailPage() {
     ['Fecha de pago', assignment.paidAt ? new Date(assignment.paidAt).toLocaleString('es-CO') : '—'],
   ]
 
-  return <div className="p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate(back)} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver a la actividad</button><div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Detalle de asignación</h1><p className="text-[#4e7460] text-sm">Información de la asignación del miembro en la actividad</p></div>
+  return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate(back)} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver a la actividad</button><div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Detalle de asignación</h1><p className="text-[#4e7460] text-sm">Información de la asignación del miembro en la actividad</p></div>
     <div className="rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4" style={card}>{fields.map(([label, value]) => cell(label, value))}{assignment.transactionId && cell('Transacción', <Link to={`/transactions/${assignment.transactionId}`} className="text-sm text-[#0a6635] underline">Ver transacción</Link>)}</div>
   </div>
 }

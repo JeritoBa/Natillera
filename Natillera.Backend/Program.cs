@@ -63,6 +63,7 @@ builder.Services.AddScoped<ILogRepository, LogRepository>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<IMemberDetailRepository, MemberDetailRepository>();
+builder.Services.AddScoped<IPendingObligationsRepository, PendingObligationsRepository>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<MonthlyPaymentService>();

@@ -9,7 +9,7 @@ export function Badge({ status }: { status: string }) {
     inactive: 'Inactivo',
     paid: 'Pagado', finished: 'Cerrada', active: 'Activo', completed: 'Completado', income: 'Ingreso',
     pending: 'Pendiente',
-    overdue: 'Vencido', cancelled: 'Cancelado', expense: 'Egreso',
+    overdue: 'Vencido', cancelled: 'Anulado', expense: 'Egreso',
   }
   return (
     <span className={`px-2 py-0.5 rounded uppercase font-medium ${cls[status] || 'badge-neutral'}`}>

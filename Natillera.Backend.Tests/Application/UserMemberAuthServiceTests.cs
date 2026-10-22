@@ -146,8 +146,27 @@ public class MemberDetailServiceTests
         new(new MemberInfoResponse(Guid.NewGuid(), "A", "B", "a@b.com", "1", UserRole.Member, true, DateTime.UtcNow, null),
             savings, activity, performances, members, [], []);
 
-    private static Task<MemberDetailResponse?> Run(MemberDetailData? data) =>
-        new MemberDetailService(new StubRepo(data)).GetDetailAsync(Guid.NewGuid(), default);
+    private sealed class StubPendingRepo(PendingObligationsData data) : IPendingObligationsRepository
+    {
+        public Task<PendingObligationsData> GetDataAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(data);
+    }
+
+    private static Task<MemberDetailResponse?> Run(MemberDetailData? data, PendingObligationsData? pending = null) =>
+        new MemberDetailService(new StubRepo(data), new StubPendingRepo(pending ?? new PendingObligationsData([], [], [], [])))
+            .GetDetailAsync(Guid.NewGuid(), default);
+
+    [Fact]
+    public async Task GetDetailAsync_IncludesPendingObligations_MEM10()
+    {
+        var pending = new PendingObligationsData(
+            [new FeeObligationRow(Guid.NewGuid(), 2026, 5, 30000m, PaymentStatus.Pending, DateTime.UtcNow)], [], [], []);
+
+        var result = await Run(Data(0m, 0m, 0m, 1), pending);
+
+        Assert.Equal(30000m, result!.PendingObligations.Total);
+        Assert.Single(result.PendingObligations.MonthlyPayments.Items);
+    }
 
     [Fact]
     public async Task GetDetailAsync_MemberNotFound_ReturnsNull()

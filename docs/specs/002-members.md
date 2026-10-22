@@ -27,7 +27,7 @@ None (`User`: names <= 45, email <= 100 unique, phone <= 10, role, `IsActive`, `
 | Verb | Route | Role | Request | Response / errors |
 |---|---|---|---|---|
 | GET | `/api/members` | Any authenticated | - | 200 list of members (role Member only), ordered by last then first name |
-| GET | `/api/members/{id}/details` | Admin | - | 200 `{ member, balance{savings, activityEarnings, performanceEarnings, total}, pendingPayments[], transactions[] }`; 404 |
+| GET | `/api/members/{id}/details` | Admin | - | 200 `{ member, balance{savings, activityEarnings, performanceEarnings, total}, pendingPayments[], transactions[], pendingObligations{total, monthlyPayments, loans, interests, activitySales} (MEM-10, spec 016) }`; 404 |
 | POST | `/api/members` | Admin | `{ firstName, lastName, email, phone }` | 201 member; 400; 409 duplicate email |
 | PUT | `/api/members/{id}` | Admin | `{ firstName, lastName, email, phone }` | 200 member; 400; 409 duplicate email |
 | PATCH | `/api/members/{id}/status` | Admin | `{ isActive }` | 200 member; 400 with pending-obligations message |

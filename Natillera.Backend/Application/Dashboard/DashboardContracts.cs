@@ -1,3 +1,4 @@
+using Natillera.Backend.Application.Users;
 using Natillera.Backend.Domain.Enums;
 
 namespace Natillera.Backend.Application.Dashboard;
@@ -17,7 +18,8 @@ public sealed record DashboardSummaryResponse(
     decimal? LoanInterestEarned,
     decimal? ActivityEarnings,
     decimal? MyActivityEarnings,
-    decimal? MyPerformanceShare);
+    decimal? MyPerformanceShare,
+    PendingObligationsResponse? PendingObligations = null);
 
 public sealed record TopSellerItem(
     Guid UserId,

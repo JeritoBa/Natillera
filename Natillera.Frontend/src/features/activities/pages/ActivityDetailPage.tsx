@@ -14,17 +14,17 @@ import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
 import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
+import { cell, cellActions, cellAmount, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll } from '@/shared/ui/tableStyles'
 
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
 const rowClass = 'flex justify-between border-t border-[#eef4f0] pt-2'
 const longDate = (value: string) => new Date(`${value.slice(0, 10)}T00:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
 const statusOrder = { Pending: 0, Paid: 1, Cancelled: 2 }
-const iconButton = 'btn-ghost p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
-const dangerButton = 'btn-danger p-2 rounded-md min-w-10 min-h-10 inline-flex items-center justify-center'
 const headings: [string, string, boolean][] = [
-  ['Miembro', '', false], ['Unidades', 'hidden sm:table-cell', true], ['Valor de venta', '', true], ['Asignada', 'hidden md:table-cell', false],
-  ['Pagada', 'hidden md:table-cell', false], ['Estado', 'hidden sm:table-cell', false], ['Acciones', 'w-px whitespace-nowrap', true],
+  ['Miembro', cellFirst, false], ['Unidades', `${cell} ${colTablet}`, true], ['Valor de venta', cell, true], ['Asignada', `${cell} ${colDesktop}`, false],
+  ['Pagada', `${cell} ${colDesktop}`, false], ['Estado', `${cell} ${colTablet}`, false], ['Acciones', `${cellLast} w-px whitespace-nowrap`, true],
 ]
+const shortDate = (value: string) => new Date(value).toLocaleDateString('es-CO')
 
 export function ActivityDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -85,15 +85,15 @@ export function ActivityDetailPage() {
 
   const back = <button onClick={() => navigate('/activities')} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver a actividades</button>
 
-  if (loading) return <div className="p-6 lg:p-8 max-w-5xl">{back}<p role="status" className="text-[#4e7460]">Cargando actividad…</p></div>
-  if (notFound) return <div className="p-6 lg:p-8 max-w-5xl">{back}
+  if (loading) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}<p role="status" className="text-[#4e7460]">Cargando actividad…</p></div>
+  if (notFound) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}
     <div role="alert" className="rounded-xl p-8 text-center" style={cardStyle}>
       <h1 className="text-lg font-bold text-[#0c1a12]">No se encontró la actividad</h1>
       <p className="text-sm text-[#4e7460]">Puede que el enlace esté incompleto o que la actividad no exista.</p>
       <button onClick={() => navigate('/activities')} className="btn-primary px-4 py-2 rounded-lg text-sm mt-4">Ver lista de actividades</button>
     </div>
   </div>
-  if (error || !activity) return <div className="p-6 lg:p-8 max-w-5xl">{back}
+  if (error || !activity) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}
     <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>
     <button onClick={() => void load()} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3">Reintentar</button>
   </div>
@@ -115,6 +115,8 @@ export function ActivityDetailPage() {
     setStatus(assignment?.status === 'Paid' ? 'Paid' : 'Pending'); setModalError(null); setSuccess(null); setActionError(null); setModal(true)
   }
   const save = async () => {
+    if (saving) return
+    setModalError(null)
     const numericQuantity = Number(quantity)
     if (!editing && !userId) return setModalError('Selecciona un miembro.')
     if (quantity === '' || !Number.isInteger(numericQuantity) || numericQuantity < 1) return setModalError('Ingresa una cantidad válida (número entero mayor que cero).')
@@ -159,7 +161,7 @@ export function ActivityDetailPage() {
     ? `¿Anular la asignación pagada de ${assignment.memberName}? La asignación y su ingreso quedarán anulados.`
     : `¿Anular la asignación de ${assignment.memberName}? La asignación quedará anulada.`
 
-  return <div className="p-6 lg:p-8 max-w-5xl">
+  return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
     {back}
     <div className="mb-7">
       <div className="flex items-center gap-2 flex-wrap">
@@ -216,21 +218,22 @@ export function ActivityDetailPage() {
             <p>Aún no hay miembros asignados a esta actividad.</p>
             {canManage && !isCancelled && <p>Usa «Asignar miembro» para repartir las unidades.</p>}
           </div>
-          : <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr style={{ borderBottom: '1px solid #eef4f0', background: '#f8fbf8' }}>
-            {headings.map(([heading, visibility, right]) => <th key={heading} className={`px-5 py-3 text-[#4e7460] text-xs font-medium ${right ? 'text-right' : 'text-left'} ${visibility}`}>{heading}</th>)}
+          : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+            {headings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
           </tr></thead><tbody>
             {sortedAssignments.map(assignment => <tr key={assignment.id} className="table-row">
-              <td className="px-5 py-3.5">
-                <Link to={`/activities/${activity.id}/assignments/${assignment.id}`} className="font-medium text-[#0c1a12] hover:underline focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{assignment.memberName}</Link>
-                <p className="sm:hidden text-xs text-[#4e7460] mt-0.5 flex items-center gap-1.5 flex-wrap"><span className="mono">{assignment.quantityAssigned} u.</span><Badge status={assignment.status.toLowerCase()} /></p>
+              <td className={`${cellFirst} py-3.5 ${cellMain}`}>
+                <Link to={`/activities/${activity.id}/assignments/${assignment.id}`} title={assignment.memberName} className={mainLink}>{assignment.memberName}</Link>
+                <p className={subMobile}><span className="mono">{assignment.quantityAssigned} u.</span><Badge status={assignment.status.toLowerCase()} /></p>
+                <p className={subTablet}><span className="whitespace-nowrap">Asignada {shortDate(assignment.assignedAt)}</span><span className="whitespace-nowrap">· Pagada {assignment.paidAt ? shortDate(assignment.paidAt) : '—'}</span></p>
               </td>
-              <td className="px-4 py-3.5 text-right mono text-[#4e7460] hidden sm:table-cell">{assignment.quantityAssigned}</td>
-              <td className="px-4 py-3.5 text-right mono text-[#0c1a12]">{formatCurrency(assignment.saleAmount)}</td>
-              <td className="px-4 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap hidden md:table-cell">{new Date(assignment.assignedAt).toLocaleDateString('es-CO')}</td>
-              <td className="px-4 py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap hidden md:table-cell">{assignment.paidAt ? new Date(assignment.paidAt).toLocaleDateString('es-CO') : '—'}</td>
-              <td className="px-4 py-3.5 hidden sm:table-cell"><Badge status={assignment.status.toLowerCase()} /></td>
-              <td className="px-5 py-3.5 text-right w-px whitespace-nowrap"><div className="flex justify-end gap-1">
-                <button onClick={() => navigate(`/activities/${activity.id}/assignments/${assignment.id}`)} className={`btn-ghost p-2 rounded-md min-w-10 min-h-10 hidden sm:inline-flex items-center justify-center`} aria-label={`Ver asignación de ${assignment.memberName}`}><Icon.Eye open /></button>
+              <td className={`${cell} ${colTablet} py-3.5 text-right mono text-[#4e7460]`}>{assignment.quantityAssigned}</td>
+              <td className={`${cell} py-3.5 ${cellAmount} text-[#0c1a12]`}>{formatCurrency(assignment.saleAmount)}</td>
+              <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{shortDate(assignment.assignedAt)}</td>
+              <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{assignment.paidAt ? shortDate(assignment.paidAt) : '—'}</td>
+              <td className={`${cell} ${colTablet} py-3.5`}><Badge status={assignment.status.toLowerCase()} /></td>
+              <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
+                <button onClick={() => navigate(`/activities/${activity.id}/assignments/${assignment.id}`)} className={eyeButton} aria-label={`Ver asignación de ${assignment.memberName}`}><Icon.Eye open /></button>
                 {canManage && !isCancelled && assignment.status === 'Pending' && <button onClick={() => openModal(assignment)} className={iconButton} aria-label={`Editar asignación de ${assignment.memberName}`}><Icon.Edit /></button>}
                 {canManage && !isCancelled && assignment.status !== 'Cancelled' && <button onClick={() => { if (window.confirm(confirmMessage(assignment))) void cancel(assignment) }} className={dangerButton} aria-label={`Anular asignación de ${assignment.memberName}`}><Icon.Trash /></button>}
               </div></td>
@@ -248,14 +251,14 @@ export function ActivityDetailPage() {
       </section>
     </div>
 
-    {modal && <Modal title={editing ? 'Editar asignación' : 'Asignar miembro'} onClose={() => !saving && setModal(false)}><div className="space-y-4">
+    {modal && <Modal title={editing ? 'Editar asignación' : 'Asignar miembro'} onClose={() => !saving && setModal(false)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4">
       {editing
         ? <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><p className="text-sm text-[#0c1a12]">{editing.memberName}</p></div>
         : <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><select value={userId} onChange={event => setUserId(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un miembro</option>{selectableMembers.map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div>}
       <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input type="number" min="1" step="1" max={available} value={quantity} onChange={event => setQuantity(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /><p className="text-xs text-[#4e7460] mt-1">Unidades disponibles: {available}</p></div>
       {editing && <StatusRadioGroup name="assignment-status" legend="Estado" value={status} onChange={setStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} />}
       {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
-      <div className="flex gap-3 pt-1"><button onClick={() => setModal(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button onClick={() => void save()} disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
-    </div></Modal>}
+      <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
+    </form></Modal>}
   </div>
 }

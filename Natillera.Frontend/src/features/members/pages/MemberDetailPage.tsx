@@ -3,9 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { appName } from '@/app/useDocumentTitle'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { getMemberDetail, type MemberDetail } from '@/features/members/api/membersApi'
+import { PendingObligationsCard } from '@/features/members/components/PendingObligationsCard'
 import { typeLabel } from '@/features/transactions/model/labels'
 import { ApiError, getFriendlyApiError } from '@/shared/api/apiError'
-import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
+import { formatCurrency } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 
@@ -55,22 +56,21 @@ export function MemberDetailPage() {
 
   const back = <button onClick={() => navigate('/members')} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver a miembros</button>
 
-  if (loading) return <div className="p-6 lg:p-8 max-w-5xl">{back}<p role="status" className="text-[#4e7460]">Cargando miembro…</p></div>
-  if (notFound) return <div className="p-6 lg:p-8 max-w-5xl">{back}
+  if (loading) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}<p role="status" className="text-[#4e7460]">Cargando miembro…</p></div>
+  if (notFound) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}
     <div role="alert" className="rounded-xl p-8 text-center" style={cardStyle}>
       <h1 className="text-lg font-bold text-[#0c1a12]">No se encontró el miembro</h1>
       <p className="text-sm text-[#4e7460]">Puede que el enlace esté incompleto o que el miembro no exista.</p>
       <button onClick={() => navigate('/members')} className="btn-primary px-4 py-2 rounded-lg text-sm mt-4">Ver lista de miembros</button>
     </div>
   </div>
-  if (error || !detail) return <div className="p-6 lg:p-8 max-w-5xl">{back}
+  if (error || !detail) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}
     <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>
     <button onClick={() => void load()} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3">Reintentar</button>
   </div>
 
-  const { member, balance, pendingPayments, transactions } = detail
+  const { member, balance, pendingObligations, transactions } = detail
   const fullName = `${member.firstName} ${member.lastName}`
-  const pendingTotal = pendingPayments.reduce((sum, payment) => sum + payment.amount, 0)
   const sorted = [...transactions].sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
   const visible = showAll ? sorted : sorted.slice(0, collapsedCount)
   const info: [string, React.ReactNode][] = [
@@ -83,7 +83,7 @@ export function MemberDetailPage() {
     ['Última actualización', member.updatedAt ? new Date(member.updatedAt).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' }) : 'Sin cambios desde el alta'],
   ]
 
-  return <div className="p-6 lg:p-8 max-w-5xl">
+  return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
     {back}
     <div className="mb-7">
       <div className="flex items-center gap-2 flex-wrap">
@@ -95,8 +95,8 @@ export function MemberDetailPage() {
     </div>
 
     <div className="flex flex-col gap-4 lg:gap-5">
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <section aria-labelledby="member-savings-title" className="stat-card rounded-xl p-5 lg:col-span-3" style={{ border: '1px solid #0c5c38' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <section aria-labelledby="member-savings-title" className="stat-card rounded-xl p-5" style={{ border: '1px solid #0c5c38' }}>
           <h2 id="member-savings-title" className="text-sm font-semibold text-[#0c1a12]">Ahorros de {member.firstName}</h2>
           <p className="mono text-2xl md:text-3xl font-bold text-[#0a6635] mt-2 break-words">{balance.total < 0 ? '−' : ''}{formatCurrency(balance.total)}</p>
           <p className="text-xs text-[#4e7460]">Lo que ha aportado más lo que ha ganado</p>
@@ -108,19 +108,8 @@ export function MemberDetailPage() {
           {balance.total === 0 && <p className="mt-3 text-xs text-[#4e7460]">Aún no tiene cuotas pagadas.</p>}
         </section>
 
-        <section aria-labelledby="member-pending-title" className="rounded-xl p-5 lg:col-span-2" style={cardStyle}>
-          <h2 id="member-pending-title" className="text-sm font-semibold text-[#0c1a12]">Cuotas pendientes</h2>
-          {pendingPayments.length === 0 ? <>
-            <p className="flex items-center gap-2 mt-3 text-base font-semibold text-[#0a6635]"><span aria-hidden="true" className="w-7 h-7 rounded-full bg-[#dcf5e8] flex items-center justify-center"><Icon.Check /></span>Está al día</p>
-            <p className="text-xs text-[#4e7460]">No tiene cuotas pendientes por pagar.</p>
-          </> : <>
-            <p className="mono text-2xl font-bold text-[#9a6e00] mt-2">Debe {formatCurrency(pendingTotal)}</p>
-            <p className="text-xs text-[#4e7460]">{pendingPayments.length === 1 ? '1 cuota sin pagar' : `${pendingPayments.length} cuotas sin pagar`}</p>
-            <ul className="mt-4 space-y-2 text-sm">{pendingPayments.map(payment => <li key={payment.id} className={rowClass}>
-              <span className="text-[#0c1a12]">{formatMonth(payment.month)} {payment.year}</span>
-              <span className="mono text-[#0c1a12] text-right">{formatCurrency(payment.amount)}</span>
-            </li>)}</ul>
-          </>}
+        <section aria-labelledby="member-pending-title" className="rounded-xl p-5" style={cardStyle}>
+          <PendingObligationsCard obligations={pendingObligations} audience="admin" titleId="member-pending-title" memberId={member.id} />
         </section>
       </div>
 

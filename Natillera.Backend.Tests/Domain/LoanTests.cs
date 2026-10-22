@@ -52,6 +52,15 @@ public class LoanTests
         Assert.NotNull(p1);
     }
 
+    [Theory]
+    [InlineData(1000, 400, 600)]
+    [InlineData(1000, 1000, 0)]
+    [InlineData(1000, 1200, 0)]
+    public void CalculateOutstandingPrincipal_NeverBelowZero(double initial, double paid, double expected)
+    {
+        Assert.Equal((decimal)expected, Loan.CalculateOutstandingPrincipal((decimal)initial, (decimal)paid));
+    }
+
     [Fact]
     public void CalculateMonthlyInterest_UsesOutstandingPrincipal()
     {

@@ -1,6 +1,6 @@
 namespace Natillera.Backend.Application.Users;
 
-public sealed class MemberDetailService(IMemberDetailRepository repository)
+public sealed class MemberDetailService(IMemberDetailRepository repository, IPendingObligationsRepository pendingObligationsRepository)
 {
     public async Task<MemberDetailResponse?> GetDetailAsync(Guid memberId, CancellationToken cancellationToken)
     {
@@ -19,6 +19,9 @@ public sealed class MemberDetailService(IMemberDetailRepository repository)
             performanceEarnings,
             data.Savings + data.ActivityEarnings + performanceEarnings);
 
-        return new MemberDetailResponse(data.Member, balance, data.PendingPayments, data.Transactions);
+        var pending = PendingObligationsCalculator.Calculate(
+            await pendingObligationsRepository.GetDataAsync(memberId, cancellationToken));
+
+        return new MemberDetailResponse(data.Member, balance, data.PendingPayments, data.Transactions, pending);
     }
 }

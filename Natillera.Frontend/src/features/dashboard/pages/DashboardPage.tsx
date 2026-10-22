@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { getDashboardSummary, type DashboardSummary } from '@/features/dashboard/api/dashboardApi'
+import { PendingObligationsCard } from '@/features/members/components/PendingObligationsCard'
+import { hasPendingObligations } from '@/features/members/model/pendingObligations'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
+import { cell, cellAmount, cellFirst, cellLast, tableScroll } from '@/shared/ui/tableStyles'
 
 const signed = (amount: number) => `${amount < 0 ? '−' : '+'}${formatCurrency(Math.abs(amount))}`
 const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CO')
@@ -32,19 +35,21 @@ export function DashboardPage() {
   const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
   const rowClass = 'flex justify-between border-t border-[#eef4f0] pt-2'
 
-  return <div className="p-6 lg:p-8 max-w-5xl">
+  return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
     <div className="mb-7">
       <h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">{isAdmin ? 'Resumen de la natillera' : 'Mi resumen'}</h1>
       <p className="text-[#4e7460] text-sm">{isAdmin ? 'Cuánto dinero hay y cómo se mueve' : 'Cuánto hay en la natillera y cuánto llevas ahorrado'}</p>
     </div>
     {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
-    {!isAdmin && !loading && (summary?.pendingPayments ?? 0) > 0 && <p role="status" className="mb-4 rounded-lg border border-[#f3dc9a] bg-[#fef6dc] px-3 py-2.5 text-sm text-[#9a6e00]">{summary!.pendingPayments === 1 ? 'Tienes 1 cuota pendiente.' : `Tienes ${summary!.pendingPayments} cuotas pendientes.`}</p>}
+    {!isAdmin && !loading && summary?.pendingObligations && hasPendingObligations(summary.pendingObligations) && <section aria-labelledby="dashboard-pending-title" className="mb-4 rounded-xl border border-[#f3dc9a] bg-[#fef6dc] p-5">
+      <PendingObligationsCard obligations={summary.pendingObligations} audience="member" titleId="dashboard-pending-title" />
+    </section>}
     {!error && <div className="flex flex-col gap-4 lg:gap-5">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <section aria-labelledby="available-title" aria-busy={loading} className="rounded-xl p-5 lg:p-6 text-white lg:col-span-3" style={{ background: '#0c5c38' }}>
           <h2 id="available-title" className="text-sm font-medium text-[#cfe8da]">Dinero disponible</h2>
           <p className="mono font-bold text-3xl md:text-4xl mt-2 break-words">
-            {loading ? '—' : available < 0 ? <><span>−</span><span className="bg-[#fde8e4] text-[#c0392b] px-2 rounded">{formatCurrency(Math.abs(available))}</span></> : formatCurrency(available)}
+            {loading ? '—' : available < 0 ? `−${formatCurrency(Math.abs(available))}` : formatCurrency(available)}
           </p>
           <p className="text-sm text-[#cfe8da] mt-2">Lo que hay hoy en caja para prestar o invertir. No incluye lo prestado ni lo invertido en actividades.</p>
           {isAdmin && !loading && <div className="border-t border-white/20 mt-4 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -103,11 +108,11 @@ export function DashboardPage() {
         </div>
         {loading ? <p className="px-5 py-10 text-center text-sm text-[#4e7460]">Cargando movimientos...</p>
           : transactions.length === 0 ? <p className="px-5 py-10 text-center text-sm text-[#4e7460]">Aún no hay movimientos registrados</p>
-          : <table className="w-full text-sm"><tbody>{transactions.map(transaction => <tr key={transaction.id} className="table-row">
-            <td className="px-5 py-2.5 mono text-xs text-[#4e7460] whitespace-nowrap hidden sm:table-cell">{formatDate(transaction.occurredAt)}</td>
-            <td className="px-3 sm:px-5 py-2.5 w-full sm:w-auto max-w-0 sm:max-w-none"><p className="text-[#0c1a12] truncate sm:max-w-[260px]">{transaction.description}</p><p className="text-xs text-[#4e7460] truncate"><span className="sm:hidden">{formatDate(transaction.occurredAt)}{transaction.memberName ? ' · ' : ''}</span>{transaction.memberName}</p></td>
-            <td className={`px-3 sm:px-5 py-2.5 text-right mono font-semibold whitespace-nowrap ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{signed(transaction.direction === 'Expense' ? -transaction.amount : transaction.amount)}</td>
-          </tr>)}</tbody></table>}
+          : <div className={tableScroll}><table className="w-full text-sm"><tbody>{transactions.map(transaction => <tr key={transaction.id} className="table-row">
+            <td className={`${cellFirst} py-2.5 mono text-xs text-[#4e7460] whitespace-nowrap hidden sm:table-cell`}>{formatDate(transaction.occurredAt)}</td>
+            <td className={`${cell} sm:px-4 py-2.5 w-full sm:w-auto max-w-0 sm:max-w-none`}><Link to={`/transactions/${transaction.id}`} className="block text-[#0c1a12] truncate sm:max-w-[260px] hover:underline focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{transaction.description}</Link><p className="text-xs text-[#4e7460] truncate"><span className="sm:hidden">{formatDate(transaction.occurredAt)}{transaction.memberName ? ' · ' : ''}</span>{transaction.memberName}</p></td>
+            <td className={`${cellLast} py-2.5 ${cellAmount} font-semibold ${transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{signed(transaction.direction === 'Expense' ? -transaction.amount : transaction.amount)}</td>
+          </tr>)}</tbody></table></div>}
       </section>
     </div>}
   </div>

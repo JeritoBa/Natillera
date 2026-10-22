@@ -7,13 +7,13 @@ import type { ActivityAssignmentResponse, ActivityDetail, ActivityListItem } fro
 import type { DashboardSummary, DashboardTransaction, TopSeller } from '@/features/dashboard/api/dashboardApi'
 import type { InterestPaymentResponse, LoanDetail, LoanListItem, LoanPaymentResponse } from '@/features/loans/api/loansApi'
 import type { LogDetail, LogEntitySummary, LogListItem } from '@/features/audit/api/logsApi'
-import type { MemberDetail, MemberPendingPayment } from '@/features/members/api/membersApi'
+import type { MemberDetail, MemberPendingPayment, PendingObligations } from '@/features/members/api/membersApi'
 import type { Member } from '@/features/members/model/memberTypes'
 import type { MonthlyPaymentResponse, MonthlyPaymentStatus } from '@/features/monthlyPayments/api/monthlyPaymentsApi'
 import type { RealTransaction, TransactionDetail, TransactionSourceDetail } from '@/features/transactions/api/transactionsApi'
 
-export type DemoTransaction = RealTransaction & { isCancelled: boolean }
-export type DemoTransactionDetail = TransactionDetail & { isCancelled: boolean }
+export type DemoTransaction = RealTransaction
+export type DemoTransactionDetail = TransactionDetail
 
 export interface DemoFixtures {
   adminUser: AuthUser
@@ -51,16 +51,18 @@ interface MemberSeed {
   isActive: boolean
   // Literal figures from the real rules (DASH-04..09); the DEMO-06 test recomputes them.
   balance: { savings: number; activityEarnings: number; performanceEarnings: number; total: number }
+  // Literal pending amounts per kind (MEM-10); the DEMO-06 test recomputes them from the entities.
+  pending: { total: number; monthlyPayments: number; loans: number; interests: number; activitySales: number }
 }
 
 // Same order as GET /api/members: last name, then first name.
 const memberSeeds: MemberSeed[] = [
-  { key: 'laura', id: guid(11), firstName: 'Laura', lastName: 'Gómez', email: 'laura.gomez@example.com', phone: '3001110011', isActive: true, balance: { savings: 150000, activityEarnings: 40000, performanceEarnings: 2000, total: 192000 } },
-  { key: 'andres', id: guid(12), firstName: 'Andrés', lastName: 'Mejía', email: 'andres.mejia@example.com', phone: '3001110012', isActive: true, balance: { savings: 150000, activityEarnings: 0, performanceEarnings: 2000, total: 152000 } },
-  { key: 'carlos', id: guid(13), firstName: 'Carlos', lastName: 'Pérez', email: 'carlos.perez@example.com', phone: '3001110013', isActive: true, balance: { savings: 200000, activityEarnings: 0, performanceEarnings: 2000, total: 202000 } },
-  { key: 'sofia', id: guid(14), firstName: 'Sofía', lastName: 'Restrepo', email: 'sofia.restrepo@example.com', phone: '3001110014', isActive: true, balance: { savings: 200000, activityEarnings: 32000, performanceEarnings: 2000, total: 234000 } },
-  { key: 'diana', id: guid(15), firstName: 'Diana', lastName: 'Ríos', email: 'diana.rios@example.com', phone: '3001110015', isActive: true, balance: { savings: 200000, activityEarnings: 48000, performanceEarnings: 2000, total: 250000 } },
-  { key: 'julian', id: guid(16), firstName: 'Julián', lastName: 'Torres', email: 'julian.torres@example.com', phone: '3001110016', isActive: false, balance: { savings: 50000, activityEarnings: 0, performanceEarnings: 2000, total: 52000 } },
+  { key: 'laura', id: guid(11), firstName: 'Laura', lastName: 'Gómez', email: 'laura.gomez@example.com', phone: '3001110011', isActive: true, balance: { savings: 150000, activityEarnings: 40000, performanceEarnings: 2000, total: 192000 }, pending: { total: 50000, monthlyPayments: 50000, loans: 0, interests: 0, activitySales: 0 } },
+  { key: 'andres', id: guid(12), firstName: 'Andrés', lastName: 'Mejía', email: 'andres.mejia@example.com', phone: '3001110012', isActive: true, balance: { savings: 150000, activityEarnings: 0, performanceEarnings: 2000, total: 152000 }, pending: { total: 50000, monthlyPayments: 50000, loans: 0, interests: 0, activitySales: 0 } },
+  { key: 'carlos', id: guid(13), firstName: 'Carlos', lastName: 'Pérez', email: 'carlos.perez@example.com', phone: '3001110013', isActive: true, balance: { savings: 200000, activityEarnings: 0, performanceEarnings: 2000, total: 202000 }, pending: { total: 204000, monthlyPayments: 0, loans: 200000, interests: 4000, activitySales: 0 } },
+  { key: 'sofia', id: guid(14), firstName: 'Sofía', lastName: 'Restrepo', email: 'sofia.restrepo@example.com', phone: '3001110014', isActive: true, balance: { savings: 200000, activityEarnings: 32000, performanceEarnings: 2000, total: 234000 }, pending: { total: 80000, monthlyPayments: 0, loans: 0, interests: 0, activitySales: 80000 } },
+  { key: 'diana', id: guid(15), firstName: 'Diana', lastName: 'Ríos', email: 'diana.rios@example.com', phone: '3001110015', isActive: true, balance: { savings: 200000, activityEarnings: 48000, performanceEarnings: 2000, total: 250000 }, pending: { total: 0, monthlyPayments: 0, loans: 0, interests: 0, activitySales: 0 } },
+  { key: 'julian', id: guid(16), firstName: 'Julián', lastName: 'Torres', email: 'julian.torres@example.com', phone: '3001110016', isActive: false, balance: { savings: 50000, activityEarnings: 0, performanceEarnings: 2000, total: 52000 }, pending: { total: 0, monthlyPayments: 0, loans: 0, interests: 0, activitySales: 0 } },
 ]
 
 const seedByKey = Object.fromEntries(memberSeeds.map(seed => [seed.key, seed])) as Record<MemberKey, MemberSeed>
@@ -332,6 +334,35 @@ export function buildDemoFixtures(now: Date): DemoFixtures {
       .filter(payment => payment.userId === seed.id && payment.status === 'Pending')
       .sort((a, b) => a.year - b.year || a.month - b.month)
       .map(payment => ({ id: payment.id, year: payment.year, month: payment.month, amount: payment.amount, status: payment.status, createdAt: pendingSortKey, transactionId: payment.transactionId }))
+    // Items are existing entities filtered like the backend (MEM-10); amounts are the literals in the seed.
+    const pendingObligations: PendingObligations = {
+      total: seed.pending.total,
+      monthlyPayments: {
+        count: pendingPayments.length, amount: seed.pending.monthlyPayments,
+        items: pendingPayments.map(payment => ({ id: payment.id, year: payment.year, month: payment.month, amount: payment.amount })),
+      },
+      loans: (() => {
+        const items = Object.values(loanDetails)
+          .filter(loan => loan.borrowerId === seed.id && loan.status === 'Active' && loan.summary.outstandingPrincipal > 0)
+          .map(loan => ({ id: loan.id, startDate: loan.startDate, initialAmount: loan.initialAmount, outstandingPrincipal: loan.summary.outstandingPrincipal }))
+        return { count: items.length, amount: seed.pending.loans, items }
+      })(),
+      interests: (() => {
+        const items = Object.values(loanDetails)
+          .filter(loan => loan.borrowerId === seed.id)
+          .flatMap(loan => loan.interestPayments)
+          .filter(interest => interest.status === 'Pending')
+          .map(interest => ({ id: interest.id, loanId: interest.loanId, createdAt: interest.createdAt, amount: interest.amount }))
+        return { count: items.length, amount: seed.pending.interests, items }
+      })(),
+      activitySales: (() => {
+        const items = Object.values(activityDetails)
+          .flatMap(activity => activity.assignments.map(item => ({ activity, item })))
+          .filter(({ item }) => item.userId === seed.id && item.status === 'Pending')
+          .map(({ activity, item }) => ({ id: item.id, activityId: activity.id, activityName: activity.name, quantity: item.quantityAssigned, salePrice: activity.unitSalePrice, amount: item.saleAmount }))
+        return { count: items.length, amount: seed.pending.activitySales, items }
+      })(),
+    }
     const own = txRecords
       .filter(record => record.owner === seed.key && !record.tx.isCancelled)
       .sort((a, b) => a.tx.occurredAt.localeCompare(b.tx.occurredAt))
@@ -341,6 +372,7 @@ export function buildDemoFixtures(now: Date): DemoFixtures {
       balance: seed.balance,
       pendingPayments,
       transactions: own,
+      pendingObligations,
     }
     return [seed.id, detail]
   }))
@@ -356,11 +388,13 @@ export function buildDemoFixtures(now: Date): DemoFixtures {
     role: 'Admin', availableMoney: 740000, totalNatilleraBalance: 988000, lentMoney: 200000, pendingActivitiesInvestment: 48000,
     mySavings: null, myEarnings: null, pendingPayments: null, recentTransactions, topSellers, myPaidMonthlyPayments: null,
     loanInterestEarned: 10000, activityEarnings: 88000, myActivityEarnings: null, myPerformanceShare: null,
+    pendingObligations: null,
   }
   const memberSummary: DashboardSummary = {
     role: 'Member', availableMoney: 740000, totalNatilleraBalance: null, lentMoney: null, pendingActivitiesInvestment: null,
     mySavings: 192000, myEarnings: 42000, pendingPayments: 1, recentTransactions, topSellers, myPaidMonthlyPayments: 150000,
     loanInterestEarned: null, activityEarnings: null, myActivityEarnings: 40000, myPerformanceShare: 2000,
+    pendingObligations: memberDetails[seedByKey[DEMO_MEMBER].id].pendingObligations,
   }
 
   return {
