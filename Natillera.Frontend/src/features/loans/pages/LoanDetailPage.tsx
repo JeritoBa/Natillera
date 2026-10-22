@@ -175,6 +175,8 @@ export function LoanDetailPage() {
     ['Intereses pendientes', formatCurrency(summary.outstandingInterest), summary.pendingInterestCount > 0 ? `${summary.pendingInterestCount} intereses sin pagar` : 'Nada pendiente'],
     ['Total pagado', formatCurrency(summary.totalPaid), 'Capital + intereses pagados'],
   ]
+  // Same condition as the loans list edit button (LOAN-07).
+  const canEditDescription = canManage && loan.status === 'Active' && summary.outstandingPrincipal === loan.initialAmount
   const paymentConfirm = (payment: LoanPaymentResponse) => `¿Anular el abono de ${formatCurrency(payment.amount)} del ${shortDate(payment.paidAt)}? El abono y su ingreso quedarán anulados y el capital pendiente aumentará.`
   const interestConfirm = (interest: InterestPaymentResponse) => interest.status === 'Paid'
     ? `¿Anular el interés pagado «${interest.description}»? El interés y su ingreso quedarán anulados.`
@@ -207,6 +209,16 @@ export function LoanDetailPage() {
             </div>)}
           </dl>
         </section>
+
+        {(loan.description || canManage) && <section aria-labelledby="loan-description-title" className="rounded-xl overflow-hidden md:col-span-2" style={cardStyle}>
+          <div className="px-5 py-3 border-b" style={{ borderColor: '#eef4f0' }}><h2 id="loan-description-title" className="text-sm font-semibold text-[#0c1a12]">Descripción</h2></div>
+          {loan.description
+            ? <p className="px-5 py-4 text-sm sm:text-[15px] leading-7 text-[#0c1a12] whitespace-pre-line break-words [overflow-wrap:anywhere] max-w-prose">{loan.description}</p>
+            : <div className="px-5 py-4 text-sm text-[#4e7460]">
+              <p className="italic">Sin descripción.</p>
+              {canEditDescription && <p className="mt-1">Puedes agregarla desde «Editar préstamo» en la lista de préstamos.</p>}
+            </div>}
+        </section>}
 
         <section aria-labelledby="loan-capital-title" className="rounded-xl p-5" style={cardStyle}>
           <h2 id="loan-capital-title" className="text-sm font-semibold text-[#0c1a12]">Capital</h2>
