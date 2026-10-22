@@ -30,7 +30,8 @@ One spec per feature. Specs describe **what the system must do** (behavior, rule
 | 014 | [Public demo](014-public-demo.md) | Implemented | DEMO-01..06 |
 | 015 | [Form and list UX fixes](015-form-and-list-ux.md) | Implemented | MP-10 (UI conventions in the spec) |
 | 016 | [Member pending obligations](016-member-pending-obligations.md) | Implemented | MEM-10, DASH-11, DASH-07 |
-| 017 | [Pending obligations redesign, list filters and responsive tables](017-pending-obligations-filters-responsive.md) | Approved | MEM-10, DASH-11, MP-09, UI-01, UI-02, UI-06, TX-01, FIN-06 |
+| 017 | [Pending obligations redesign, list filters and responsive tables](017-pending-obligations-filters-responsive.md) | Implemented | MEM-10, DASH-11, MP-09, UI-01, UI-02, UI-06, TX-01, FIN-06 |
+| 018 | [Saving periods](018-saving-periods.md) | Approved | PER-01..08, MP-11, MP-02, MP-04, MP-10, FIN-09, FIN-13 |
 
 Not specified because not implemented: in-app payments, member loan requests/approval workflow, payment reminders beyond the dashboard notice.
 

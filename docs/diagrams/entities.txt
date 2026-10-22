@@ -15,6 +15,9 @@ Important:
 - Foreign keys use ON DELETE RESTRICT: nothing is physically deleted. "Deleting" = status Cancelled
 - Rule: every business entity that moves money has exactly ONE Transaction (1:1, unique transaction_id).
   Pending items have NO Transaction until they are paid (transaction_id is POSSIBLE NULL there).
+- [018] Lines marked [018] are the target model of spec 018 (saving periods), not built yet.
+  Every root entity belongs to one SavingPeriod (required FK); children belong to their parent's period.
+  Every balance, list and guard is computed within one period (rule PER-06).
 
 User
 - id
@@ -27,6 +30,13 @@ User
 - is_active BOOL DEFAULT true
 - created_at DATETIME (UTC, set by the domain)
 - updated_at DATETIME POSSIBLE NULL
+
+[018] SavingPeriod (one year of the natillera; created only by the developer with one migration per year)
+- id
+- year INT UNIQUE
+  Roots with saving_period_id: MonthlyPayment, Loan, Activity, Transaction, Log.
+  Children without own column (parent's period): LoanPayment, Performance -> Loan; ActivityAssignment -> Activity.
+  User has no period.
 
 Technical Entities
 
@@ -44,6 +54,7 @@ Transaction
 - occurred_at DATETIME
 - description VARCHAR(200)
 - is_cancelled BOOL DEFAULT false (a cancelled transaction is excluded from every balance but stays visible)
+- [018] saving_period_id FK WITH SavingPeriod (the period of its source entity; for a child, the parent's period)
 
 Log (immutable audit record; one per create/update/cancel, written in the same DB transaction as the change)
 - id
@@ -55,6 +66,7 @@ Log (immutable audit record; one per create/update/cancel, written in the same D
 - old_value DECIMAL POSSIBLE NULL
 - new_value DECIMAL POSSIBLE NULL
 - user_id FK WITH User (the user who performed the operation, from the JWT)
+- [018] saving_period_id FK WITH SavingPeriod (the period of the audited entity; for a child, the parent's period)
 
 Business Entities
 
@@ -70,6 +82,7 @@ Activity
     Finished/Pending is automatic: Finished only when ALL units are assigned and every non-cancelled assignment is Paid.
 - created_at DATETIME
 - transaction_id FK WITH Transaction (UNIQUE; Expense created together with the activity)
+- [018] saving_period_id FK WITH SavingPeriod (start_date must fall inside the period's year)
 
 ActivityAssignment (replaces the planned ActivitySale entity: the assignment is the sale record)
 - id
@@ -94,6 +107,7 @@ Loan
 - updated_at DATETIME POSSIBLE NULL
 - borrower_id FK WITH User
 - transaction_id FK WITH Transaction (UNIQUE; Expense created together with the loan)
+- [018] saving_period_id FK WITH SavingPeriod (start_date must fall inside the period's year)
 
 LoanPayment (principal payment)
 - id
@@ -118,8 +132,9 @@ MonthlyPayment
 - id
 - amount DECIMAL (> 0 and >= NATILLERA_MIN_MONTHLY_PAYMENT)
 - paid_at DATETIME POSSIBLE NULL
-- year INT (>= 1)
+- year INT (>= 1)   [018] REMOVED: the fee's year is its period's year
 - month INT (1-12)
+- [018] saving_period_id FK WITH SavingPeriod
 - status ENUM('Pending', 'Paid', 'Cancelled')   (created as Pending or Paid; entity default is Pending)
 - created_at DATETIME
 - transaction_id FK WITH Transaction POSSIBLE NULL (UNIQUE; Income created when marked Paid)
@@ -128,6 +143,7 @@ MonthlyPayment
 Derived values (never stored)
 - Loan outstanding principal = initial_amount - SUM(non-cancelled LoanPayment.amount)
 - Available money = SUM(Income) - SUM(Expense) over non-cancelled transactions
+  [018] of one saving period (nothing carries over between periods)
 - Member savings / earnings: see docs/business-rules.md (DASH-04, DASH-05, DASH-06)
 
 Not in the model (not implemented): ActivitySale, in-app payment records, loan requests/approvals,
@@ -136,6 +152,9 @@ RowVersion concurrency tokens (planned, rule FIN-11).
 Indexes (as created by the migrations / configurations):
 - User.email UNIQUE
 - MonthlyPayment(user_id, year, month) UNIQUE WHERE status <> 'Cancelled'   (partial index)
+  [018] becomes MonthlyPayment(user_id, saving_period_id, month) UNIQUE WHERE status <> 'Cancelled'
+- [018] SavingPeriod.year UNIQUE
+- [018] saving_period_id on MonthlyPayment, Loan, Activity, Transaction, Log
 - MonthlyPayment.transaction_id UNIQUE
 - Loan.transaction_id UNIQUE
 - LoanPayment.loan_id

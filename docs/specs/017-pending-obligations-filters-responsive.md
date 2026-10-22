@@ -1,6 +1,6 @@
 # 017 - Pending obligations redesign, list filters and responsive tables
 
-- **Status:** Approved (2026-10-21)
+- **Status:** Implemented (2026-10-21)
 - **Owner decision date / reference:** 2026-10-21 (ux-designer spec reviewed by the owner; one commit per task)
 - **Related rules:** MEM-10, DASH-11 (presentation only), MP-09, UI-01, UI-02, UI-06, TX-01, FIN-06
 
