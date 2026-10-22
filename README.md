@@ -47,6 +47,13 @@
 
 > **This is not an open-source project.** The source code is private property of its owner and is shared here only to describe what the application is, how it works and how it is built. No license is granted to use, copy, modify or distribute it. All rights reserved.
 
+## Latest version: v1.0.1
+
+- **Pending obligations:** the member detail page and the member dashboard show everything a member still owes (fees, loan principal, interest and activity sales), grouped by kind and linked to each record.
+- **Filters:** monthly fees by member, month and status; loans by borrower and status; members by name and status; transactions by type and month.
+- **Fixes:** cancelled transactions are no longer counted in the income and expense totals, and they show as "Anulado"; the fee form offers only the months a member has not paid yet.
+- **Mobile, tablet and desktop:** one consistent table layout and centred stat cards, so every list stays readable on any screen; forms can be submitted with Enter.
+
 ## Take a look
 
 The application is live at **[natillera-web.onrender.com](https://natillera-web.onrender.com)**. Anyone can visit the public landing page to learn what a natillera is, how a month works and what members see when they log in (all example figures there are fictitious). Want to join? Use the **"Quiero unirme"** button to write to the natillera on WhatsApp.
