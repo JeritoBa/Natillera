@@ -226,6 +226,7 @@ Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, A
 ### Pending changes
 
 - **Saving periods (spec 018, branch `v1.1.0`) change the logical structure of the app.** Every root entity (`MonthlyPayment`, `Loan`, `Activity`, `Transaction`, `Log`) belongs to one saving period (year); children follow their parent. Every balance, list and guard is computed **within the selected period**, nothing carries over between years (PER-06), and period-scoped requests carry `X-Saving-Id` (PER-04). New periods are added by the developer with one migration per year (PER-01). Read the PER rules before touching any balance, list or guard.
+- **Activity extra costs (spec 020, branch `v1.1.0`) change how members' earnings are computed:** the interest share divides the period's shared interest pool = Paid interest - Paid extra costs (DASH-12), guarded by FIN-14.
 - **MP-09 has no automated test:** list visibility (Admin sees all statuses, a Member sees only `Paid` payments) is enforced in `MonthlyPaymentsController.Get` -> `MonthlyPaymentRepository.GetOrderedAsync(includeNonPaid)` with no test. Add a test (likely as part of the integration tests, since it lives in the controller/repository).
 
 ### Other open items
