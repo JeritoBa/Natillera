@@ -124,7 +124,8 @@ export function MonthlyPaymentsPage() {
   const effectiveMonth = filterMonth !== 'all' && monthOptions.some(option => option.key === filterMonth) ? filterMonth : 'all'
   const effectiveStatus = isAdmin ? filterStatus : 'all'
   const filtered = filterPayments(payments, effectiveMember, effectiveMonth, effectiveStatus)
-  const statusCounts = countPaymentsByStatus(payments)
+  // The status buttons count the fees left by the member and month filters.
+  const statusCounts = countPaymentsByStatus(filterPayments(payments, effectiveMember, effectiveMonth))
   const hasFilters = effectiveMember !== 'all' || effectiveMonth !== 'all' || effectiveStatus !== 'all'
   const clearFilters = () => { setFilterMember('all'); setFilterMonth('all'); setFilterStatus('all') }
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`

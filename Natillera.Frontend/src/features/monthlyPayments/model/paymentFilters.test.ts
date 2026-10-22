@@ -30,6 +30,11 @@ describe('payment filters (MP-09, UI-06)', () => {
     expect(countPaymentsByStatus(payments)).toEqual({ all: 4, pending: 1, paid: 2, cancelled: 1 })
   })
 
+  it('counts by status within the member and month filters', () => {
+    expect(countPaymentsByStatus(filterPayments(payments, 'u1', 'all'))).toEqual({ all: 2, pending: 1, paid: 0, cancelled: 1 })
+    expect(countPaymentsByStatus(filterPayments(payments, 'all', '2026-10'))).toEqual({ all: 2, pending: 1, paid: 1, cancelled: 0 })
+  })
+
   it('lists members A-Z and months newest first, with counts', () => {
     expect(paymentMemberOptions(payments)).toEqual([{ id: 'u2', name: 'Ana Gallego', count: 2 }, { id: 'u1', name: 'Luis Gálvez', count: 2 }])
     expect(paymentMonthOptions(payments)).toEqual([{ key: '2026-10', count: 2 }, { key: '2026-09', count: 1 }, { key: '2025-12', count: 1 }])
