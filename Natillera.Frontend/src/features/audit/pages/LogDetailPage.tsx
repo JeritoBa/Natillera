@@ -23,7 +23,7 @@ export function LogDetailPage() {
     const load = async () => {
       try { setLog(await getLogDetail(session.accessToken, id)) }
       catch (requestError) {
-        setError(requestError instanceof ApiError && requestError.status === 404 ? 'No se encontró el log solicitado.' : getFriendlyApiError(requestError))
+        setError(requestError instanceof ApiError && requestError.status === 404 ? 'No se encontró el log solicitado. Puede pertenecer a otro periodo.' : getFriendlyApiError(requestError))
       }
     }
     void load()

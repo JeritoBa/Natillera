@@ -1,4 +1,4 @@
-export type Page = 'landing' | 'auth' | 'dashboard' | 'members' | 'loans' | 'activities' | 'payments' | 'transactions' | 'logs'
+export type Page = 'landing' | 'auth' | 'dashboard' | 'members' | 'loans' | 'activities' | 'payments' | 'transactions' | 'logs' | 'settings'
 
 export interface Transaction {
   id: number

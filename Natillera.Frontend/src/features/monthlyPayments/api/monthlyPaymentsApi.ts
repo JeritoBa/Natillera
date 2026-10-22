@@ -4,7 +4,6 @@ export type MonthlyPaymentStatus = 'Pending' | 'Paid' | 'Cancelled'
 
 export interface CreateMonthlyPaymentRequest {
   userId: string
-  year: number
   month: number
   amount: number
   status: 'Pending' | 'Paid'

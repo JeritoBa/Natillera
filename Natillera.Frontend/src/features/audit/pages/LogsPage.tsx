@@ -2,6 +2,7 @@ import { Icon } from '@/shared/ui/Icon'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { getLogs, type LogAction, type LogEntityType, type LogListItem } from '@/features/audit/api/logsApi'
 import { actionBackground, actionColor, actionLabel, actions, entityBackground, entityColor, entityLabel, entityTypes } from '@/features/audit/model/labels'
 import { getFriendlyApiError } from '@/shared/api/apiError'
@@ -13,6 +14,7 @@ const money = (value: number | null) => value === null ? '—' : formatCurrency(
 
 export function LogsPage() {
   const { session } = useAuth()
+  const { selected } = useSavingPeriod()
   const navigate = useNavigate()
   const [logs, setLogs] = useState<LogListItem[]>([])
   const [entity, setEntity] = useState<LogEntityType | 'all'>('all')
@@ -58,7 +60,7 @@ export function LogsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
-      <div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Logs</h1><p className="text-[#4e7460] text-sm">Historial de auditoría de operaciones financieras</p></div>
+      <div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Logs</h1><p className="text-[#4e7460] text-sm">Historial de auditoría de operaciones financieras{selected ? ` · Periodo ${selected.year}` : ''}</p></div>
       <div className="rounded-xl p-4 mb-4 space-y-3" style={{ background: '#fff', border: '1px solid #d6e8dc' }}>
         <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar por usuario, entidad, acción, id o monto" className="w-full px-3 py-2.5 rounded-lg text-sm" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

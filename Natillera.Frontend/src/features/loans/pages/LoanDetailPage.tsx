@@ -95,7 +95,7 @@ export function LoanDetailPage() {
   if (notFound) return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">{back}
     <div role="alert" className="rounded-xl p-8 text-center" style={cardStyle}>
       <h1 className="text-lg font-bold text-[#0c1a12]">No se encontró el préstamo</h1>
-      <p className="text-sm text-[#4e7460]">Puede que el enlace esté incompleto o que el préstamo no exista.</p>
+      <p className="text-sm text-[#4e7460]">Puede que el enlace esté incompleto o que el préstamo no exista. Puede pertenecer a otro periodo.</p>
       <button onClick={() => navigate('/loans')} className="btn-primary px-4 py-2 rounded-lg text-sm mt-4">Ver lista de préstamos</button>
     </div>
   </div>

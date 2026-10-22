@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { getDashboardSummary, type DashboardSummary } from '@/features/dashboard/api/dashboardApi'
 import { PendingObligationsCard } from '@/features/members/components/PendingObligationsCard'
 import { hasPendingObligations } from '@/features/members/model/pendingObligations'
@@ -13,6 +14,7 @@ const formatDate = (value: string) => new Date(value).toLocaleDateString('es-CO'
 
 export function DashboardPage() {
   const { session } = useAuth()
+  const { selected } = useSavingPeriod()
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -38,7 +40,7 @@ export function DashboardPage() {
   return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
     <div className="mb-7">
       <h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">{isAdmin ? 'Resumen de la natillera' : 'Mi resumen'}</h1>
-      <p className="text-[#4e7460] text-sm">{isAdmin ? 'Cuánto dinero hay y cómo se mueve' : 'Cuánto hay en la natillera y cuánto llevas ahorrado'}</p>
+      <p className="text-[#4e7460] text-sm">{isAdmin ? 'Cuánto dinero hay y cómo se mueve' : 'Cuánto hay en la natillera y cuánto llevas ahorrado'}{selected ? ` · Periodo ${selected.year}` : ''}</p>
     </div>
     {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
     {!isAdmin && !loading && summary?.pendingObligations && hasPendingObligations(summary.pendingObligations) && <section aria-labelledby="dashboard-pending-title" className="mb-4 rounded-xl border border-[#f3dc9a] bg-[#fef6dc] p-5">

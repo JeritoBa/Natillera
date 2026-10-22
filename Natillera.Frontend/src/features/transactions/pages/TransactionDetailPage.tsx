@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { getTransactionDetail, type TransactionDetail } from '@/features/transactions/api/transactionsApi'
-import { getFriendlyApiError } from '@/shared/api/apiError'
+import { ApiError, getFriendlyApiError } from '@/shared/api/apiError'
 import { typeBackground, typeColor, typeLabel } from '@/features/transactions/model/labels'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
@@ -18,7 +18,7 @@ export function TransactionDetailPage() {
     if (!session || !id) return
     const load = async () => {
       try { setTransaction(await getTransactionDetail(session.accessToken, id)) }
-      catch (requestError) { setError(getFriendlyApiError(requestError)) }
+      catch (requestError) { setError(requestError instanceof ApiError && requestError.status === 404 ? `${getFriendlyApiError(requestError)} Puede pertenecer a otro periodo.` : getFriendlyApiError(requestError)) }
     }
     void load()
   }, [id, session])
