@@ -9,15 +9,16 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
     public Task AddAsync(Transaction transaction, CancellationToken cancellationToken = default) =>
         dbContext.Transactions.AddAsync(transaction, cancellationToken).AsTask();
 
-    public async Task<decimal> GetAvailableMoneyAsync(CancellationToken cancellationToken = default) =>
+    public async Task<decimal> GetAvailableMoneyAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         await dbContext.Transactions
-            .Where(transaction => !transaction.IsCancelled)
+            .Where(transaction => transaction.SavingPeriodId == savingPeriodId && !transaction.IsCancelled)
             .Select(transaction => transaction.Direction == Domain.Enums.TransactionDirection.Income ? transaction.Amount : -transaction.Amount)
             .SumAsync(cancellationToken);
 
-    public async Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(Guid savingPeriodId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Transactions
+            .Where(transaction => transaction.SavingPeriodId == savingPeriodId)
             .OrderByDescending(transaction => transaction.OccurredAt)
             .Select(transaction => new TransactionListItem(
                 transaction.Id,
@@ -50,9 +51,9 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<TransactionDetailResponse?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<TransactionDetailResponse?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default)
     {
-        var transaction = await dbContext.Transactions.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        var transaction = await dbContext.Transactions.SingleOrDefaultAsync(item => item.Id == id && item.SavingPeriodId == savingPeriodId, cancellationToken);
         if (transaction is null) return null;
 
         return transaction.Type switch

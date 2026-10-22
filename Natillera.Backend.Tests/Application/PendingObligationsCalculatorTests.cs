@@ -1,6 +1,7 @@
 using Natillera.Backend.Application.Dashboard;
 using Natillera.Backend.Application.Users;
 using Natillera.Backend.Domain.Enums;
+using Natillera.Backend.Tests.Fakes;
 
 namespace Natillera.Backend.Tests.Application;
 
@@ -182,7 +183,7 @@ public class DashboardServiceTests
 {
     private sealed class StubDashboardRepo(DashboardSummaryResponse summary) : IDashboardRepository
     {
-        public Task<DashboardSummaryResponse> GetSummaryAsync(Guid userId, string role, CancellationToken cancellationToken = default) =>
+        public Task<DashboardSummaryResponse> GetSummaryAsync(Guid userId, string role, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
             Task.FromResult(summary);
     }
 
@@ -190,7 +191,7 @@ public class DashboardServiceTests
     {
         public int Calls { get; private set; }
 
-        public Task<PendingObligationsData> GetDataAsync(Guid memberId, CancellationToken cancellationToken = default)
+        public Task<PendingObligationsData> GetDataAsync(Guid memberId, Guid savingPeriodId, CancellationToken cancellationToken = default)
         {
             Calls++;
             return Task.FromResult(data);
@@ -209,7 +210,7 @@ public class DashboardServiceTests
         var pending = new StubPendingRepo(OneFee());
         var service = new DashboardService(new StubDashboardRepo(Summary("Member")), pending);
 
-        var result = await service.GetSummaryAsync(Guid.NewGuid(), "Member", default);
+        var result = await service.GetSummaryAsync(Guid.NewGuid(), "Member", TestPeriods.Y2026, default);
 
         Assert.Equal(30000m, result.PendingObligations!.Total);
         Assert.Equal(1, result.PendingPayments);
@@ -222,7 +223,7 @@ public class DashboardServiceTests
         var pending = new StubPendingRepo(OneFee());
         var service = new DashboardService(new StubDashboardRepo(Summary("Admin")), pending);
 
-        var result = await service.GetSummaryAsync(Guid.NewGuid(), "Admin", default);
+        var result = await service.GetSummaryAsync(Guid.NewGuid(), "Admin", TestPeriods.Y2026, default);
 
         Assert.Null(result.PendingObligations);
         Assert.Equal(0, pending.Calls);

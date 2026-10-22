@@ -3,6 +3,7 @@ using Natillera.Backend.Application.Audit;
 using Natillera.Backend.Application.Common;
 using Natillera.Backend.Application.Loans;
 using Natillera.Backend.Application.MonthlyPayments;
+using Natillera.Backend.Application.SavingPeriods;
 using Natillera.Backend.Application.Security;
 using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Application.Users;
@@ -10,6 +11,24 @@ using Natillera.Backend.Domain.Entities;
 using Natillera.Backend.Domain.Enums;
 
 namespace Natillera.Backend.Tests.Fakes;
+
+/// <summary>Shared saving periods for tests; records default to <see cref="Y2026"/>.</summary>
+public static class TestPeriods
+{
+    public static readonly SavingPeriod Y2025 = new(2025);
+    public static readonly SavingPeriod Y2026 = new(2026);
+}
+
+public sealed class FakeSavingPeriodRepository : ISavingPeriodRepository
+{
+    public List<SavingPeriod> Periods { get; } = [TestPeriods.Y2026, TestPeriods.Y2025];
+
+    public Task<SavingPeriod?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Periods.FirstOrDefault(p => p.Id == id));
+
+    public Task<IReadOnlyCollection<SavingPeriod>> GetAllAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyCollection<SavingPeriod>>(Periods.OrderByDescending(p => p.Year).ToList());
+}
 
 public sealed class FakeUnitOfWork : IUnitOfWork
 {
@@ -32,10 +51,10 @@ public sealed class FakeLogRepository : ILogRepository
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyCollection<LogListItem>> GetAllAsync(CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyCollection<LogListItem>> GetAllAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
-    public Task<LogDetailResponse?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default) =>
+    public Task<LogDetailResponse?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 }
 
@@ -49,25 +68,35 @@ public sealed class FakeTransactionRepository : ITransactionRepository
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
-    public Task<TransactionDetailResponse?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default) =>
+    public Task<TransactionDetailResponse?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
-    public Task<decimal> GetAvailableMoneyAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(Available());
+    public Task<decimal> GetAvailableMoneyAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Available(savingPeriodId));
+
+    private readonly Dictionary<Guid, decimal> _seededCash = [];
 
     /// <summary>Cash that exists outside the recorded transactions, so tests can seed money without extra Transactions.</summary>
-    public decimal SeededCash { get; private set; }
+    public decimal SeededCash => _seededCash.GetValueOrDefault(TestPeriods.Y2026.Id);
 
-    /// <summary>Seeded cash plus non-cancelled Income minus Expense (DASH-01).</summary>
-    public decimal Available() => SeededCash + Transactions
-        .Where(t => !t.IsCancelled)
-        .Sum(t => t.Direction == TransactionDirection.Income ? t.Amount : -t.Amount);
+    /// <summary>Seeded cash plus non-cancelled Income minus Expense of one period (DASH-01, PER-06). Defaults to 2026.</summary>
+    public decimal Available(Guid? savingPeriodId = null)
+    {
+        var id = savingPeriodId ?? TestPeriods.Y2026.Id;
+        return _seededCash.GetValueOrDefault(id) + Transactions
+            .Where(t => t.SavingPeriodId == id && !t.IsCancelled)
+            .Sum(t => t.Direction == TransactionDirection.Income ? t.Amount : -t.Amount);
+    }
 
-    /// <summary>Sets the seeded cash so that the available money equals <paramref name="target"/>.</summary>
-    public void SetAvailableMoney(decimal target) => SeededCash += target - Available();
+    /// <summary>Sets the seeded cash so that the available money of the period (2026 by default) equals <paramref name="target"/>.</summary>
+    public void SetAvailableMoney(decimal target, Guid? savingPeriodId = null)
+    {
+        var id = savingPeriodId ?? TestPeriods.Y2026.Id;
+        _seededCash[id] = _seededCash.GetValueOrDefault(id) + target - Available(id);
+    }
 }
 
 public sealed class FakeUserRepository : IUserRepository
@@ -123,8 +152,8 @@ public sealed class FakeMonthlyPaymentRepository : IMonthlyPaymentRepository
         Task.FromResult(Payments.Any(p => p.UserId == userId && p.SavingPeriodId == savingPeriodId && p.Month == month
             && p.Status != Natillera.Backend.Domain.Enums.PaymentStatus.Cancelled));
 
-    public Task<MonthlyPayment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Payments.FirstOrDefault(p => p.Id == id));
+    public Task<MonthlyPayment?> GetByIdAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Payments.FirstOrDefault(p => p.Id == id && p.SavingPeriodId == savingPeriodId));
 
     public Task<bool> ExistsForAnotherPaymentAsync(Guid userId, Guid savingPeriodId, int month, Guid paymentId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Payments.Any(p => p.UserId == userId && p.SavingPeriodId == savingPeriodId && p.Month == month && p.Id != paymentId
@@ -136,7 +165,7 @@ public sealed class FakeMonthlyPaymentRepository : IMonthlyPaymentRepository
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyCollection<MonthlyPaymentListItem>> GetOrderedAsync(bool includeNonPaid, CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyCollection<MonthlyPaymentListItem>> GetOrderedAsync(bool includeNonPaid, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 }
 
@@ -146,14 +175,14 @@ public sealed class FakeLoanRepository : ILoanRepository
     public List<LoanPayment> AddedPayments { get; } = [];
     public List<Performance> AddedPerformances { get; } = [];
 
-    public Task<IReadOnlyCollection<LoanListData>> GetListAsync(CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyCollection<LoanListData>> GetListAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
-    public Task<Loan?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Loans.FirstOrDefault(l => l.Id == id));
+    public Task<Loan?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Loans.FirstOrDefault(l => l.Id == id && l.SavingPeriodId == savingPeriodId));
 
-    public Task<Loan?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Loans.FirstOrDefault(l => l.Id == id));
+    public Task<Loan?> GetForUpdateAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Loans.FirstOrDefault(l => l.Id == id && l.SavingPeriodId == savingPeriodId));
 
     public Task AddAsync(Loan loan, CancellationToken cancellationToken = default)
     {
@@ -179,14 +208,14 @@ public sealed class FakeActivityRepository : IActivityRepository
     public List<Activity> Activities { get; } = [];
     public List<ActivityAssignment> AddedAssignments { get; } = [];
 
-    public Task<IReadOnlyCollection<ActivityListData>> GetListAsync(CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyCollection<ActivityListData>> GetListAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
-    public Task<Activity?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Activities.FirstOrDefault(a => a.Id == id));
+    public Task<Activity?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Activities.FirstOrDefault(a => a.Id == id && a.SavingPeriodId == savingPeriodId));
 
-    public Task<Activity?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Activities.FirstOrDefault(a => a.Id == id));
+    public Task<Activity?> GetForUpdateAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Activities.FirstOrDefault(a => a.Id == id && a.SavingPeriodId == savingPeriodId));
 
     public Task AddAsync(Activity activity, CancellationToken cancellationToken = default)
     {

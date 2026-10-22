@@ -1,13 +1,14 @@
 using Natillera.Backend.Domain.Entities;
 using Natillera.Backend.Domain.Enums;
 using Natillera.Backend.Domain.Exceptions;
+using Natillera.Backend.Tests.Fakes;
 
 namespace Natillera.Backend.Tests.Domain;
 
 public class LoanTests
 {
     private static Loan Create(decimal amount = 1000m, decimal rate = 5m) =>
-        new(amount, rate, new DateTime(2025, 1, 15, 13, 45, 0), Guid.NewGuid(), Guid.NewGuid());
+        new(amount, rate, new DateTime(2025, 1, 15, 13, 45, 0), Guid.NewGuid(), Guid.NewGuid(), TestPeriods.Y2025);
 
     [Fact]
     public void Constructor_Valid_IsActiveWithDateOnlyStart()
@@ -327,7 +328,7 @@ public class LoanTests
         var loan = Create();
         var borrower = Guid.NewGuid();
 
-        loan.UpdateDetails(2000m, 3m, new DateTime(2025, 2, 2, 10, 0, 0), borrower);
+        loan.UpdateDetails(2000m, 3m, new DateTime(2025, 2, 2, 10, 0, 0), borrower, TestPeriods.Y2025);
 
         Assert.Equal(2000m, loan.InitialAmount);
         Assert.Equal(3m, loan.InterestRate);
@@ -342,7 +343,7 @@ public class LoanTests
         var loan = Create();
         loan.RegisterPayment(10m, PaymentMethod.Cash, Guid.NewGuid());
 
-        Assert.Throws<DomainException>(() => loan.UpdateDetails(2000m, 3m, DateTime.UtcNow, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => loan.UpdateDetails(2000m, 3m, new DateTime(2025, 6, 1), Guid.NewGuid(), TestPeriods.Y2025));
     }
 
     [Fact]
@@ -351,7 +352,7 @@ public class LoanTests
         var loan = Create();
         loan.Cancel();
 
-        Assert.Throws<DomainException>(() => loan.UpdateDetails(2000m, 3m, DateTime.UtcNow, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => loan.UpdateDetails(2000m, 3m, new DateTime(2025, 6, 1), Guid.NewGuid(), TestPeriods.Y2025));
     }
 
     [Fact]
@@ -359,7 +360,7 @@ public class LoanTests
     {
         var loan = Create();
 
-        Assert.Throws<DomainException>(() => loan.UpdateDetails(0m, 3m, DateTime.UtcNow, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => loan.UpdateDetails(0m, 3m, new DateTime(2025, 6, 1), Guid.NewGuid(), TestPeriods.Y2025));
         Assert.Equal(1000m, loan.InitialAmount);
     }
 }

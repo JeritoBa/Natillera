@@ -1,13 +1,14 @@
 using Natillera.Backend.Domain.Entities;
 using Natillera.Backend.Domain.Enums;
 using Natillera.Backend.Domain.Exceptions;
+using Natillera.Backend.Tests.Fakes;
 
 namespace Natillera.Backend.Tests.Domain;
 
 public class TransactionTests
 {
     private static Transaction Create(decimal amount = 100m) =>
-        new(amount, TransactionDirection.Income, TransactionType.MonthlyPayment, "  Pago  ");
+        new(amount, TransactionDirection.Income, TransactionType.MonthlyPayment, "  Pago  ", Guid.NewGuid());
 
     [Fact]
     public void Constructor_ValidData_SetsFieldsAndTrimsDescription()
@@ -28,7 +29,7 @@ public class TransactionTests
     public void Constructor_ExplicitOccurredAt_UsesIt()
     {
         var at = new DateTime(2025, 3, 1, 0, 0, 0, DateTimeKind.Utc);
-        var t = new Transaction(1m, TransactionDirection.Expense, TransactionType.Loan, "x", at);
+        var t = new Transaction(1m, TransactionDirection.Expense, TransactionType.Loan, "x", Guid.NewGuid(), at);
 
         Assert.Equal(at, t.OccurredAt);
     }
@@ -48,20 +49,20 @@ public class TransactionTests
     public void Constructor_BlankDescription_Throws(string description)
     {
         Assert.Throws<DomainException>(() =>
-            new Transaction(1m, TransactionDirection.Income, TransactionType.Loan, description));
+            new Transaction(1m, TransactionDirection.Income, TransactionType.Loan, description, Guid.NewGuid()));
     }
 
     [Fact]
     public void Constructor_DescriptionOver200_Throws()
     {
         Assert.Throws<DomainException>(() =>
-            new Transaction(1m, TransactionDirection.Income, TransactionType.Loan, new string('a', 201)));
+            new Transaction(1m, TransactionDirection.Income, TransactionType.Loan, new string('a', 201), Guid.NewGuid()));
     }
 
     [Fact]
     public void Constructor_Description200_IsAccepted()
     {
-        var t = new Transaction(1m, TransactionDirection.Income, TransactionType.Loan, new string('a', 200));
+        var t = new Transaction(1m, TransactionDirection.Income, TransactionType.Loan, new string('a', 200), Guid.NewGuid());
 
         Assert.Equal(200, t.Description.Length);
     }

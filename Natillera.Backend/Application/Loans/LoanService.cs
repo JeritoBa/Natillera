@@ -15,9 +15,9 @@ public sealed class LoanService(
     ILogRepository logRepository,
     IUnitOfWork unitOfWork)
 {
-    public async Task<IReadOnlyCollection<LoanListItem>> GetListAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyCollection<LoanListItem>> GetListAsync(SavingPeriod period, CancellationToken cancellationToken)
     {
-        var loans = await loanRepository.GetListAsync(cancellationToken);
+        var loans = await loanRepository.GetListAsync(period.Id, cancellationToken);
         return loans
             .Select(loan => new LoanListItem(
                 loan.Id,
@@ -31,25 +31,25 @@ public sealed class LoanService(
             .ToArray();
     }
 
-    public async Task<LoanDetailResponse?> GetDetailAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<LoanDetailResponse?> GetDetailAsync(Guid id, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var loan = await loanRepository.GetDetailAsync(id, cancellationToken);
+        var loan = await loanRepository.GetDetailAsync(id, period.Id, cancellationToken);
         return loan is null ? null : ToDetail(loan, BorrowerName(loan.Borrower));
     }
 
-    public async Task<LoanPaymentResponse?> GetPaymentAsync(Guid loanId, Guid paymentId, CancellationToken cancellationToken)
+    public async Task<LoanPaymentResponse?> GetPaymentAsync(Guid loanId, Guid paymentId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var loan = await GetDetailAsync(loanId, cancellationToken);
+        var loan = await GetDetailAsync(loanId, period, cancellationToken);
         return loan?.Payments.FirstOrDefault(payment => payment.Id == paymentId);
     }
 
-    public async Task<InterestPaymentResponse?> GetInterestAsync(Guid loanId, Guid interestId, CancellationToken cancellationToken)
+    public async Task<InterestPaymentResponse?> GetInterestAsync(Guid loanId, Guid interestId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var loan = await GetDetailAsync(loanId, cancellationToken);
+        var loan = await GetDetailAsync(loanId, period, cancellationToken);
         return loan?.InterestPayments.FirstOrDefault(interest => interest.Id == interestId);
     }
 
-    public async Task<LoanDetailResponse> CreateLoanAsync(LoanRequest request, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task<LoanDetailResponse> CreateLoanAsync(LoanRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
         var member = await GetActiveMemberAsync(request.BorrowerId, cancellationToken);
         var borrowerName = BorrowerName(member);
@@ -58,66 +58,68 @@ public sealed class LoanService(
             request.InitialAmount,
             TransactionDirection.Expense,
             TransactionType.Loan,
-            $"Loan - {borrowerName}");
-        var loan = new Loan(request.InitialAmount, request.InterestRate, ToUtcDate(request.StartDate), request.BorrowerId, transaction.Id);
+            $"Loan - {borrowerName}",
+            period.Id);
+        var loan = new Loan(request.InitialAmount, request.InterestRate, ToUtcDate(request.StartDate), request.BorrowerId, transaction.Id, period);
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            CashGuard.EnsureAvailable(await transactionRepository.GetAvailableMoneyAsync(ct), loan.InitialAmount); // FIN-13
+            CashGuard.EnsureAvailable(await transactionRepository.GetAvailableMoneyAsync(period.Id, ct), loan.InitialAmount); // FIN-13
             await transactionRepository.AddAsync(transaction, ct);
             await loanRepository.AddAsync(loan, ct);
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.Loan, loan.Id, LogAction.Create, null, loan.InitialAmount),
+                new Log(performedByUserId, LogEntityType.Loan, loan.Id, LogAction.Create, loan.SavingPeriodId, null, loan.InitialAmount),
                 ct);
         }, cancellationToken);
 
         return ToDetail(loan, borrowerName);
     }
 
-    public async Task<LoanDetailResponse> UpdateLoanAsync(Guid loanId, LoanRequest request, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task<LoanDetailResponse> UpdateLoanAsync(Guid loanId, LoanRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var loan = await GetLoanForUpdateAsync(loanId, cancellationToken);
+        var loan = await GetLoanForUpdateAsync(loanId, period, cancellationToken);
         var member = await GetActiveMemberAsync(request.BorrowerId, cancellationToken);
         var borrowerName = BorrowerName(member);
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            var available = await transactionRepository.GetAvailableMoneyAsync(ct);
+            var available = await transactionRepository.GetAvailableMoneyAsync(loan.SavingPeriodId, ct);
             var oldAmount = loan.InitialAmount;
-            loan.UpdateDetails(request.InitialAmount, request.InterestRate, ToUtcDate(request.StartDate), request.BorrowerId);
+            loan.UpdateDetails(request.InitialAmount, request.InterestRate, ToUtcDate(request.StartDate), request.BorrowerId, period);
             CashGuard.EnsureAvailable(available, loan.InitialAmount - oldAmount); // FIN-13
             loan.Transaction.Update(loan.InitialAmount, TransactionDirection.Expense, TransactionType.Loan, $"Loan - {borrowerName}");
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.Loan, loan.Id, LogAction.Update, oldAmount, loan.InitialAmount),
+                new Log(performedByUserId, LogEntityType.Loan, loan.Id, LogAction.Update, loan.SavingPeriodId, oldAmount, loan.InitialAmount),
                 ct);
         }, cancellationToken);
 
         return ToDetail(loan, borrowerName);
     }
 
-    public async Task CancelLoanAsync(Guid loanId, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task CancelLoanAsync(Guid loanId, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var loan = await GetLoanForUpdateAsync(loanId, cancellationToken);
+        var loan = await GetLoanForUpdateAsync(loanId, period, cancellationToken);
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
             loan.Cancel();
             loan.Transaction.Cancel();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.Loan, loan.Id, LogAction.Delete, loan.InitialAmount, null),
+                new Log(performedByUserId, LogEntityType.Loan, loan.Id, LogAction.Delete, loan.SavingPeriodId, loan.InitialAmount, null),
                 ct);
         }, cancellationToken);
     }
 
-    public async Task<LoanPaymentResponse> CreatePaymentAsync(Guid loanId, LoanPaymentRequest request, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task<LoanPaymentResponse> CreatePaymentAsync(Guid loanId, LoanPaymentRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
         var method = GetPaymentMethod(request);
-        var loan = await GetLoanForUpdateAsync(loanId, cancellationToken);
+        var loan = await GetLoanForUpdateAsync(loanId, period, cancellationToken);
         var transaction = new Transaction(
             request.Amount,
             TransactionDirection.Income,
             TransactionType.LoanPayment,
-            $"Loan payment - {BorrowerName(loan.Borrower)}");
+            $"Loan payment - {BorrowerName(loan.Borrower)}",
+            loan.SavingPeriodId);
         LoanPayment? payment = null;
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
@@ -127,22 +129,22 @@ public sealed class LoanService(
             await loanRepository.AddPaymentAsync(payment, ct);
             loan.RefreshStatus();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.LoanPayment, payment.Id, LogAction.Create, null, payment.Amount),
+                new Log(performedByUserId, LogEntityType.LoanPayment, payment.Id, LogAction.Create, loan.SavingPeriodId, null, payment.Amount),
                 ct);
         }, cancellationToken);
 
         return ToPayment(payment!);
     }
 
-    public async Task<LoanPaymentResponse> UpdatePaymentAsync(Guid loanId, Guid paymentId, LoanPaymentRequest request, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task<LoanPaymentResponse> UpdatePaymentAsync(Guid loanId, Guid paymentId, LoanPaymentRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
         var method = GetPaymentMethod(request);
-        var loan = await GetLoanForUpdateAsync(loanId, cancellationToken);
+        var loan = await GetLoanForUpdateAsync(loanId, period, cancellationToken);
         var payment = FindPayment(loan, paymentId);
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            var available = await transactionRepository.GetAvailableMoneyAsync(ct);
+            var available = await transactionRepository.GetAvailableMoneyAsync(loan.SavingPeriodId, ct);
             var oldAmount = payment.Amount;
             loan.UpdatePayment(payment, request.Amount, method);
             CashGuard.EnsureAvailable(available, oldAmount - payment.Amount); // FIN-13
@@ -153,16 +155,16 @@ public sealed class LoanService(
                 $"Loan payment - {BorrowerName(loan.Borrower)}");
             loan.RefreshStatus();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.LoanPayment, payment.Id, LogAction.Update, oldAmount, payment.Amount),
+                new Log(performedByUserId, LogEntityType.LoanPayment, payment.Id, LogAction.Update, loan.SavingPeriodId, oldAmount, payment.Amount),
                 ct);
         }, cancellationToken);
 
         return ToPayment(payment);
     }
 
-    public async Task CancelPaymentAsync(Guid loanId, Guid paymentId, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task CancelPaymentAsync(Guid loanId, Guid paymentId, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var loan = await GetLoanForUpdateAsync(loanId, cancellationToken);
+        var loan = await GetLoanForUpdateAsync(loanId, period, cancellationToken);
         var payment = FindPayment(loan, paymentId);
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
@@ -171,15 +173,15 @@ public sealed class LoanService(
             payment.Transaction.Cancel();
             loan.RefreshStatus();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.LoanPayment, payment.Id, LogAction.Delete, payment.Amount, null),
+                new Log(performedByUserId, LogEntityType.LoanPayment, payment.Id, LogAction.Delete, loan.SavingPeriodId, payment.Amount, null),
                 ct);
         }, cancellationToken);
     }
 
-    public async Task<InterestPaymentResponse> CreateInterestAsync(Guid loanId, InterestPaymentRequest request, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task<InterestPaymentResponse> CreateInterestAsync(Guid loanId, InterestPaymentRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
         var status = GetInterestStatus(request);
-        var loan = await GetLoanForUpdateAsync(loanId, cancellationToken);
+        var loan = await GetLoanForUpdateAsync(loanId, period, cancellationToken);
         Performance? performance = null;
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
@@ -195,17 +197,17 @@ public sealed class LoanService(
 
             loan.RefreshStatus();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.Performance, performance.Id, LogAction.Create, null, performance.Amount),
+                new Log(performedByUserId, LogEntityType.Performance, performance.Id, LogAction.Create, loan.SavingPeriodId, null, performance.Amount),
                 ct);
         }, cancellationToken);
 
         return ToInterest(performance!);
     }
 
-    public async Task<InterestPaymentResponse> UpdateInterestAsync(Guid loanId, Guid interestId, InterestPaymentRequest request, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task<InterestPaymentResponse> UpdateInterestAsync(Guid loanId, Guid interestId, InterestPaymentRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
         var status = GetInterestStatus(request);
-        var loan = await GetLoanForUpdateAsync(loanId, cancellationToken);
+        var loan = await GetLoanForUpdateAsync(loanId, period, cancellationToken);
         var performance = FindInterest(loan, interestId);
 
         if (performance.Status == PaymentStatus.Paid && status == PaymentStatus.Pending)
@@ -214,7 +216,7 @@ public sealed class LoanService(
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
             var wasPaid = performance.Status == PaymentStatus.Paid;
-            var available = wasPaid ? await transactionRepository.GetAvailableMoneyAsync(ct) : 0m;
+            var available = wasPaid ? await transactionRepository.GetAvailableMoneyAsync(loan.SavingPeriodId, ct) : 0m;
             var oldAmount = performance.Amount;
             performance.UpdateDetails(request.Amount, request.Description);
             if (wasPaid)
@@ -235,16 +237,16 @@ public sealed class LoanService(
 
             loan.RefreshStatus();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.Performance, performance.Id, LogAction.Update, oldAmount, performance.Amount),
+                new Log(performedByUserId, LogEntityType.Performance, performance.Id, LogAction.Update, loan.SavingPeriodId, oldAmount, performance.Amount),
                 ct);
         }, cancellationToken);
 
         return ToInterest(performance);
     }
 
-    public async Task CancelInterestAsync(Guid loanId, Guid interestId, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task CancelInterestAsync(Guid loanId, Guid interestId, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var loan = await GetLoanForUpdateAsync(loanId, cancellationToken);
+        var loan = await GetLoanForUpdateAsync(loanId, period, cancellationToken);
         var performance = FindInterest(loan, interestId);
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
@@ -256,7 +258,7 @@ public sealed class LoanService(
 
             loan.RefreshStatus();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.Performance, performance.Id, LogAction.Delete, performance.Amount, null),
+                new Log(performedByUserId, LogEntityType.Performance, performance.Id, LogAction.Delete, loan.SavingPeriodId, performance.Amount, null),
                 ct);
         }, cancellationToken);
     }
@@ -272,8 +274,8 @@ public sealed class LoanService(
         return member;
     }
 
-    private async Task<Loan> GetLoanForUpdateAsync(Guid loanId, CancellationToken cancellationToken) =>
-        await loanRepository.GetForUpdateAsync(loanId, cancellationToken)
+    private async Task<Loan> GetLoanForUpdateAsync(Guid loanId, SavingPeriod period, CancellationToken cancellationToken) =>
+        await loanRepository.GetForUpdateAsync(loanId, period.Id, cancellationToken)
             ?? throw new DomainException("Loan not found.");
 
     private static LoanPayment FindPayment(Loan loan, Guid paymentId) =>
@@ -301,7 +303,7 @@ public sealed class LoanService(
     }
 
     private static Transaction NewInterestTransaction(Loan loan, Performance performance) =>
-        new(performance.Amount, TransactionDirection.Income, TransactionType.Performance, InterestDescription(loan));
+        new(performance.Amount, TransactionDirection.Income, TransactionType.Performance, InterestDescription(loan), loan.SavingPeriodId);
 
     private static string InterestDescription(Loan loan) => $"Loan interest - {BorrowerName(loan.Borrower)}";
 

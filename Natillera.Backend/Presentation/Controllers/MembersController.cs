@@ -4,6 +4,7 @@ using Natillera.Backend.Application.Authentication;
 using Natillera.Backend.Application.Users;
 using Natillera.Backend.Domain.Enums;
 using Natillera.Backend.Domain.Exceptions;
+using Natillera.Backend.Presentation.Filters;
 
 namespace Natillera.Backend.Presentation.Controllers;
 
@@ -18,12 +19,13 @@ public sealed class MembersController(UserService userService, MemberDetailServi
         Ok(await userService.GetMembersAsync(cancellationToken));
 
     [HttpGet("{id:guid}/details")]
+    [SavingPeriodScoped]
     [Authorize(Roles = nameof(UserRole.Admin))]
     [ProducesResponseType(typeof(MemberDetailResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<MemberDetailResponse>> GetDetails(Guid id, CancellationToken cancellationToken)
     {
-        var detail = await memberDetailService.GetDetailAsync(id, cancellationToken);
+        var detail = await memberDetailService.GetDetailAsync(id, this.SavingPeriod(), cancellationToken);
         return detail is null ? NotFound(new { message = "Member not found." }) : Ok(detail);
     }
 

@@ -13,6 +13,8 @@ public class MonthlyPayment
     {
         ValidatePeriod(month);
         ValidateAmount(amount);
+        if (savingPeriodId == Guid.Empty)
+            throw new DomainException("Saving period id is required.");
         Id = Guid.NewGuid();
         Amount = amount;
         Month = month;

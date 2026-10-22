@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Natillera.Backend.Presentation.Filters;
 using System.Security.Claims;
 using Natillera.Backend.Application.Dashboard;
 
@@ -7,6 +8,7 @@ namespace Natillera.Backend.Presentation.Controllers;
 
 [ApiController]
 [Route("api/dashboard")]
+[SavingPeriodScoped]
 [Authorize]
 public sealed class DashboardController(DashboardService dashboardService) : ControllerBase
 {
@@ -19,6 +21,6 @@ public sealed class DashboardController(DashboardService dashboardService) : Con
         if (!Guid.TryParse(userIdValue, out var userId)) return Unauthorized();
 
         var role = User.FindFirstValue(ClaimTypes.Role) ?? "Member";
-        return Ok(await dashboardService.GetSummaryAsync(userId, role, cancellationToken));
+        return Ok(await dashboardService.GetSummaryAsync(userId, role, this.SavingPeriod(), cancellationToken));
     }
 }

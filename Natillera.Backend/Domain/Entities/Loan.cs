@@ -13,9 +13,10 @@ public class Loan
     }
 
     public Loan(decimal initialAmount, decimal interestRate, DateTime startDate, Guid borrowerId,
-        Guid transactionId)
+        Guid transactionId, SavingPeriod savingPeriod)
     {
         Validate(initialAmount, interestRate);
+        savingPeriod.EnsureContains(startDate); // PER-05
 
         Id = Guid.NewGuid();
         InitialAmount = initialAmount;
@@ -25,6 +26,7 @@ public class Loan
         CreatedAt = DateTime.UtcNow;
         BorrowerId = borrowerId;
         TransactionId = transactionId;
+        SavingPeriodId = savingPeriod.Id;
     }
 
     public Guid Id { get; private set; }
@@ -71,7 +73,8 @@ public class Loan
         _payments.Any(payment => payment.Status != PaymentStatus.Cancelled)
         || _performances.Any(performance => performance.Status != PaymentStatus.Cancelled);
 
-    public void UpdateDetails(decimal initialAmount, decimal interestRate, DateTime startDate, Guid borrowerId)
+    public void UpdateDetails(decimal initialAmount, decimal interestRate, DateTime startDate, Guid borrowerId,
+        SavingPeriod savingPeriod)
     {
         if (Status == LoanStatus.Cancelled)
             throw new DomainException("Cancelled loans cannot be modified.");
@@ -79,6 +82,8 @@ public class Loan
             throw new DomainException("Loan cannot be modified because it has payments.");
 
         Validate(initialAmount, interestRate);
+        EnsureSamePeriod(savingPeriod);
+        savingPeriod.EnsureContains(startDate); // PER-05
         InitialAmount = initialAmount;
         InterestRate = interestRate;
         StartDate = startDate.Date;
@@ -141,6 +146,12 @@ public class Loan
             EndDate = null;
             UpdatedAt = DateTime.UtcNow;
         }
+    }
+
+    private void EnsureSamePeriod(SavingPeriod savingPeriod)
+    {
+        if (savingPeriod.Id != SavingPeriodId)
+            throw new DomainException("A loan cannot move to another saving period.");
     }
 
     private static void Validate(decimal initialAmount, decimal interestRate)

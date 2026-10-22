@@ -1,10 +1,12 @@
+using Natillera.Backend.Domain.Entities;
+
 namespace Natillera.Backend.Application.Users;
 
 public sealed class MemberDetailService(IMemberDetailRepository repository, IPendingObligationsRepository pendingObligationsRepository)
 {
-    public async Task<MemberDetailResponse?> GetDetailAsync(Guid memberId, CancellationToken cancellationToken)
+    public async Task<MemberDetailResponse?> GetDetailAsync(Guid memberId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var data = await repository.GetDetailAsync(memberId, cancellationToken);
+        var data = await repository.GetDetailAsync(memberId, period.Id, cancellationToken);
         if (data is null) return null;
 
         // Equal share of all paid performances among active members. Rounded to 2 decimals,
@@ -20,7 +22,7 @@ public sealed class MemberDetailService(IMemberDetailRepository repository, IPen
             data.Savings + data.ActivityEarnings + performanceEarnings);
 
         var pending = PendingObligationsCalculator.Calculate(
-            await pendingObligationsRepository.GetDataAsync(memberId, cancellationToken));
+            await pendingObligationsRepository.GetDataAsync(memberId, period.Id, cancellationToken));
 
         return new MemberDetailResponse(data.Member, balance, data.PendingPayments, data.Transactions, pending);
     }

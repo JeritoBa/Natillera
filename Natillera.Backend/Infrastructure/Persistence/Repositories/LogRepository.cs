@@ -10,10 +10,11 @@ public sealed class LogRepository(NatilleraDbContext dbContext) : ILogRepository
     public Task AddAsync(Log log, CancellationToken cancellationToken = default) =>
         dbContext.Logs.AddAsync(log, cancellationToken).AsTask();
 
-    public async Task<IReadOnlyCollection<LogListItem>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<LogListItem>> GetAllAsync(Guid savingPeriodId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Logs
             .AsNoTracking()
+            .Where(log => log.SavingPeriodId == savingPeriodId)
             .OrderByDescending(log => log.OccurredAt)
             .Select(log => new LogListItem(
                 log.Id,
@@ -28,12 +29,12 @@ public sealed class LogRepository(NatilleraDbContext dbContext) : ILogRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<LogDetailResponse?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<LogDetailResponse?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default)
     {
         var log = await dbContext.Logs
             .AsNoTracking()
             .Include(item => item.User)
-            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(item => item.Id == id && item.SavingPeriodId == savingPeriodId, cancellationToken);
         if (log is null) return null;
 
         var summary = new LogEntitySummary(null, null, null, null, null, null);

@@ -12,9 +12,10 @@ public class Activity
     }
 
     public Activity(string name, string description, int quantity, decimal unitCost, decimal unitSalePrice,
-        DateTime startDate, Guid transactionId)
+        DateTime startDate, Guid transactionId, SavingPeriod savingPeriod)
     {
         Validate(name, description, quantity, unitCost, unitSalePrice);
+        savingPeriod.EnsureContains(startDate); // PER-05
 
         Id = Guid.NewGuid();
         Name = name.Trim();
@@ -26,6 +27,7 @@ public class Activity
         Status = ActivityStatus.Pending;
         CreatedAt = DateTime.UtcNow;
         TransactionId = transactionId;
+        SavingPeriodId = savingPeriod.Id;
     }
 
     public Guid Id { get; private set; }
@@ -62,10 +64,13 @@ public class Activity
     }
 
     public void UpdateDetails(string name, string description, int quantity, decimal unitCost, decimal unitSalePrice,
-        DateTime startDate)
+        DateTime startDate, SavingPeriod savingPeriod)
     {
         EnsureNotCancelled();
         Validate(name, description, quantity, unitCost, unitSalePrice);
+        if (savingPeriod.Id != SavingPeriodId)
+            throw new DomainException("An activity cannot move to another saving period.");
+        savingPeriod.EnsureContains(startDate); // PER-05
 
         if (quantity < AssignedQuantity())
             throw new DomainException("Activity quantity cannot be lower than the assigned quantity.");

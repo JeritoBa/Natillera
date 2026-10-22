@@ -10,15 +10,18 @@ public class Transaction
     }
 
     public Transaction(decimal amount, TransactionDirection direction, TransactionType type,
-        string description, DateTime? occurredAt = null)
+        string description, Guid savingPeriodId, DateTime? occurredAt = null)
     {
         Validate(amount, description);
+        if (savingPeriodId == Guid.Empty)
+            throw new DomainException("Saving period id is required.");
         Id = Guid.NewGuid();
         Amount = amount;
         Direction = direction;
         Type = type;
         Description = description.Trim();
         OccurredAt = occurredAt ?? DateTime.UtcNow;
+        SavingPeriodId = savingPeriodId;
     }
 
     public Guid Id { get; private set; }

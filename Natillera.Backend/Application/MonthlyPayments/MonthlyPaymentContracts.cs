@@ -8,9 +8,6 @@ public sealed class CreateMonthlyPaymentRequest
     [Required]
     public Guid UserId { get; init; }
 
-    [Range(1, 9999)]
-    public int Year { get; init; }
-
     [Range(1, 12)]
     public int Month { get; init; }
 
@@ -25,9 +22,6 @@ public sealed class UpdateMonthlyPaymentRequest
 {
     [Required]
     public Guid UserId { get; init; }
-
-    [Range(1, 9999)]
-    public int Year { get; init; }
 
     [Range(1, 12)]
     public int Month { get; init; }

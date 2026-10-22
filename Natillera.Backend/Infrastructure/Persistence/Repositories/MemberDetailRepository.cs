@@ -6,7 +6,7 @@ namespace Natillera.Backend.Infrastructure.Persistence.Repositories;
 
 public sealed class MemberDetailRepository(NatilleraDbContext dbContext) : IMemberDetailRepository
 {
-    public async Task<MemberDetailData?> GetDetailAsync(Guid memberId, CancellationToken cancellationToken = default)
+    public async Task<MemberDetailData?> GetDetailAsync(Guid memberId, Guid savingPeriodId, CancellationToken cancellationToken = default)
     {
         var member = await dbContext.Users.AsNoTracking()
             .Where(user => user.Id == memberId && user.Role == UserRole.Member)
@@ -16,25 +16,26 @@ public sealed class MemberDetailRepository(NatilleraDbContext dbContext) : IMemb
         if (member is null) return null;
 
         var savings = await dbContext.MonthlyPayments.AsNoTracking()
-            .Where(payment => payment.UserId == memberId && payment.Status == PaymentStatus.Paid)
+            .Where(payment => payment.SavingPeriodId == savingPeriodId && payment.UserId == memberId && payment.Status == PaymentStatus.Paid)
             .Select(payment => (decimal?)payment.Amount)
             .SumAsync(cancellationToken) ?? 0m;
 
         var activityEarnings = await dbContext.ActivityAssignments.AsNoTracking()
-            .Where(assignment => assignment.UserId == memberId && assignment.Status != AssignmentStatus.Cancelled)
+            .Where(assignment => assignment.Activity.SavingPeriodId == savingPeriodId && assignment.UserId == memberId && assignment.Status != AssignmentStatus.Cancelled)
             .Select(assignment => (decimal?)(assignment.QuantityAssigned * (assignment.Activity.UnitSalePrice - assignment.Activity.UnitCost)))
             .SumAsync(cancellationToken) ?? 0m;
 
         var paidPerformancesTotal = await dbContext.Performances.AsNoTracking()
-            .Where(performance => performance.Status == PaymentStatus.Paid)
+            .Where(performance => performance.Loan.SavingPeriodId == savingPeriodId && performance.Status == PaymentStatus.Paid)
             .Select(performance => (decimal?)performance.Amount)
             .SumAsync(cancellationToken) ?? 0m;
 
+        // PER-07: members have no period, the interest share is divided among those active today.
         var activeMembersCount = await dbContext.Users.AsNoTracking()
             .CountAsync(user => user.IsActive && user.Role == UserRole.Member, cancellationToken);
 
         var pendingPayments = await dbContext.MonthlyPayments.AsNoTracking()
-            .Where(payment => payment.UserId == memberId && payment.Status == PaymentStatus.Pending)
+            .Where(payment => payment.SavingPeriodId == savingPeriodId && payment.UserId == memberId && payment.Status == PaymentStatus.Pending)
             .OrderBy(payment => payment.SavingPeriod.Year).ThenBy(payment => payment.Month).ThenBy(payment => payment.CreatedAt)
             .Select(payment => new MemberPendingPaymentResponse(payment.Id, payment.SavingPeriod.Year, payment.Month, payment.Amount,
                 payment.Status, payment.CreatedAt, payment.TransactionId))
@@ -48,7 +49,7 @@ public sealed class MemberDetailRepository(NatilleraDbContext dbContext) : IMemb
             .Union(dbContext.ActivityAssignments.Where(assignment => assignment.UserId == memberId && assignment.TransactionId != null).Select(assignment => assignment.TransactionId!.Value));
 
         var transactions = await dbContext.Transactions.AsNoTracking()
-            .Where(transaction => userTransactionIds.Contains(transaction.Id) && !transaction.IsCancelled)
+            .Where(transaction => transaction.SavingPeriodId == savingPeriodId && userTransactionIds.Contains(transaction.Id) && !transaction.IsCancelled)
             .OrderBy(transaction => transaction.OccurredAt)
             .Select(transaction => new MemberTransactionResponse(transaction.Id, transaction.Amount, transaction.Direction,
                 transaction.Type, transaction.OccurredAt, transaction.Description))

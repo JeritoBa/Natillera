@@ -26,12 +26,12 @@ public class MonthlyPaymentServiceTests
     }
 
     private static CreateMonthlyPaymentRequest CreateRequest(Guid userId, PaymentStatus? status, decimal amount = 50_000m,
-        int year = 2025, int month = 6) =>
-        new() { UserId = userId, Year = year, Month = month, Amount = amount, Status = status };
+        int month = 6) =>
+        new() { UserId = userId, Month = month, Amount = amount, Status = status };
 
     private static UpdateMonthlyPaymentRequest UpdateRequest(Guid userId, PaymentStatus? status, decimal amount = 50_000m,
-        int year = 2025, int month = 6) =>
-        new() { UserId = userId, Year = year, Month = month, Amount = amount, Status = status };
+        int month = 6) =>
+        new() { UserId = userId, Month = month, Amount = amount, Status = status };
 
     /// <summary>Mimics the EF navigation fix-up that links a payment to its Transaction.</summary>
     private void LinkTransaction(MonthlyPayment payment)
@@ -42,7 +42,7 @@ public class MonthlyPaymentServiceTests
 
     private async Task<MonthlyPayment> SeedAsync(Guid userId, PaymentStatus status)
     {
-        var response = await _service.CreateAsync(CreateRequest(userId, status), Admin, default);
+        var response = await _service.CreateAsync(CreateRequest(userId, status), Admin, TestPeriods.Y2026, default);
         var payment = _payments.Payments.Single(p => p.Id == response.Id);
         if (payment.TransactionId is not null) LinkTransaction(payment);
         _logs.Logs.Clear();
@@ -54,7 +54,7 @@ public class MonthlyPaymentServiceTests
     {
         var member = _users.AddUser();
 
-        var response = await _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, default);
+        var response = await _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(PaymentStatus.Pending, response.Status);
         Assert.Null(response.TransactionId);
@@ -74,7 +74,7 @@ public class MonthlyPaymentServiceTests
     {
         var member = _users.AddUser();
 
-        var response = await _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Paid), Admin, default);
+        var response = await _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Paid), Admin, TestPeriods.Y2026, default);
 
         var tx = Assert.Single(_transactions.Transactions);
         Assert.Equal(TransactionDirection.Income, tx.Direction);
@@ -92,7 +92,7 @@ public class MonthlyPaymentServiceTests
         var member = _users.AddUser();
 
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending, Minimum - 0.01m), Admin, default));
+            _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending, Minimum - 0.01m), Admin, TestPeriods.Y2026, default));
 
         Assert.Contains("at least", ex.Message);
         Assert.Empty(_payments.Payments);
@@ -104,7 +104,7 @@ public class MonthlyPaymentServiceTests
     {
         var member = _users.AddUser();
 
-        var response = await _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending, Minimum), Admin, default);
+        var response = await _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending, Minimum), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(Minimum, response.Amount);
     }
@@ -115,7 +115,7 @@ public class MonthlyPaymentServiceTests
         var member = _users.AddUser(active: false);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, default));
+            _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, TestPeriods.Y2026, default));
         Assert.Empty(_payments.Payments);
     }
 
@@ -123,7 +123,7 @@ public class MonthlyPaymentServiceTests
     public async Task CreateAsync_UnknownMember_Throws()
     {
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateAsync(CreateRequest(Guid.NewGuid(), PaymentStatus.Pending), Admin, default));
+            _service.CreateAsync(CreateRequest(Guid.NewGuid(), PaymentStatus.Pending), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal("Member not found.", ex.Message);
     }
@@ -132,10 +132,10 @@ public class MonthlyPaymentServiceTests
     public async Task CreateAsync_DuplicatePeriod_Throws()
     {
         var member = _users.AddUser();
-        await _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, default);
+        await _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, TestPeriods.Y2026, default);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, default));
+            _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, TestPeriods.Y2026, default));
         Assert.Single(_payments.Payments);
     }
 
@@ -144,9 +144,9 @@ public class MonthlyPaymentServiceTests
     {
         var member = _users.AddUser();
         var cancelled = await SeedAsync(member.Id, PaymentStatus.Pending);
-        await _service.CancelAsync(cancelled.Id, Admin, default);
+        await _service.CancelAsync(cancelled.Id, Admin, TestPeriods.Y2026, default);
 
-        var response = await _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, default);
+        var response = await _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, TestPeriods.Y2026, default);
 
         Assert.NotEqual(cancelled.Id, response.Id);
         Assert.Equal(2, _payments.Payments.Count);
@@ -160,7 +160,7 @@ public class MonthlyPaymentServiceTests
         await SeedAsync(member.Id, PaymentStatus.Paid);
 
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, default));
+            _service.CreateAsync(CreateRequest(member.Id, PaymentStatus.Pending), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal("A monthly payment already exists for this member and period.", ex.Message);
         Assert.Single(_payments.Payments);
@@ -174,7 +174,7 @@ public class MonthlyPaymentServiceTests
         var member = _users.AddUser();
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateAsync(CreateRequest(member.Id, status), Admin, default));
+            _service.CreateAsync(CreateRequest(member.Id, status), Admin, TestPeriods.Y2026, default));
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public class MonthlyPaymentServiceTests
         var member = _users.AddUser();
         var payment = await SeedAsync(member.Id, PaymentStatus.Pending);
 
-        var response = await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid), Admin, default);
+        var response = await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid), Admin, TestPeriods.Y2026, default);
 
         var tx = Assert.Single(_transactions.Transactions);
         Assert.Equal(TransactionDirection.Income, tx.Direction);
@@ -199,10 +199,10 @@ public class MonthlyPaymentServiceTests
     {
         var member = _users.AddUser();
         var payment = await SeedAsync(member.Id, PaymentStatus.Pending);
-        var existing = new Transaction(50_000m, TransactionDirection.Income, TransactionType.MonthlyPayment, "old");
+        var existing = new Transaction(50_000m, TransactionDirection.Income, TransactionType.MonthlyPayment, "old", TestPeriods.Y2026.Id);
         payment.Set("Transaction", existing);
 
-        var response = await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid, 60_000m), Admin, default);
+        var response = await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid, 60_000m), Admin, TestPeriods.Y2026, default);
 
         Assert.Empty(_transactions.Transactions);
         Assert.Equal(existing.Id, response.TransactionId);
@@ -215,12 +215,12 @@ public class MonthlyPaymentServiceTests
     {
         var member = _users.AddUser();
         var payment = await SeedAsync(member.Id, PaymentStatus.Pending);
-        var existing = new Transaction(50_000m, TransactionDirection.Income, TransactionType.MonthlyPayment, "old");
+        var existing = new Transaction(50_000m, TransactionDirection.Income, TransactionType.MonthlyPayment, "old", TestPeriods.Y2026.Id);
         existing.Cancel();
         payment.Set("Transaction", existing);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid), Admin, default));
+            _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid), Admin, TestPeriods.Y2026, default));
         Assert.Equal(PaymentStatus.Pending, payment.Status);
         Assert.Empty(_logs.Logs);
     }
@@ -232,7 +232,7 @@ public class MonthlyPaymentServiceTests
         var payment = await SeedAsync(member.Id, PaymentStatus.Paid);
 
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Pending), Admin, default));
+            _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Pending), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal("Paid monthly payment cannot return to pending.", ex.Message);
         Assert.Equal(PaymentStatus.Paid, payment.Status);
@@ -244,7 +244,7 @@ public class MonthlyPaymentServiceTests
         var member = _users.AddUser();
         var payment = await SeedAsync(member.Id, PaymentStatus.Paid);
 
-        await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid, 70_000m), Admin, default);
+        await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid, 70_000m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(70_000m, payment.Amount);
         Assert.Equal(70_000m, payment.Transaction!.Amount);
@@ -259,7 +259,7 @@ public class MonthlyPaymentServiceTests
         payment.Cancel();
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Pending), Admin, default));
+            _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Pending), Admin, TestPeriods.Y2026, default));
     }
 
     [Fact]
@@ -269,7 +269,7 @@ public class MonthlyPaymentServiceTests
         var payment = await SeedAsync(member.Id, PaymentStatus.Pending);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Pending, 1m), Admin, default));
+            _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Pending, 1m), Admin, TestPeriods.Y2026, default));
         Assert.Equal(50_000m, payment.Amount);
     }
 
@@ -281,7 +281,7 @@ public class MonthlyPaymentServiceTests
         var payment = await SeedAsync(member.Id, PaymentStatus.Pending);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateAsync(payment.Id, UpdateRequest(other.Id, PaymentStatus.Pending), Admin, default));
+            _service.UpdateAsync(payment.Id, UpdateRequest(other.Id, PaymentStatus.Pending), Admin, TestPeriods.Y2026, default));
     }
 
     [Fact]
@@ -290,7 +290,7 @@ public class MonthlyPaymentServiceTests
         var member = _users.AddUser();
 
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateAsync(Guid.NewGuid(), UpdateRequest(member.Id, PaymentStatus.Pending), Admin, default));
+            _service.UpdateAsync(Guid.NewGuid(), UpdateRequest(member.Id, PaymentStatus.Pending), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal("Monthly payment not found.", ex.Message);
     }
@@ -301,7 +301,7 @@ public class MonthlyPaymentServiceTests
         var member = _users.AddUser();
         var payment = await SeedAsync(member.Id, PaymentStatus.Paid);
 
-        await _service.CancelAsync(payment.Id, Admin, default);
+        await _service.CancelAsync(payment.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(PaymentStatus.Cancelled, payment.Status);
         Assert.True(payment.Transaction!.IsCancelled);
@@ -317,10 +317,10 @@ public class MonthlyPaymentServiceTests
     {
         var member = _users.AddUser();
         var payment = await SeedAsync(member.Id, PaymentStatus.Pending);
-        var existing = new Transaction(50_000m, TransactionDirection.Income, TransactionType.MonthlyPayment, "old");
+        var existing = new Transaction(50_000m, TransactionDirection.Income, TransactionType.MonthlyPayment, "old", TestPeriods.Y2026.Id);
         payment.Set("Transaction", existing);
 
-        await _service.CancelAsync(payment.Id, Admin, default);
+        await _service.CancelAsync(payment.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.True(existing.IsCancelled);
         Assert.Equal(PaymentStatus.Cancelled, payment.Status);
@@ -332,7 +332,7 @@ public class MonthlyPaymentServiceTests
         var member = _users.AddUser();
         var payment = await SeedAsync(member.Id, PaymentStatus.Pending);
 
-        await _service.CancelAsync(payment.Id, Admin, default);
+        await _service.CancelAsync(payment.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(PaymentStatus.Cancelled, payment.Status);
         Assert.Single(_logs.Logs);
@@ -343,16 +343,16 @@ public class MonthlyPaymentServiceTests
     {
         var member = _users.AddUser();
         var payment = await SeedAsync(member.Id, PaymentStatus.Paid);
-        await _service.CancelAsync(payment.Id, Admin, default);
+        await _service.CancelAsync(payment.Id, Admin, TestPeriods.Y2026, default);
 
-        await Assert.ThrowsAsync<DomainException>(() => _service.CancelAsync(payment.Id, Admin, default));
+        await Assert.ThrowsAsync<DomainException>(() => _service.CancelAsync(payment.Id, Admin, TestPeriods.Y2026, default));
         Assert.Single(_logs.Logs);
     }
 
     [Fact]
     public async Task CancelAsync_NotFound_Throws()
     {
-        await Assert.ThrowsAsync<DomainException>(() => _service.CancelAsync(Guid.NewGuid(), Admin, default));
+        await Assert.ThrowsAsync<DomainException>(() => _service.CancelAsync(Guid.NewGuid(), Admin, TestPeriods.Y2026, default));
     }
 
     // ---- FIN-13: available money check ----
@@ -365,7 +365,7 @@ public class MonthlyPaymentServiceTests
         _transactions.SetAvailableMoney(20_000m);
 
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid, 20_000m), Admin, default));
+            _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid, 20_000m), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal("Insufficient available money. Available: 20,000; required: 30,000.", ex.Message);
         Assert.Equal(50_000m, payment.Transaction!.Amount);
@@ -379,7 +379,7 @@ public class MonthlyPaymentServiceTests
         var payment = await SeedAsync(member.Id, PaymentStatus.Paid);
         _transactions.SetAvailableMoney(0m);
 
-        await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid, 70_000m), Admin, default);
+        await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Paid, 70_000m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(70_000m, payment.Transaction!.Amount);
     }
@@ -391,7 +391,7 @@ public class MonthlyPaymentServiceTests
         var payment = await SeedAsync(member.Id, PaymentStatus.Pending);
         _transactions.SetAvailableMoney(0m);
 
-        await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Pending, 20_000m), Admin, default);
+        await _service.UpdateAsync(payment.Id, UpdateRequest(member.Id, PaymentStatus.Pending, 20_000m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(20_000m, payment.Amount);
     }
@@ -403,7 +403,7 @@ public class MonthlyPaymentServiceTests
         var payment = await SeedAsync(member.Id, PaymentStatus.Paid);
         _transactions.SetAvailableMoney(10_000m);
 
-        await _service.CancelAsync(payment.Id, Admin, default);
+        await _service.CancelAsync(payment.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.True(payment.Transaction!.IsCancelled);
         Assert.True(_transactions.Available() < 0m);

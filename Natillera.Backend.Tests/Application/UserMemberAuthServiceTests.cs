@@ -138,7 +138,7 @@ public class MemberDetailServiceTests
 {
     private sealed class StubRepo(MemberDetailData? data) : IMemberDetailRepository
     {
-        public Task<MemberDetailData?> GetDetailAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        public Task<MemberDetailData?> GetDetailAsync(Guid memberId, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
             Task.FromResult(data);
     }
 
@@ -148,13 +148,13 @@ public class MemberDetailServiceTests
 
     private sealed class StubPendingRepo(PendingObligationsData data) : IPendingObligationsRepository
     {
-        public Task<PendingObligationsData> GetDataAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        public Task<PendingObligationsData> GetDataAsync(Guid memberId, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
             Task.FromResult(data);
     }
 
     private static Task<MemberDetailResponse?> Run(MemberDetailData? data, PendingObligationsData? pending = null) =>
         new MemberDetailService(new StubRepo(data), new StubPendingRepo(pending ?? new PendingObligationsData([], [], [], [])))
-            .GetDetailAsync(Guid.NewGuid(), default);
+            .GetDetailAsync(Guid.NewGuid(), TestPeriods.Y2026, default);
 
     [Fact]
     public async Task GetDetailAsync_IncludesPendingObligations_MEM10()

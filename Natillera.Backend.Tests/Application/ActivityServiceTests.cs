@@ -24,7 +24,7 @@ public class ActivityServiceTests
     }
 
     private static ActivityRequest ActivityReq(int quantity = 10, decimal cost = 1000m, decimal price = 1500m) =>
-        new() { Name = "Rifa", Description = "Rifa anual", Quantity = quantity, UnitCost = cost, UnitSalePrice = price, StartDate = new DateTime(2025, 5, 5) };
+        new() { Name = "Rifa", Description = "Rifa anual", Quantity = quantity, UnitCost = cost, UnitSalePrice = price, StartDate = new DateTime(2026, 5, 5) };
 
     private static ActivityAssignmentRequest AssignReq(Guid userId, int quantity) =>
         new() { UserId = userId, QuantityAssigned = quantity };
@@ -34,7 +34,7 @@ public class ActivityServiceTests
 
     private async Task<Activity> SeedActivityAsync(int quantity = 10, decimal cost = 1000m, decimal price = 1500m)
     {
-        var response = await _service.CreateActivityAsync(ActivityReq(quantity, cost, price), Admin, default);
+        var response = await _service.CreateActivityAsync(ActivityReq(quantity, cost, price), Admin, TestPeriods.Y2026, default);
         var activity = _activities.Activities.Single(a => a.Id == response.Id);
         activity.Set("Transaction", _transactions.Transactions.Single(t => t.Id == activity.TransactionId));
         _logs.Logs.Clear();
@@ -43,7 +43,7 @@ public class ActivityServiceTests
 
     private async Task<ActivityAssignment> SeedAssignmentAsync(Activity activity, User member, int quantity)
     {
-        var response = await _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, quantity), Admin, default);
+        var response = await _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, quantity), Admin, TestPeriods.Y2026, default);
         var assignment = activity.Assignments.Single(a => a.Id == response.Id);
         assignment.Set("User", member);
         _logs.Logs.Clear();
@@ -53,7 +53,7 @@ public class ActivityServiceTests
     [Fact]
     public async Task CreateActivityAsync_Valid_CreatesExpenseTransactionOfQuantityTimesCost()
     {
-        var response = await _service.CreateActivityAsync(ActivityReq(12, 2500m, 3000m), Admin, default);
+        var response = await _service.CreateActivityAsync(ActivityReq(12, 2500m, 3000m), Admin, TestPeriods.Y2026, default);
 
         var tx = Assert.Single(_transactions.Transactions);
         Assert.Equal(TransactionDirection.Expense, tx.Direction);
@@ -71,7 +71,7 @@ public class ActivityServiceTests
     public async Task CreateActivityAsync_PriceBelowCost_ThrowsWithoutPersisting()
     {
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateActivityAsync(ActivityReq(5, 2000m, 1000m), Admin, default));
+            _service.CreateActivityAsync(ActivityReq(5, 2000m, 1000m), Admin, TestPeriods.Y2026, default));
 
         Assert.Empty(_transactions.Transactions);
         Assert.Empty(_activities.Activities);
@@ -84,7 +84,7 @@ public class ActivityServiceTests
         var activity = await SeedActivityAsync();
         var member = _users.AddUser();
 
-        var response = await _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 4), Admin, default);
+        var response = await _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 4), Admin, TestPeriods.Y2026, default);
 
         Assert.Single(_transactions.Transactions); // only the activity expense
         Assert.Equal(AssignmentStatus.Pending, response.Status);
@@ -103,7 +103,7 @@ public class ActivityServiceTests
         await SeedAssignmentAsync(activity, member, 2);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 1), Admin, default));
+            _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 1), Admin, TestPeriods.Y2026, default));
         Assert.Single(activity.Assignments);
     }
 
@@ -114,7 +114,7 @@ public class ActivityServiceTests
         var member = _users.AddUser();
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 6), Admin, default));
+            _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 6), Admin, TestPeriods.Y2026, default));
         Assert.Empty(activity.Assignments);
     }
 
@@ -125,7 +125,7 @@ public class ActivityServiceTests
         var member = _users.AddUser(active: false);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 1), Admin, default));
+            _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 1), Admin, TestPeriods.Y2026, default));
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public class ActivityServiceTests
         var member = _users.AddUser();
         var assignment = await SeedAssignmentAsync(activity, member, 3);
 
-        var response = await _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(3, AssignmentStatus.Paid), Admin, default);
+        var response = await _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(3, AssignmentStatus.Paid), Admin, TestPeriods.Y2026, default);
 
         var tx = _transactions.Transactions.Last();
         Assert.Equal(TransactionDirection.Income, tx.Direction);
@@ -157,7 +157,7 @@ public class ActivityServiceTests
         var assignment = await SeedAssignmentAsync(activity, member, 3);
         var before = _transactions.Transactions.Count;
 
-        await _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(5, AssignmentStatus.Pending), Admin, default);
+        await _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(5, AssignmentStatus.Pending), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(5, assignment.QuantityAssigned);
         Assert.Equal(before, _transactions.Transactions.Count);
@@ -169,10 +169,10 @@ public class ActivityServiceTests
         var activity = await SeedActivityAsync();
         var member = _users.AddUser();
         var assignment = await SeedAssignmentAsync(activity, member, 3);
-        await _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(3, AssignmentStatus.Paid), Admin, default);
+        await _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(3, AssignmentStatus.Paid), Admin, TestPeriods.Y2026, default);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(3, AssignmentStatus.Pending), Admin, default));
+            _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(3, AssignmentStatus.Pending), Admin, TestPeriods.Y2026, default));
     }
 
     [Fact]
@@ -182,7 +182,7 @@ public class ActivityServiceTests
         var member = _users.AddUser();
         var assignment = await SeedAssignmentAsync(activity, member, 3);
 
-        await _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(3, AssignmentStatus.Paid), Admin, default);
+        await _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(3, AssignmentStatus.Paid), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(ActivityStatus.Finished, activity.Status);
     }
@@ -193,12 +193,12 @@ public class ActivityServiceTests
         var activity = await SeedActivityAsync(3);
         var member = _users.AddUser();
         var assignment = await SeedAssignmentAsync(activity, member, 3);
-        await _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(3, AssignmentStatus.Paid), Admin, default);
+        await _service.UpdateAssignmentAsync(activity.Id, assignment.Id, UpdateReq(3, AssignmentStatus.Paid), Admin, TestPeriods.Y2026, default);
         var saleTx = _transactions.Transactions.Last();
         assignment.Set("Transaction", saleTx);
         _logs.Logs.Clear();
 
-        await _service.CancelAssignmentAsync(activity.Id, assignment.Id, Admin, default);
+        await _service.CancelAssignmentAsync(activity.Id, assignment.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(AssignmentStatus.Cancelled, assignment.Status);
         Assert.True(saleTx.IsCancelled);
@@ -216,7 +216,7 @@ public class ActivityServiceTests
         var member = _users.AddUser();
         var assignment = await SeedAssignmentAsync(activity, member, 2);
 
-        await _service.CancelAssignmentAsync(activity.Id, assignment.Id, Admin, default);
+        await _service.CancelAssignmentAsync(activity.Id, assignment.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(AssignmentStatus.Cancelled, assignment.Status);
         Assert.All(_transactions.Transactions, t => Assert.False(t.IsCancelled));
@@ -227,7 +227,7 @@ public class ActivityServiceTests
     {
         var activity = await SeedActivityAsync(10, 1000m);
 
-        await _service.CancelActivityAsync(activity.Id, Admin, default);
+        await _service.CancelActivityAsync(activity.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(ActivityStatus.Cancelled, activity.Status);
         Assert.True(activity.Transaction.IsCancelled);
@@ -242,7 +242,7 @@ public class ActivityServiceTests
         var activity = await SeedActivityAsync();
         await SeedAssignmentAsync(activity, _users.AddUser(), 1);
 
-        await Assert.ThrowsAsync<DomainException>(() => _service.CancelActivityAsync(activity.Id, Admin, default));
+        await Assert.ThrowsAsync<DomainException>(() => _service.CancelActivityAsync(activity.Id, Admin, TestPeriods.Y2026, default));
         Assert.False(activity.Transaction.IsCancelled);
     }
 
@@ -251,7 +251,7 @@ public class ActivityServiceTests
     {
         var activity = await SeedActivityAsync(10, 1000m, 1500m);
 
-        await _service.UpdateActivityAsync(activity.Id, ActivityReq(20, 1000m, 1500m), Admin, default);
+        await _service.UpdateActivityAsync(activity.Id, ActivityReq(20, 1000m, 1500m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(20_000m, activity.Transaction.Amount);
         var log = Assert.Single(_logs.Logs);
@@ -265,7 +265,7 @@ public class ActivityServiceTests
         var member = _users.AddUser();
 
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateAssignmentAsync(Guid.NewGuid(), AssignReq(member.Id, 1), Admin, default));
+            _service.CreateAssignmentAsync(Guid.NewGuid(), AssignReq(member.Id, 1), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal("Activity not found.", ex.Message);
     }
@@ -278,7 +278,7 @@ public class ActivityServiceTests
         _transactions.SetAvailableMoney(100_000m);
 
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateActivityAsync(ActivityReq(10, 20_000m, 30_000m), Admin, default));
+            _service.CreateActivityAsync(ActivityReq(10, 20_000m, 30_000m), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal("Insufficient available money. Available: 100,000; required: 200,000.", ex.Message);
         Assert.Empty(_transactions.Transactions);
@@ -291,7 +291,7 @@ public class ActivityServiceTests
     {
         _transactions.SetAvailableMoney(200_000m);
 
-        await _service.CreateActivityAsync(ActivityReq(10, 20_000m, 30_000m), Admin, default);
+        await _service.CreateActivityAsync(ActivityReq(10, 20_000m, 30_000m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(0m, _transactions.Available());
         Assert.Single(_logs.Logs);
@@ -304,7 +304,7 @@ public class ActivityServiceTests
         _transactions.SetAvailableMoney(5_000m);
 
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateActivityAsync(activity.Id, ActivityReq(20, 1000m, 1500m), Admin, default));
+            _service.UpdateActivityAsync(activity.Id, ActivityReq(20, 1000m, 1500m), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal("Insufficient available money. Available: 5,000; required: 10,000.", ex.Message);
         Assert.Equal(10_000m, activity.Transaction.Amount);
@@ -317,7 +317,7 @@ public class ActivityServiceTests
         var activity = await SeedActivityAsync(10, 1000m, 1500m);
         _transactions.SetAvailableMoney(0m);
 
-        await _service.UpdateActivityAsync(activity.Id, ActivityReq(5, 1000m, 1500m), Admin, default);
+        await _service.UpdateActivityAsync(activity.Id, ActivityReq(5, 1000m, 1500m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(5_000m, activity.Transaction.Amount);
     }
@@ -328,7 +328,7 @@ public class ActivityServiceTests
         var activity = await SeedActivityAsync(10, 1000m, 1500m);
         _transactions.SetAvailableMoney(-1m);
 
-        await _service.CancelActivityAsync(activity.Id, Admin, default);
+        await _service.CancelActivityAsync(activity.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.True(activity.Transaction.IsCancelled);
     }

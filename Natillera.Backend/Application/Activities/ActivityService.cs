@@ -15,9 +15,9 @@ public sealed class ActivityService(
     ILogRepository logRepository,
     IUnitOfWork unitOfWork)
 {
-    public async Task<IReadOnlyCollection<ActivityListItem>> GetListAsync(CancellationToken cancellationToken)
+    public async Task<IReadOnlyCollection<ActivityListItem>> GetListAsync(SavingPeriod period, CancellationToken cancellationToken)
     {
-        var activities = await activityRepository.GetListAsync(cancellationToken);
+        var activities = await activityRepository.GetListAsync(period.Id, cancellationToken);
         return activities
             .Select(activity => new ActivityListItem(
                 activity.Id,
@@ -34,66 +34,67 @@ public sealed class ActivityService(
             .ToArray();
     }
 
-    public async Task<ActivityDetailResponse?> GetDetailAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<ActivityDetailResponse?> GetDetailAsync(Guid id, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var activity = await activityRepository.GetDetailAsync(id, cancellationToken);
+        var activity = await activityRepository.GetDetailAsync(id, period.Id, cancellationToken);
         return activity is null ? null : ToDetail(activity);
     }
 
-    public async Task<ActivityAssignmentResponse?> GetAssignmentAsync(Guid activityId, Guid assignmentId, CancellationToken cancellationToken)
+    public async Task<ActivityAssignmentResponse?> GetAssignmentAsync(Guid activityId, Guid assignmentId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var activity = await GetDetailAsync(activityId, cancellationToken);
+        var activity = await GetDetailAsync(activityId, period, cancellationToken);
         return activity?.Assignments.FirstOrDefault(assignment => assignment.Id == assignmentId);
     }
 
-    public async Task<ActivityDetailResponse> CreateActivityAsync(ActivityRequest request, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task<ActivityDetailResponse> CreateActivityAsync(ActivityRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
         var transaction = new Transaction(
             request.Quantity * request.UnitCost,
             TransactionDirection.Expense,
             TransactionType.Activity,
-            ActivityDescription(request.Name));
+            ActivityDescription(request.Name),
+            period.Id);
         var activity = new Activity(request.Name, request.Description, request.Quantity, request.UnitCost,
-            request.UnitSalePrice, ToUtcDate(request.StartDate), transaction.Id);
+            request.UnitSalePrice, ToUtcDate(request.StartDate), transaction.Id, period);
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            CashGuard.EnsureAvailable(await transactionRepository.GetAvailableMoneyAsync(ct), activity.TotalCost()); // FIN-13
+            CashGuard.EnsureAvailable(await transactionRepository.GetAvailableMoneyAsync(period.Id, ct), activity.TotalCost()); // FIN-13
             await transactionRepository.AddAsync(transaction, ct);
             await activityRepository.AddAsync(activity, ct);
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.Activity, activity.Id, LogAction.Create, null, activity.TotalCost()),
+                new Log(performedByUserId, LogEntityType.Activity, activity.Id, LogAction.Create, activity.SavingPeriodId, null, activity.TotalCost()),
                 ct);
         }, cancellationToken);
 
         return ToDetail(activity);
     }
 
-    public async Task<ActivityDetailResponse> UpdateActivityAsync(Guid activityId, ActivityRequest request, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task<ActivityDetailResponse> UpdateActivityAsync(Guid activityId, ActivityRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var activity = await GetActivityForUpdateAsync(activityId, cancellationToken);
+        var activity = await GetActivityForUpdateAsync(activityId, period, cancellationToken);
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
-            var available = await transactionRepository.GetAvailableMoneyAsync(ct);
+            var available = await transactionRepository.GetAvailableMoneyAsync(activity.SavingPeriodId, ct);
             var oldAmount = activity.TotalCost();
             activity.UpdateDetails(request.Name, request.Description, request.Quantity, request.UnitCost,
-                request.UnitSalePrice, ToUtcDate(request.StartDate));
+                request.UnitSalePrice, ToUtcDate(request.StartDate), period);
             CashGuard.EnsureAvailable(available, activity.TotalCost() - oldAmount); // FIN-13
             activity.Transaction.Update(activity.TotalCost(), TransactionDirection.Expense, TransactionType.Activity,
                 ActivityDescription(activity.Name));
             activity.RefreshStatus();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.Activity, activity.Id, LogAction.Update, oldAmount, activity.TotalCost()),
+                new Log(performedByUserId, LogEntityType.Activity, activity.Id, LogAction.Update, activity.SavingPeriodId, oldAmount, activity.TotalCost()),
                 ct);
         }, cancellationToken);
 
         return ToDetail(activity);
     }
 
-    public async Task CancelActivityAsync(Guid activityId, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task CancelActivityAsync(Guid activityId, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var activity = await GetActivityForUpdateAsync(activityId, cancellationToken);
+        var activity = await GetActivityForUpdateAsync(activityId, period, cancellationToken);
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
@@ -101,14 +102,14 @@ public sealed class ActivityService(
             activity.Cancel();
             activity.Transaction.Cancel();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.Activity, activity.Id, LogAction.Delete, oldAmount, null),
+                new Log(performedByUserId, LogEntityType.Activity, activity.Id, LogAction.Delete, activity.SavingPeriodId, oldAmount, null),
                 ct);
         }, cancellationToken);
     }
 
-    public async Task<ActivityAssignmentResponse> CreateAssignmentAsync(Guid activityId, ActivityAssignmentRequest request, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task<ActivityAssignmentResponse> CreateAssignmentAsync(Guid activityId, ActivityAssignmentRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var activity = await GetActivityForUpdateAsync(activityId, cancellationToken);
+        var activity = await GetActivityForUpdateAsync(activityId, period, cancellationToken);
         var member = await GetActiveMemberAsync(request.UserId, cancellationToken);
         ActivityAssignment? assignment = null;
 
@@ -118,7 +119,7 @@ public sealed class ActivityService(
             await activityRepository.AddAssignmentAsync(assignment, ct);
             activity.RefreshStatus();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.ActivityAssignment, assignment.Id, LogAction.Create, null,
+                new Log(performedByUserId, LogEntityType.ActivityAssignment, assignment.Id, LogAction.Create, activity.SavingPeriodId, null,
                     SaleAmount(activity, assignment)),
                 ct);
         }, cancellationToken);
@@ -126,10 +127,10 @@ public sealed class ActivityService(
         return ToAssignment(assignment!, MemberName(member), activity.UnitSalePrice);
     }
 
-    public async Task<ActivityAssignmentResponse> UpdateAssignmentAsync(Guid activityId, Guid assignmentId, ActivityAssignmentUpdateRequest request, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task<ActivityAssignmentResponse> UpdateAssignmentAsync(Guid activityId, Guid assignmentId, ActivityAssignmentUpdateRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
         var status = GetAssignmentStatus(request);
-        var activity = await GetActivityForUpdateAsync(activityId, cancellationToken);
+        var activity = await GetActivityForUpdateAsync(activityId, period, cancellationToken);
         var assignment = FindAssignment(activity, assignmentId);
 
         if (assignment.Status == AssignmentStatus.Paid && status == AssignmentStatus.Pending)
@@ -147,14 +148,15 @@ public sealed class ActivityService(
                     SaleAmount(activity, assignment),
                     TransactionDirection.Income,
                     TransactionType.ActivitySale,
-                    SaleDescription(activity.Name, MemberName(assignment.User)));
+                    SaleDescription(activity.Name, MemberName(assignment.User)),
+                    activity.SavingPeriodId);
                 await transactionRepository.AddAsync(transaction, ct);
                 assignment.MarkAsPaid(transaction.Id);
             }
 
             activity.RefreshStatus();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.ActivityAssignment, assignment.Id, LogAction.Update, oldAmount,
+                new Log(performedByUserId, LogEntityType.ActivityAssignment, assignment.Id, LogAction.Update, activity.SavingPeriodId, oldAmount,
                     SaleAmount(activity, assignment)),
                 ct);
         }, cancellationToken);
@@ -162,9 +164,9 @@ public sealed class ActivityService(
         return ToAssignment(assignment, MemberName(assignment.User), activity.UnitSalePrice);
     }
 
-    public async Task CancelAssignmentAsync(Guid activityId, Guid assignmentId, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task CancelAssignmentAsync(Guid activityId, Guid assignmentId, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var activity = await GetActivityForUpdateAsync(activityId, cancellationToken);
+        var activity = await GetActivityForUpdateAsync(activityId, period, cancellationToken);
         var assignment = FindAssignment(activity, assignmentId);
 
         if (activity.Status == ActivityStatus.Cancelled)
@@ -180,7 +182,7 @@ public sealed class ActivityService(
 
             activity.RefreshStatus();
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.ActivityAssignment, assignment.Id, LogAction.Delete, oldAmount, null),
+                new Log(performedByUserId, LogEntityType.ActivityAssignment, assignment.Id, LogAction.Delete, activity.SavingPeriodId, oldAmount, null),
                 ct);
         }, cancellationToken);
     }
@@ -196,8 +198,8 @@ public sealed class ActivityService(
         return member;
     }
 
-    private async Task<Activity> GetActivityForUpdateAsync(Guid activityId, CancellationToken cancellationToken) =>
-        await activityRepository.GetForUpdateAsync(activityId, cancellationToken)
+    private async Task<Activity> GetActivityForUpdateAsync(Guid activityId, SavingPeriod period, CancellationToken cancellationToken) =>
+        await activityRepository.GetForUpdateAsync(activityId, period.Id, cancellationToken)
             ?? throw new DomainException("Activity not found.");
 
     private static ActivityAssignment FindAssignment(Activity activity, Guid assignmentId) =>

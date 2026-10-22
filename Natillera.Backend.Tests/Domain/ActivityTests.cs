@@ -1,13 +1,14 @@
 using Natillera.Backend.Domain.Entities;
 using Natillera.Backend.Domain.Enums;
 using Natillera.Backend.Domain.Exceptions;
+using Natillera.Backend.Tests.Fakes;
 
 namespace Natillera.Backend.Tests.Domain;
 
 public class ActivityTests
 {
     private static Activity Create(int quantity = 10, decimal cost = 1000m, decimal price = 1500m) =>
-        new("Rifa", "Rifa anual", quantity, cost, price, new DateTime(2025, 5, 5, 8, 0, 0), Guid.NewGuid());
+        new("Rifa", "Rifa anual", quantity, cost, price, new DateTime(2025, 5, 5, 8, 0, 0), Guid.NewGuid(), TestPeriods.Y2025);
 
     [Fact]
     public void Constructor_Valid_SetsFieldsAndTotals()
@@ -45,22 +46,22 @@ public class ActivityTests
     [InlineData("  ")]
     public void Constructor_BlankName_Throws(string name)
     {
-        Assert.Throws<DomainException>(() => new Activity(name, "d", 1, 1m, 1m, DateTime.UtcNow, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => new Activity(name, "d", 1, 1m, 1m, new DateTime(2026, 6, 1), Guid.NewGuid(), TestPeriods.Y2026));
     }
 
     [Fact]
     public void Constructor_NameOver100_Throws()
     {
         Assert.Throws<DomainException>(() =>
-            new Activity(new string('a', 101), "d", 1, 1m, 1m, DateTime.UtcNow, Guid.NewGuid()));
+            new Activity(new string('a', 101), "d", 1, 1m, 1m, new DateTime(2026, 6, 1), Guid.NewGuid(), TestPeriods.Y2026));
     }
 
     [Fact]
     public void Constructor_BlankOrLongDescription_Throws()
     {
-        Assert.Throws<DomainException>(() => new Activity("n", " ", 1, 1m, 1m, DateTime.UtcNow, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => new Activity("n", " ", 1, 1m, 1m, new DateTime(2026, 6, 1), Guid.NewGuid(), TestPeriods.Y2026));
         Assert.Throws<DomainException>(() =>
-            new Activity("n", new string('a', 201), 1, 1m, 1m, DateTime.UtcNow, Guid.NewGuid()));
+            new Activity("n", new string('a', 201), 1, 1m, 1m, new DateTime(2026, 6, 1), Guid.NewGuid(), TestPeriods.Y2026));
     }
 
     [Fact]
@@ -186,7 +187,7 @@ public class ActivityTests
     {
         var a = Create(10);
 
-        a.UpdateDetails(" Nueva ", "Desc", 12, 900m, 1800m, new DateTime(2025, 6, 1, 5, 0, 0));
+        a.UpdateDetails(" Nueva ", "Desc", 12, 900m, 1800m, new DateTime(2025, 6, 1, 5, 0, 0), TestPeriods.Y2025);
 
         Assert.Equal("Nueva", a.Name);
         Assert.Equal(12, a.Quantity);
@@ -201,7 +202,7 @@ public class ActivityTests
         var a = Create(10);
         a.AddAssignment(6, Guid.NewGuid());
 
-        Assert.Throws<DomainException>(() => a.UpdateDetails("n", "d", 5, 1000m, 1500m, DateTime.UtcNow));
+        Assert.Throws<DomainException>(() => a.UpdateDetails("n", "d", 5, 1000m, 1500m, new DateTime(2025, 6, 1), TestPeriods.Y2025));
         Assert.Equal(10, a.Quantity);
     }
 
@@ -211,7 +212,7 @@ public class ActivityTests
         var a = Create(10);
         a.AddAssignment(6, Guid.NewGuid());
 
-        a.UpdateDetails("n", "d", 6, 1000m, 1500m, DateTime.UtcNow);
+        a.UpdateDetails("n", "d", 6, 1000m, 1500m, new DateTime(2025, 6, 1), TestPeriods.Y2025);
 
         Assert.Equal(6, a.Quantity);
     }
@@ -222,7 +223,7 @@ public class ActivityTests
         var a = Create(10);
         a.AddAssignment(2, Guid.NewGuid()).MarkAsPaid(Guid.NewGuid());
 
-        Assert.Throws<DomainException>(() => a.UpdateDetails("n", "d", 10, 1000m, 2000m, DateTime.UtcNow));
+        Assert.Throws<DomainException>(() => a.UpdateDetails("n", "d", 10, 1000m, 2000m, new DateTime(2025, 6, 1), TestPeriods.Y2025));
         Assert.Equal(1500m, a.UnitSalePrice);
     }
 
@@ -232,7 +233,7 @@ public class ActivityTests
         var a = Create(10);
         a.AddAssignment(2, Guid.NewGuid()).MarkAsPaid(Guid.NewGuid());
 
-        a.UpdateDetails("n", "d", 10, 800m, 1500m, DateTime.UtcNow);
+        a.UpdateDetails("n", "d", 10, 800m, 1500m, new DateTime(2025, 6, 1), TestPeriods.Y2025);
 
         Assert.Equal(800m, a.UnitCost);
     }
@@ -243,7 +244,7 @@ public class ActivityTests
         var a = Create(10);
         a.AddAssignment(2, Guid.NewGuid());
 
-        a.UpdateDetails("n", "d", 10, 1000m, 2000m, DateTime.UtcNow);
+        a.UpdateDetails("n", "d", 10, 1000m, 2000m, new DateTime(2025, 6, 1), TestPeriods.Y2025);
 
         Assert.Equal(2000m, a.UnitSalePrice);
     }
@@ -254,7 +255,7 @@ public class ActivityTests
         var a = Create();
         a.Cancel();
 
-        Assert.Throws<DomainException>(() => a.UpdateDetails("n", "d", 1, 1m, 1m, DateTime.UtcNow));
+        Assert.Throws<DomainException>(() => a.UpdateDetails("n", "d", 1, 1m, 1m, new DateTime(2025, 6, 1), TestPeriods.Y2025));
     }
 
     [Fact]
@@ -262,7 +263,7 @@ public class ActivityTests
     {
         var a = Create();
 
-        Assert.Throws<DomainException>(() => a.UpdateDetails("n", "d", 10, 2000m, 1000m, DateTime.UtcNow));
+        Assert.Throws<DomainException>(() => a.UpdateDetails("n", "d", 10, 2000m, 1000m, new DateTime(2025, 6, 1), TestPeriods.Y2025));
     }
 
     [Fact]

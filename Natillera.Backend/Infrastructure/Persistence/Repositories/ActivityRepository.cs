@@ -7,9 +7,10 @@ namespace Natillera.Backend.Infrastructure.Persistence.Repositories;
 
 public sealed class ActivityRepository(NatilleraDbContext dbContext) : IActivityRepository
 {
-    public async Task<IReadOnlyCollection<ActivityListData>> GetListAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<ActivityListData>> GetListAsync(Guid savingPeriodId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Activities.AsNoTracking()
+            .Where(activity => activity.SavingPeriodId == savingPeriodId)
             .OrderByDescending(activity => activity.StartDate)
             .ThenByDescending(activity => activity.CreatedAt)
             .Select(activity => new ActivityListData(
@@ -27,17 +28,17 @@ public sealed class ActivityRepository(NatilleraDbContext dbContext) : IActivity
             .ToArrayAsync(cancellationToken);
     }
 
-    public Task<Activity?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default) =>
+    public Task<Activity?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         dbContext.Activities.AsNoTracking()
             .Include(activity => activity.Assignments).ThenInclude(assignment => assignment.User)
-            .SingleOrDefaultAsync(activity => activity.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(activity => activity.Id == id && activity.SavingPeriodId == savingPeriodId, cancellationToken);
 
-    public Task<Activity?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default) =>
+    public Task<Activity?> GetForUpdateAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         dbContext.Activities
             .Include(activity => activity.Transaction)
             .Include(activity => activity.Assignments).ThenInclude(assignment => assignment.Transaction)
             .Include(activity => activity.Assignments).ThenInclude(assignment => assignment.User)
-            .SingleOrDefaultAsync(activity => activity.Id == id, cancellationToken);
+            .SingleOrDefaultAsync(activity => activity.Id == id && activity.SavingPeriodId == savingPeriodId, cancellationToken);
 
     public Task AddAsync(Activity activity, CancellationToken cancellationToken = default) =>
         dbContext.Activities.AddAsync(activity, cancellationToken).AsTask();
