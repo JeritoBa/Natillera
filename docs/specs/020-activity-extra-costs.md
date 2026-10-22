@@ -66,12 +66,25 @@ All period-scoped (`X-Saving-Id`, PER-04); the activity must belong to the selec
 | PUT | `/api/activities/{id}/extra-costs/{costId}` | Admin | `{ description, amount, status }` | 200 detail; 400 as above |
 | DELETE | `/api/activities/{id}/extra-costs/{costId}` | Admin | - | 204 (cancel, never physical delete; same verb as the other cancellations) |
 | GET | `/api/activities/{id}` | Admin, Member | - | + extra costs |
-| GET | `/api/dashboard/summary` | Admin | - | + `sharedInterestPool` (net); `loanInterestEarned` stays gross |
+| GET | `/api/dashboard/summary` | Admin | - | + `sharedInterestPool` (net) and `paidExtraCosts`; `loanInterestEarned` stays gross |
 
 Errors use the app format `{ "message": "..." }` (OPS-05).
 
 ## Acceptance criteria
-Defined in the implementation plan and added here before build.
+1. Given an active activity, when the Admin adds a Pending extra cost, then it is listed as Pending with no Transaction and one ExtraCost Create Log.
+2. Given pool >= X and available money >= X, when the Admin adds a Paid extra cost of X, then an Expense Transaction of type `ExtraCost` exists in the activity's period, and the available money and the net pool both fall by X.
+3. Given pool P, when the Admin adds a Paid extra cost greater than P, then the API returns 400 `{ message }` and nothing is saved.
+4. Given a Pending extra cost, when it is marked Paid, then its Transaction is created; given a Paid one, setting it back to Pending returns 400.
+5. Given a Paid extra cost of A raised to B with B - A > pool, then 400; when it is lowered, its Transaction is updated.
+6. Given a Paid extra cost, when it is cancelled, then its Transaction is cancelled and the pool and available money are restored, even when the pool is 0.
+7. Given an activity with a Pending or Paid extra cost, cancelling the activity returns 400; on a cancelled activity, adding or editing an extra cost returns 400.
+8. Given paid interest I and paid extra costs C, the Admin dashboard shows max(0, I - C) with the gross I and C below it; "Mis ahorros" and the member detail use the same share, round((I - C) / active members).
+9. Given a Paid interest whose cancellation or reduction would leave the pool below 0, then 400.
+10. The transaction detail and the log detail of an extra cost show its activity and never return 500.
+11. With another period selected, every extra-cost route of an activity returns 404; Members get 403 on POST/PUT/DELETE and can read the list.
+12. The activity's own figures (cost, collected, net profit) do not change when extra costs are added.
+13. In the activity detail at 375 and 1280 px, the Admin can add, edit and cancel extra costs and a Member sees them read-only; the public demo still works.
+14. `dotnet test`, `npm test`, `npm run lint` and `npm run build` pass.
 
 ## Test plan
 - Backend unit tests per rule ID (ACT-13..15, DASH-12, FIN-14, FIN-13 for extra costs, FIN-08 transitions), with in-memory fakes.
