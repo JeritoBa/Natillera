@@ -23,7 +23,8 @@ public sealed class LoanRepository(NatilleraDbContext dbContext) : ILoanReposito
                 loan.Status,
                 dbContext.LoanPayments
                     .Where(payment => payment.LoanId == loan.Id && payment.Status != PaymentStatus.Cancelled)
-                    .Select(payment => (decimal?)payment.Amount).Sum() ?? 0m))
+                    .Select(payment => (decimal?)payment.Amount).Sum() ?? 0m,
+                loan.Description))
             .ToArrayAsync(cancellationToken);
     }
 

@@ -27,7 +27,8 @@ public sealed class LoanService(
                 loan.InterestRate,
                 loan.StartDate,
                 loan.Status,
-                Math.Max(0, loan.InitialAmount - loan.PrincipalPaid)))
+                Math.Max(0, loan.InitialAmount - loan.PrincipalPaid),
+                loan.Description))
             .ToArray();
     }
 
@@ -60,7 +61,8 @@ public sealed class LoanService(
             TransactionType.Loan,
             $"Loan - {borrowerName}",
             period.Id);
-        var loan = new Loan(request.InitialAmount, request.InterestRate, ToUtcDate(request.StartDate), request.BorrowerId, transaction.Id, period);
+        var loan = new Loan(request.InitialAmount, request.InterestRate, ToUtcDate(request.StartDate), request.BorrowerId, transaction.Id, period,
+            request.Description);
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
@@ -85,7 +87,7 @@ public sealed class LoanService(
         {
             var available = await transactionRepository.GetAvailableMoneyAsync(loan.SavingPeriodId, ct);
             var oldAmount = loan.InitialAmount;
-            loan.UpdateDetails(request.InitialAmount, request.InterestRate, ToUtcDate(request.StartDate), request.BorrowerId, period);
+            loan.UpdateDetails(request.InitialAmount, request.InterestRate, ToUtcDate(request.StartDate), request.BorrowerId, period, request.Description);
             CashGuard.EnsureAvailable(available, loan.InitialAmount - oldAmount); // FIN-13
             loan.Transaction.Update(loan.InitialAmount, TransactionDirection.Expense, TransactionType.Loan, $"Loan - {borrowerName}");
             await logRepository.AddAsync(
@@ -333,6 +335,7 @@ public sealed class LoanService(
             loan.InitialAmount,
             loan.InterestRate,
             loan.StartDate,
+            loan.Description,
             loan.EndDate,
             loan.Status,
             loan.CreatedAt,

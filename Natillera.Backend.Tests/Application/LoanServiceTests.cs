@@ -499,4 +499,52 @@ public class LoanServiceTests
         Assert.True(loan.Payments.Single().Transaction.IsCancelled);
         Assert.True(_transactions.Available() < 0m);
     }
+
+    private static LoanRequest LoanReqWithDescription(Guid borrower, string? description, decimal amount = 1000m) =>
+        new() { BorrowerId = borrower, InitialAmount = amount, InterestRate = 5m, StartDate = new DateTime(2026, 1, 1), Description = description };
+
+    [Fact]
+    public async Task CreateLoanAsync_WithDescription_StoresTrimmedDescriptionInDetail_LOAN11()
+    {
+        var borrower = _users.AddUser();
+
+        var response = await _service.CreateLoanAsync(
+            LoanReqWithDescription(borrower.Id, "  Linea 1\nLinea 2  "), Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal("Linea 1\nLinea 2", response.Description);
+        Assert.Equal("Linea 1\nLinea 2", _loans.Loans.Single().Description);
+    }
+
+    [Fact]
+    public async Task UpdateLoanAsync_ChangesDescription_KeepsTransactionAmountAndWritesOneUpdateLog_LOAN11()
+    {
+        var borrower = _users.AddUser();
+        var loan = await SeedLoanAsync(borrower, 1000m);
+
+        var response = await _service.UpdateLoanAsync(
+            loan.Id, LoanReqWithDescription(borrower.Id, "Para la moto"), Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal("Para la moto", response.Description);
+        Assert.Equal(1000m, loan.Transaction.Amount);
+        var log = Assert.Single(_logs.Logs);
+        Assert.Equal(LogAction.Update, log.Action);
+        Assert.Equal(1000m, log.OldValue);
+        Assert.Equal(1000m, log.NewValue);
+    }
+
+    [Fact]
+    public async Task UpdateLoanAsync_EmptyDescription_ClearsIt_LOAN11()
+    {
+        var borrower = _users.AddUser();
+        var created = await _service.CreateLoanAsync(
+            LoanReqWithDescription(borrower.Id, "Algo"), Admin, TestPeriods.Y2026, default);
+        var loan = _loans.Loans.Single(l => l.Id == created.Id);
+        loan.Set("Borrower", borrower).Set("Transaction", _transactions.Transactions.Single(t => t.Id == loan.TransactionId));
+
+        var response = await _service.UpdateLoanAsync(
+            loan.Id, LoanReqWithDescription(borrower.Id, "   "), Admin, TestPeriods.Y2026, default);
+
+        Assert.Null(response.Description);
+        Assert.Null(loan.Description);
+    }
 }
