@@ -22,6 +22,7 @@ using Natillera.Backend.Infrastructure.Security;
 using Natillera.Backend.Infrastructure.Persistence;
 using Natillera.Backend.Infrastructure.Persistence.Repositories;
 using Natillera.Backend.Infrastructure.Persistence.Seed;
+using Natillera.Backend.Presentation;
 
 if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("JWT_SECRET")))
     DotNetEnv.Env.TraversePath().Load();
@@ -115,7 +116,13 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        // OPS-05: no framework error bodies; validation errors and bare status results use the app's format.
+        options.InvalidModelStateResponseFactory = ApiErrors.InvalidModelState;
+        options.SuppressMapClientErrors = true;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -166,6 +173,13 @@ else
 {
     app.Logger.LogInformation("Skipping database migrations and admin seed (NATILLERA_APPLY_MIGRATIONS is not true).");
 }
+
+// OPS-05: an unhandled exception returns a generic message (never a stack trace or exception page); it is still logged.
+app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
+{
+    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+    await context.Response.WriteAsJsonAsync(new { message = ApiErrors.Unexpected });
+}));
 
 if (app.Environment.IsDevelopment())
 {

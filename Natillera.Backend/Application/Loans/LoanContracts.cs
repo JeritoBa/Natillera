@@ -18,7 +18,7 @@ public sealed class LoanRequest
     [Required]
     public DateTime StartDate { get; init; }
 
-    [MaxLength(Loan.DescriptionMaxLength)]
+    // LOAN-11: length is checked by the domain after trimming (message in the app's format, OPS-05).
     public string? Description { get; init; }
 }
 
