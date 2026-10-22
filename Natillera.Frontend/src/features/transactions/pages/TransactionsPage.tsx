@@ -94,13 +94,13 @@ export function TransactionsPage() {
           const typeChip = <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: typeBackground[transaction.type], color: typeColor[transaction.type] }}>{typeLabel[transaction.type]}</span>
           return <tr key={transaction.id} className="table-row">
             <td className={`${cellFirst} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap ${colTablet}`}>{date}</td>
-            <td className={`${cell} py-3.5 text-[#0c1a12] w-full sm:w-auto max-w-0 sm:max-w-[220px] xl:max-w-[260px]`}>
-              <Link to={`/transactions/${transaction.id}`} title={transaction.description} className="block min-w-0 truncate sm:pointer-events-none focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{transaction.description}</Link>
+            <td className={`${cell} py-3.5 text-[#0c1a12] w-full sm:w-auto max-w-0 sm:max-w-none`}>
+              <Link to={`/transactions/${transaction.id}`} title={transaction.description} className="block min-w-0 truncate sm:max-w-[150px] xl:max-w-[260px] sm:pointer-events-none focus-visible:outline-2 focus-visible:outline-[#0c5c38] rounded">{transaction.description}</Link>
               <p className={subMobile}><span className="mono">{date}</span>{transaction.memberName && <span className="truncate min-w-0">· {transaction.memberName}</span>}{typeChip}{transaction.isCancelled && <Badge status="cancelled" />}</p>
               {transaction.memberName && <p className={subTablet}><span className="truncate">{transaction.memberName}</span></p>}
             </td>
             <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460]`}>{transaction.memberName ?? '—'}</td>
-            <td className={`${cell} ${colTablet} py-3.5`}>{typeChip}{transaction.isCancelled && <span className="ml-1.5"><Badge status="cancelled" /></span>}</td>
+            <td className={`${cell} ${colTablet} py-3.5`}><div className="flex flex-col items-start gap-1">{typeChip}{transaction.isCancelled && <Badge status="cancelled" />}</div></td>
             <td className={`${cell} py-3.5 ${cellAmount} font-semibold text-sm ${transaction.isCancelled ? 'text-[#4e7460] line-through' : transaction.direction === 'Expense' ? 'text-[#c0392b]' : 'text-[#0a6635]'}`}>{transaction.direction === 'Expense' ? '−' : '+'}{formatCurrency(transaction.amount)}</td>
             <td className={`${cellLast} py-3.5 ${cellActions} ${colTablet}`}><div className="flex justify-end gap-1"><button onClick={() => navigate(`/transactions/${transaction.id}`)} className={eyeButton} aria-label="Ver detalle"><Icon.Eye open /></button></div></td>
           </tr>

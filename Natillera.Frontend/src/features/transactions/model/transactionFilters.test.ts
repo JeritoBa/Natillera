@@ -2,21 +2,21 @@ import { describe, expect, it } from 'vitest'
 import type { TransactionType } from '@/features/transactions/api/transactionsApi'
 import { filterTransactions, transactionMonthKey, transactionMonthOptions } from '@/features/transactions/model/transactionFilters'
 
-// Built from local date parts so the tests do not depend on the machine time zone.
-const at = (year: number, month: number, day: number, hour = 12) => new Date(year, month - 1, day, hour).toISOString()
+// Colombia is UTC-5 all year, so these instants do not depend on the machine time zone.
 const tx = (type: TransactionType, occurredAt: string) => ({ type, occurredAt })
 
 const transactions = [
-  tx('MonthlyPayment', at(2026, 10, 31, 23)),
-  tx('Loan', at(2026, 10, 5)),
-  tx('MonthlyPayment', at(2026, 9, 30)),
-  tx('Activity', at(2025, 12, 1, 0)),
+  tx('MonthlyPayment', '2026-11-01T04:30:00Z'), // 23:30 on 31/10 in Colombia
+  tx('Loan', '2026-10-05T17:00:00Z'),
+  tx('MonthlyPayment', '2026-09-30T17:00:00Z'),
+  tx('Activity', '2025-12-01T15:00:00Z'),
 ]
 
 describe('transaction filters (UI-06)', () => {
-  it('uses the local date for the month key (23:00 on the 31st stays in its month)', () => {
-    expect(transactionMonthKey(at(2026, 10, 31, 23))).toBe('2026-10')
-    expect(transactionMonthKey(at(2026, 1, 1, 0))).toBe('2026-01')
+  it('uses the Colombia date for the month key, whatever the browser time zone', () => {
+    expect(transactionMonthKey('2026-11-01T04:30:00Z')).toBe('2026-10')
+    expect(transactionMonthKey('2026-11-01T05:30:00Z')).toBe('2026-11')
+    expect(transactionMonthKey('2026-01-01T04:59:00Z')).toBe('2025-12')
   })
 
   it('filters by type and month, combined', () => {

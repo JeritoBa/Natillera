@@ -1,9 +1,11 @@
 import type { TransactionType } from '@/features/transactions/api/transactionsApi'
 
-// UI-06: the month is the local date of occurredAt (the API sends a UTC timestamp), not slice(0, 7) of the UTC string.
+// UI-06: the month is the Colombia (America/Bogota) date of occurredAt (the API sends a UTC timestamp), regardless of the browser time zone.
+const bogotaMonth = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit' })
 export const transactionMonthKey = (occurredAt: string) => {
-  const date = new Date(occurredAt)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  const parts = bogotaMonth.formatToParts(new Date(occurredAt))
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? ''
+  return `${part('year')}-${part('month')}`
 }
 
 interface FilterableTransaction { type: TransactionType, occurredAt: string }
