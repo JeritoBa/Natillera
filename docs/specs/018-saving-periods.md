@@ -73,8 +73,28 @@ Period-scoped: monthly payments, loans (and their payments/interest), activities
 ## UI
 Configuración view (form, select "Año", "Guardar"), Settings icon in the navigation, selected year visible in the app shell, notice when the current year has no period, fee form without "Año". UI copy and layout specified by the ux-designer.
 
+## Delivery
+One vertical slice (schema + backend + frontend delivered together, validated once), committed per layer with clear conventional commits.
+
 ## Acceptance criteria
-Defined in the implementation plan and added here before build.
+1. Given the migrated dev DB, when compared with the backup, then row counts, total available money and fee years/amounts are identical.
+2. Given the migration applied on a temporary copy, when reverted, then `monthly_payments."Year"` matches the backup.
+3. Given a logged-in user with no stored selection, when the app loads, then the current year's period is selected and its year is shown in the app shell.
+4. Given a stored period id that no longer exists, when the app loads, then the default applies.
+5. Given the current year has no period (e.g. 2027), when the app loads, then the most recent period is selected and a dismissible notice says so.
+6. Given an Admin or a Member, when they choose 2025 in Configuración and press "Guardar", then every view shows only 2025 data and the shell shows 2025.
+7. Given 2025 has no data, when the dashboard opens, then available money and every figure are 0 (nothing carried over).
+8. Given a period-scoped request without `X-Saving-Id`, or with a malformed or unknown id, then the API returns 400 with an English message.
+9. Given `GET /api/saving-periods`, login, members CRUD and `/health` without the header, then they succeed.
+10. Given 2025 is selected, when the Admin creates a March fee, then it is stored in 2025, and the same member can also have a March fee in 2026 (MP-04).
+11. Given the fee form, then there is no "Año" field and only the free months of the selected year are offered.
+12. Given 2026 is selected, when a loan is created with start date 2025-12-31, then the API returns 400 (PER-05) and the form prevents it.
+13. Given available money 100 in 2026 and 0 in 2025, when a loan of 50 is created in 2025, then it is rejected (FIN-13 per period).
+14. Given a loan payment of a 2026 loan, then its transaction and log belong to 2026 and appear only in 2026 lists.
+15. Given a member whose only pending fee is in 2025, when the Admin deactivates them with 2026 selected, then it is blocked (MEM-04, PER-07).
+16. Given 2026 is selected, when a 2025 record's URL is opened, then the API returns 404 and the page says the record may belong to another period.
+17. Given the public demo, then it works as before (the period UI is hidden there).
+18. `dotnet test`, `npm test`, `npm run lint` and `npm run build` pass.
 
 ## Test plan
 - Backend unit tests per rule ID (PER-03..07, MP-04/MP-11, FIN-13 per period), with in-memory fakes.
@@ -83,4 +103,9 @@ Defined in the implementation plan and added here before build.
 - Validator: acceptance criteria on the Docker dev stack, Admin and Member, mobile and desktop.
 
 ## Open questions
-1. Opening a record by id from another period (e.g. a 2025 loan while 2026 is selected): allowed using the record's own period, or 404? To decide with the plan.
+None. Owner decisions 2026-10-21 (plan review):
+1. **Strict by-id access:** a record (or child) whose period differs from `X-Saving-Id` is not found (404); detail pages say it may belong to another period.
+2. Flow: the backend exposes the periods, the frontend shows them with their year and sends the selected period id as `X-Saving-Id`. Period 2026 has a fixed id in the migration.
+3. Yearly period migrations insert only if the year does not exist yet (`ON CONFLICT ("Year") DO NOTHING`).
+4. The public demo keeps working; the period UI (nav item, chip, notice) is hidden in `/demo` for now.
+5. When the current year has no period yet, the app goes to the most recent period and shows a notice that can be dismissed for the session and disappears once a period is saved.
