@@ -1,6 +1,6 @@
 # 019 - Loan description
 
-- **Status:** Approved (2026-10-21)
+- **Status:** Implemented (2026-10-21)
 - **Owner decision date / reference:** 2026-10-21 (branch `v1.1.0`; max 500 chars; editable; visible to Admin and Members)
 - **Related rules:** LOAN-11 (new), LOAN-09, FIN-05, PER-02
 
