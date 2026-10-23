@@ -47,12 +47,22 @@
 
 > **This is not an open-source project.** The source code is private property of its owner and is shared here only to describe what the application is, how it works and how it is built. No license is granted to use, copy, modify or distribute it. All rights reserved.
 
-## Latest version: v1.0.1
+## Latest version: v1.1.0
+
+- **Saving periods:** the natillera runs by years. In the new **Configuración** view (gear icon) every user picks the year to see; the selected year is always shown on screen and the choice is remembered on each device (default: the current year). Every figure, list and check is computed within that year and each year starts from zero.
+- **Loan description:** an optional note of up to 500 characters on each loan, with a character counter in the form and its own card in the loan detail.
+- **Activity extra costs:** the Admin records the extra costs of an activity (e.g. delivery) as pending or paid from the activity detail. Paid extra costs are subtracted from the loan interest shared among the members, and a cost that exceeds that interest or the available money is rejected.
+- **Safer API errors:** every error the API returns uses the app's own message format; framework error pages and internal details are never sent.
+
+<details>
+<summary>v1.0.1</summary>
 
 - **Pending obligations:** the member detail page and the member dashboard show everything a member still owes (fees, loan principal, interest and activity sales), grouped by kind and linked to each record.
 - **Filters:** monthly fees by member, month and status; loans by borrower and status; members by name and status; transactions by type and month.
 - **Fixes:** cancelled transactions are no longer counted in the income and expense totals, and they show as "Anulado"; the fee form offers only the months a member has not paid yet.
 - **Mobile, tablet and desktop:** one consistent table layout and centred stat cards, so every list stays readable on any screen; forms can be submitted with Enter.
+
+</details>
 
 ## Take a look
 
