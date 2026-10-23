@@ -385,6 +385,69 @@ public class ActivityTests
 
         Assert.Throws<DomainException>(a.Finish);
     }
+
+    [Fact]
+    public void AddExtraCost_CancelledActivity_Throws_ACT14()
+    {
+        var a = Create();
+        a.Cancel();
+
+        Assert.Throws<DomainException>(() => a.AddExtraCost("Domicilio", 5000m));
+    }
+
+    [Fact]
+    public void UpdateExtraCost_CancelledActivity_Throws_ACT14()
+    {
+        var a = Create();
+        var cost = a.AddExtraCost("Domicilio", 5000m);
+        cost.Cancel();
+        a.Cancel();
+
+        Assert.Throws<DomainException>(() => a.UpdateExtraCost(cost, "Otro", 100m));
+    }
+
+    [Fact]
+    public void Cancel_WithPendingExtraCost_Throws_ACT14()
+    {
+        var a = Create();
+        a.AddExtraCost("Domicilio", 5000m);
+
+        Assert.Throws<DomainException>(a.Cancel);
+        Assert.Equal(ActivityStatus.Pending, a.Status);
+    }
+
+    [Fact]
+    public void Cancel_WithPaidExtraCost_Throws_ACT14()
+    {
+        var a = Create();
+        a.AddExtraCost("Domicilio", 5000m).MarkAsPaid(Guid.NewGuid());
+
+        Assert.Throws<DomainException>(a.Cancel);
+    }
+
+    [Fact]
+    public void Cancel_WithOnlyCancelledExtraCosts_Succeeds_ACT14()
+    {
+        var a = Create();
+        a.AddExtraCost("Domicilio", 5000m).Cancel();
+
+        a.Cancel();
+
+        Assert.Equal(ActivityStatus.Cancelled, a.Status);
+    }
+
+    [Fact]
+    public void ExtraCosts_DoNotChangeTotalCostOrStatus_ACT15()
+    {
+        var a = Create(10, 1000m, 1500m);
+
+        a.AddExtraCost("Domicilio", 5000m).MarkAsPaid(Guid.NewGuid());
+        a.RefreshStatus();
+
+        Assert.Equal(10_000m, a.TotalCost());
+        Assert.Equal(10, a.AvailableQuantity());
+        Assert.Equal(ActivityStatus.Pending, a.Status);
+    }
 }
 
 public class ActivityAssignmentTests

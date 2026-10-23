@@ -6,6 +6,7 @@ namespace Natillera.Backend.Domain.Entities;
 public class Activity
 {
     private readonly List<ActivityAssignment> _assignments = [];
+    private readonly List<ExtraCost> _extraCosts = [];
 
     private Activity()
     {
@@ -44,6 +45,7 @@ public class Activity
     public SavingPeriod SavingPeriod { get; private set; } = null!;
     public Transaction Transaction { get; private set; } = null!;
     public IReadOnlyCollection<ActivityAssignment> Assignments => _assignments;
+    public IReadOnlyCollection<ExtraCost> ExtraCosts => _extraCosts;
 
     public decimal TotalCost() => Quantity * UnitCost;
 
@@ -103,12 +105,29 @@ public class Activity
         assignment.UpdateQuantity(quantity);
     }
 
+    // ACT-14, ACT-15: extra costs never touch the activity's own figures (cost, quantities, status).
+    public ExtraCost AddExtraCost(string description, decimal amount)
+    {
+        EnsureNotCancelled();
+        var cost = new ExtraCost(description, amount, Id);
+        _extraCosts.Add(cost);
+        return cost;
+    }
+
+    public void UpdateExtraCost(ExtraCost cost, string description, decimal amount)
+    {
+        EnsureNotCancelled();
+        cost.UpdateDetails(description, amount);
+    }
+
     public void Cancel()
     {
         if (Status == ActivityStatus.Cancelled)
             throw new DomainException("Activity is already cancelled.");
         if (_assignments.Any(assignment => assignment.Status != AssignmentStatus.Cancelled))
             throw new DomainException("Activity cannot be cancelled because it has active assignments.");
+        if (_extraCosts.Any(cost => cost.Status != ExtraCostStatus.Cancelled))
+            throw new DomainException("Activity cannot be cancelled because it has extra costs.");
 
         Status = ActivityStatus.Cancelled;
     }

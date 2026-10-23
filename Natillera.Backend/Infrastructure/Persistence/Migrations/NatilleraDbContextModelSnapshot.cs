@@ -115,6 +115,47 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.ToTable("activity_assignments", (string)null);
                 });
 
+            modelBuilder.Entity("Natillera.Backend.Domain.Entities.ExtraCost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("TransactionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityId");
+
+                    b.HasIndex("TransactionId")
+                        .IsUnique();
+
+                    b.ToTable("extra_costs", (string)null);
+                });
+
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.Loan", b =>
                 {
                     b.Property<Guid>("Id")
@@ -498,6 +539,24 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Natillera.Backend.Domain.Entities.ExtraCost", b =>
+                {
+                    b.HasOne("Natillera.Backend.Domain.Entities.Activity", "Activity")
+                        .WithMany("ExtraCosts")
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Natillera.Backend.Domain.Entities.Transaction", "Transaction")
+                        .WithOne()
+                        .HasForeignKey("Natillera.Backend.Domain.Entities.ExtraCost", "TransactionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Activity");
+
+                    b.Navigation("Transaction");
+                });
+
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.Loan", b =>
                 {
                     b.HasOne("Natillera.Backend.Domain.Entities.User", "Borrower")
@@ -621,6 +680,8 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.Activity", b =>
                 {
                     b.Navigation("Assignments");
+
+                    b.Navigation("ExtraCosts");
                 });
 
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.Loan", b =>

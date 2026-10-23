@@ -7,5 +7,6 @@ public enum TransactionType
     ActivitySale,
     Loan,
     LoanPayment,
-    Performance
+    Performance,
+    ExtraCost
 }
