@@ -262,40 +262,6 @@ export function ActivityDetailPage() {
         </section>
       </div>
 
-      <section aria-labelledby="activity-assignments-title" className="rounded-xl overflow-hidden" style={cardStyle}>
-        <div className="px-5 py-3 border-b flex items-center justify-between gap-3 flex-wrap" style={{ borderColor: '#eef4f0' }}>
-          <h2 id="activity-assignments-title" className="text-sm font-semibold text-[#0c1a12]">Asignaciones <span className="text-[#4e7460] font-normal">({activeCount})</span></h2>
-          {canManage && !isCancelled && activity.availableQuantity > 0 && <button onClick={() => openModal(null)} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Asignar miembro</button>}
-          {canManage && !isCancelled && activity.availableQuantity === 0 && <p className="text-xs text-[#4e7460]">Todas las unidades están asignadas</p>}
-        </div>
-        {sortedAssignments.length === 0
-          ? <div className="px-5 py-10 text-center text-sm text-[#4e7460]">
-            <p>Aún no hay miembros asignados a esta actividad.</p>
-            {canManage && !isCancelled && <p>Usa «Asignar miembro» para repartir las unidades.</p>}
-          </div>
-          : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
-            {headings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
-          </tr></thead><tbody>
-            {sortedAssignments.map(assignment => <tr key={assignment.id} className="table-row">
-              <td className={`${cellFirst} py-3.5 ${cellMain}`}>
-                <Link to={`/activities/${activity.id}/assignments/${assignment.id}`} title={assignment.memberName} className={mainLink}>{assignment.memberName}</Link>
-                <p className={subMobile}><span className="mono">{assignment.quantityAssigned} u.</span><Badge status={assignment.status.toLowerCase()} /></p>
-                <p className={subTablet}><span className="whitespace-nowrap">Asignada {shortDate(assignment.assignedAt)}</span><span className="whitespace-nowrap">· Pagada {assignment.paidAt ? shortDate(assignment.paidAt) : '—'}</span></p>
-              </td>
-              <td className={`${cell} ${colTablet} py-3.5 text-right mono text-[#4e7460]`}>{assignment.quantityAssigned}</td>
-              <td className={`${cell} py-3.5 ${cellAmount} text-[#0c1a12]`}>{formatCurrency(assignment.saleAmount)}</td>
-              <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{shortDate(assignment.assignedAt)}</td>
-              <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{assignment.paidAt ? shortDate(assignment.paidAt) : '—'}</td>
-              <td className={`${cell} ${colTablet} py-3.5`}><Badge status={assignment.status.toLowerCase()} /></td>
-              <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
-                <button onClick={() => navigate(`/activities/${activity.id}/assignments/${assignment.id}`)} className={eyeButton} aria-label={`Ver asignación de ${assignment.memberName}`}><Icon.Eye open /></button>
-                {canManage && !isCancelled && assignment.status === 'Pending' && <button onClick={() => openModal(assignment)} className={iconButton} aria-label={`Editar asignación de ${assignment.memberName}`}><Icon.Edit /></button>}
-                {canManage && !isCancelled && assignment.status !== 'Cancelled' && <button onClick={() => { if (window.confirm(confirmMessage(assignment))) void cancel(assignment) }} className={dangerButton} aria-label={`Anular asignación de ${assignment.memberName}`}><Icon.Trash /></button>}
-              </div></td>
-            </tr>)}
-          </tbody></table></div>}
-      </section>
-
       <section aria-labelledby="activity-extra-costs-title" className="rounded-xl overflow-hidden" style={cardStyle}>
         <div className="px-5 py-3 border-b flex items-center justify-between gap-3 flex-wrap" style={{ borderColor: '#eef4f0' }}>
           <h2 id="activity-extra-costs-title" className="text-sm font-semibold text-[#0c1a12]">Costos extra <span className="text-[#4e7460] font-normal">({costTotals.activeCount})</span></h2>
@@ -329,6 +295,40 @@ export function ActivityDetailPage() {
                 </div></td>}
               </tr>
             })}
+          </tbody></table></div>}
+      </section>
+
+      <section aria-labelledby="activity-assignments-title" className="rounded-xl overflow-hidden" style={cardStyle}>
+        <div className="px-5 py-3 border-b flex items-center justify-between gap-3 flex-wrap" style={{ borderColor: '#eef4f0' }}>
+          <h2 id="activity-assignments-title" className="text-sm font-semibold text-[#0c1a12]">Asignaciones <span className="text-[#4e7460] font-normal">({activeCount})</span></h2>
+          {canManage && !isCancelled && activity.availableQuantity > 0 && <button onClick={() => openModal(null)} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Asignar miembro</button>}
+          {canManage && !isCancelled && activity.availableQuantity === 0 && <p className="text-xs text-[#4e7460]">Todas las unidades están asignadas</p>}
+        </div>
+        {sortedAssignments.length === 0
+          ? <div className="px-5 py-10 text-center text-sm text-[#4e7460]">
+            <p>Aún no hay miembros asignados a esta actividad.</p>
+            {canManage && !isCancelled && <p>Usa «Asignar miembro» para repartir las unidades.</p>}
+          </div>
+          : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+            {headings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
+          </tr></thead><tbody>
+            {sortedAssignments.map(assignment => <tr key={assignment.id} className="table-row">
+              <td className={`${cellFirst} py-3.5 ${cellMain}`}>
+                <Link to={`/activities/${activity.id}/assignments/${assignment.id}`} title={assignment.memberName} className={mainLink}>{assignment.memberName}</Link>
+                <p className={subMobile}><span className="mono">{assignment.quantityAssigned} u.</span><Badge status={assignment.status.toLowerCase()} /></p>
+                <p className={subTablet}><span className="whitespace-nowrap">Asignada {shortDate(assignment.assignedAt)}</span><span className="whitespace-nowrap">· Pagada {assignment.paidAt ? shortDate(assignment.paidAt) : '—'}</span></p>
+              </td>
+              <td className={`${cell} ${colTablet} py-3.5 text-right mono text-[#4e7460]`}>{assignment.quantityAssigned}</td>
+              <td className={`${cell} py-3.5 ${cellAmount} text-[#0c1a12]`}>{formatCurrency(assignment.saleAmount)}</td>
+              <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{shortDate(assignment.assignedAt)}</td>
+              <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{assignment.paidAt ? shortDate(assignment.paidAt) : '—'}</td>
+              <td className={`${cell} ${colTablet} py-3.5`}><Badge status={assignment.status.toLowerCase()} /></td>
+              <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
+                <button onClick={() => navigate(`/activities/${activity.id}/assignments/${assignment.id}`)} className={eyeButton} aria-label={`Ver asignación de ${assignment.memberName}`}><Icon.Eye open /></button>
+                {canManage && !isCancelled && assignment.status === 'Pending' && <button onClick={() => openModal(assignment)} className={iconButton} aria-label={`Editar asignación de ${assignment.memberName}`}><Icon.Edit /></button>}
+                {canManage && !isCancelled && assignment.status !== 'Cancelled' && <button onClick={() => { if (window.confirm(confirmMessage(assignment))) void cancel(assignment) }} className={dangerButton} aria-label={`Anular asignación de ${assignment.memberName}`}><Icon.Trash /></button>}
+              </div></td>
+            </tr>)}
           </tbody></table></div>}
       </section>
 
