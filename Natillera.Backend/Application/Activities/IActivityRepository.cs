@@ -9,4 +9,5 @@ public interface IActivityRepository
     Task<Activity?> GetForUpdateAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default);
     Task AddAsync(Activity activity, CancellationToken cancellationToken = default);
     Task AddAssignmentAsync(ActivityAssignment assignment, CancellationToken cancellationToken = default);
+    Task AddExtraCostAsync(ExtraCost extraCost, CancellationToken cancellationToken = default);
 }

@@ -219,11 +219,13 @@ public sealed class LoanService(
         {
             var wasPaid = performance.Status == PaymentStatus.Paid;
             var available = wasPaid ? await transactionRepository.GetAvailableMoneyAsync(loan.SavingPeriodId, ct) : 0m;
+            var pool = wasPaid ? await transactionRepository.GetSharedInterestPoolAsync(loan.SavingPeriodId, ct) : 0m;
             var oldAmount = performance.Amount;
             performance.UpdateDetails(request.Amount, request.Description);
             if (wasPaid)
             {
                 CashGuard.EnsureAvailable(available, oldAmount - performance.Amount); // FIN-13
+                InterestPool.EnsureReductionAllowed(pool, oldAmount - performance.Amount); // FIN-14
                 performance.Transaction!.Update(
                     performance.Amount,
                     TransactionDirection.Income,
@@ -254,6 +256,8 @@ public sealed class LoanService(
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
             var wasPaid = performance.Status == PaymentStatus.Paid;
+            if (wasPaid)
+                InterestPool.EnsureReductionAllowed(await transactionRepository.GetSharedInterestPoolAsync(loan.SavingPeriodId, ct), performance.Amount); // FIN-14
             performance.Cancel();
             if (wasPaid)
                 performance.Transaction!.Cancel();

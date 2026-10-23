@@ -272,6 +272,82 @@ public class LoanServiceTests
         Assert.Equal(LogAction.Delete, Assert.Single(_logs.Logs).Action);
     }
 
+    private void SeedExtraCostPaid(decimal amount) =>
+        _transactions.Transactions.Add(new Transaction(amount, TransactionDirection.Expense, TransactionType.ExtraCost, "Activity extra cost - QA", TestPeriods.Y2026.Id));
+
+    [Fact]
+    public async Task CancelInterestAsync_Paid_LeavingPoolNegative_Throws_FIN14()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 500m), Admin, TestPeriods.Y2026, default);
+        LinkPaymentTransactions(loan);
+        SeedExtraCostPaid(200m); // pool 300 < 500
+        _logs.Logs.Clear();
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            _service.CancelInterestAsync(loan.Id, created.Id, Admin, TestPeriods.Y2026, default));
+
+        Assert.Equal("This change would leave the shared interest pool below zero. Pool: 300; reduction: 500.", ex.Message);
+        Assert.Equal(PaymentStatus.Paid, loan.Performances.Single().Status);
+        Assert.False(loan.Performances.Single().Transaction!.IsCancelled);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task CancelInterestAsync_Paid_PoolCovers_Succeeds_FIN14()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 500m), Admin, TestPeriods.Y2026, default);
+        LinkPaymentTransactions(loan);
+        _transactions.Transactions.Add(new Transaction(300m, TransactionDirection.Income, TransactionType.Performance, "Loan interest - QA", TestPeriods.Y2026.Id));
+        SeedExtraCostPaid(300m); // pool 500 = amount being cancelled
+
+        await _service.CancelInterestAsync(loan.Id, created.Id, Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal(PaymentStatus.Cancelled, loan.Performances.Single().Status);
+    }
+
+    [Fact]
+    public async Task UpdateInterestAsync_PaidLowered_BelowExtraCosts_Throws_FIN14()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 500m), Admin, TestPeriods.Y2026, default);
+        LinkPaymentTransactions(loan);
+        SeedExtraCostPaid(400m); // pool 100
+        _logs.Logs.Clear();
+
+        await Assert.ThrowsAsync<DomainException>(() =>
+            _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Paid, 300m), Admin, TestPeriods.Y2026, default)); // reduction 200 > pool 100
+
+        Assert.Equal(500m, loan.Performances.Single().Transaction!.Amount);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task UpdateInterestAsync_PaidRaised_IsNotPoolChecked_FIN14()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 500m), Admin, TestPeriods.Y2026, default);
+        LinkPaymentTransactions(loan);
+        SeedExtraCostPaid(500m); // pool 0
+
+        await _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Paid, 800m), Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal(800m, loan.Performances.Single().Transaction!.Amount);
+    }
+
+    [Fact]
+    public async Task CancelInterestAsync_Pending_NoPoolCheck_FIN14()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending, 500m), Admin, TestPeriods.Y2026, default);
+        SeedExtraCostPaid(900m); // pool negative (legacy data)
+
+        await _service.CancelInterestAsync(loan.Id, created.Id, Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal(PaymentStatus.Cancelled, loan.Performances.Single().Status);
+    }
+
     [Fact]
     public async Task CancelInterestAsync_Pending_CancelsWithoutTouchingOtherTransactions()
     {

@@ -53,6 +53,23 @@ public sealed class LogRepository(NatilleraDbContext dbContext) : ILogRepository
                 .SingleOrDefaultAsync(cancellationToken);
             if (payment is not null) summary = payment;
         }
+        else if (log.EntityType == LogEntityType.ExtraCost) // AUD-02
+        {
+            var extraCost = await dbContext.ExtraCosts
+                .AsNoTracking()
+                .Where(item => item.Id == log.EntityId)
+                .Select(item => new LogEntitySummary(
+                    null,
+                    null,
+                    null,
+                    item.Status.ToString(),
+                    item.Amount,
+                    item.TransactionId,
+                    item.ActivityId,
+                    item.Activity.Name))
+                .SingleOrDefaultAsync(cancellationToken);
+            if (extraCost is not null) summary = extraCost;
+        }
 
         return new LogDetailResponse(
             log.Id, log.EntityType, log.EntityId, log.Action, log.OccurredAt, log.OldValue, log.NewValue,

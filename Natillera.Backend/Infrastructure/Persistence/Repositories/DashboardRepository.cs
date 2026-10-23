@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Natillera.Backend.Application.Dashboard;
+using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Domain.Enums;
 
 namespace Natillera.Backend.Infrastructure.Persistence.Repositories;
@@ -33,10 +34,9 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
             .Select(assignment => assignment.QuantityAssigned * assignment.Activity.UnitCost)
             .SumAsync(cancellationToken);
 
-        var loanInterestEarned = await dbContext.Performances
-            .Where(performance => performance.Loan.SavingPeriodId == savingPeriodId && performance.Status == PaymentStatus.Paid)
-            .Select(performance => (decimal?)performance.Amount)
-            .SumAsync(cancellationToken) ?? 0m;
+        // DASH-12: gross paid interest stays as is; the net pool and the paid extra costs are reported next to it.
+        var loanInterestEarned = await SharedInterestPoolQuery.PaidTotalAsync(dbContext, savingPeriodId, TransactionType.Performance, cancellationToken);
+        var paidExtraCosts = await SharedInterestPoolQuery.PaidTotalAsync(dbContext, savingPeriodId, TransactionType.ExtraCost, cancellationToken);
 
         var realizedActivityEarnings = await PaidAssignments(savingPeriodId)
             .Select(assignment => (decimal?)(assignment.QuantityAssigned * (assignment.Activity.UnitSalePrice - assignment.Activity.UnitCost)))
@@ -59,7 +59,10 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
             loanInterestEarned,
             realizedActivityEarnings,
             null,
-            null);
+            null,
+            null,
+            InterestPool.Net(loanInterestEarned - paidExtraCosts),
+            paidExtraCosts);
     }
 
     private async Task<DashboardSummaryResponse> GetMemberSummaryAsync(Guid userId, decimal availableMoney, Guid savingPeriodId, CancellationToken cancellationToken)
@@ -75,18 +78,13 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
             .Select(assignment => (decimal?)(assignment.QuantityAssigned * (assignment.Activity.UnitSalePrice - assignment.Activity.UnitCost)))
             .SumAsync(cancellationToken) ?? 0m;
 
-        var paidPerformancesTotal = await dbContext.Performances
-            .Where(performance => performance.Loan.SavingPeriodId == savingPeriodId && performance.Status == PaymentStatus.Paid)
-            .Select(performance => (decimal?)performance.Amount)
-            .SumAsync(cancellationToken) ?? 0m;
+        var sharedInterestPool = InterestPool.Net(await SharedInterestPoolQuery.RawAsync(dbContext, savingPeriodId, cancellationToken)); // DASH-12
 
         // PER-07: members have no period, the interest share is divided among those active today.
         var activeMembersCount = await dbContext.Users
             .CountAsync(user => user.IsActive && user.Role == UserRole.Member, cancellationToken);
 
-        var performanceShare = activeMembersCount == 0
-            ? 0m
-            : Math.Round(paidPerformancesTotal / activeMembersCount, 2, MidpointRounding.AwayFromZero);
+        var performanceShare = InterestPool.Share(sharedInterestPool, activeMembersCount);
 
         var mySavings = paidMonthlyPayments + activityEarnings + performanceShare;
         var myEarnings = activityEarnings + performanceShare;

@@ -77,6 +77,23 @@ public sealed class FakeTransactionRepository : ITransactionRepository
     public Task<decimal> GetAvailableMoneyAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Available(savingPeriodId));
 
+    public Task<decimal> GetSharedInterestPoolAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(SharedInterestPool(savingPeriodId));
+
+    /// <summary>DASH-12: non-cancelled Performance minus ExtraCost transactions of one period (raw, not clamped). Defaults to 2026.</summary>
+    public decimal SharedInterestPool(Guid? savingPeriodId = null)
+    {
+        var id = savingPeriodId ?? TestPeriods.Y2026.Id;
+        return Transactions
+            .Where(t => t.SavingPeriodId == id && !t.IsCancelled)
+            .Sum(t => t.Type switch
+            {
+                TransactionType.Performance => t.Amount,
+                TransactionType.ExtraCost => -t.Amount,
+                _ => 0m
+            });
+    }
+
     private readonly Dictionary<Guid, decimal> _seededCash = [];
 
     /// <summary>Cash that exists outside the recorded transactions, so tests can seed money without extra Transactions.</summary>
@@ -207,6 +224,7 @@ public sealed class FakeActivityRepository : IActivityRepository
 {
     public List<Activity> Activities { get; } = [];
     public List<ActivityAssignment> AddedAssignments { get; } = [];
+    public List<ExtraCost> AddedExtraCosts { get; } = [];
 
     public Task<IReadOnlyCollection<ActivityListData>> GetListAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
@@ -226,6 +244,12 @@ public sealed class FakeActivityRepository : IActivityRepository
     public Task AddAssignmentAsync(ActivityAssignment assignment, CancellationToken cancellationToken = default)
     {
         AddedAssignments.Add(assignment);
+        return Task.CompletedTask;
+    }
+
+    public Task AddExtraCostAsync(ExtraCost extraCost, CancellationToken cancellationToken = default)
+    {
+        AddedExtraCosts.Add(extraCost);
         return Task.CompletedTask;
     }
 }

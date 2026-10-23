@@ -19,7 +19,9 @@ public sealed record LogEntitySummary(
     int? Month,
     string? Status,
     decimal? Amount,
-    Guid? TransactionId);
+    Guid? TransactionId,
+    Guid? ActivityId = null,
+    string? ActivityName = null);
 
 public sealed record LogDetailResponse(
     Guid Id,

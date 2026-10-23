@@ -1,3 +1,4 @@
+using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Domain.Entities;
 
 namespace Natillera.Backend.Application.Users;
@@ -9,11 +10,8 @@ public sealed class MemberDetailService(IMemberDetailRepository repository, IPen
         var data = await repository.GetDetailAsync(memberId, period.Id, cancellationToken);
         if (data is null) return null;
 
-        // Equal share of all paid performances among active members. Rounded to 2 decimals,
-        // half away from zero (conventional money rounding); 0 when there are no active members.
-        var performanceEarnings = data.ActiveMembersCount == 0
-            ? 0m
-            : Math.Round(data.PaidPerformancesTotal / data.ActiveMembersCount, 2, MidpointRounding.AwayFromZero);
+        // DASH-06 / DASH-12: equal share of the shared interest pool (paid interest minus paid extra costs).
+        var performanceEarnings = InterestPool.Share(data.SharedInterestPool, data.ActiveMembersCount);
 
         var balance = new MemberBalanceResponse(
             data.Savings,

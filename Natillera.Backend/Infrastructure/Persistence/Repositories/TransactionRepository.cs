@@ -15,6 +15,9 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
             .Select(transaction => transaction.Direction == Domain.Enums.TransactionDirection.Income ? transaction.Amount : -transaction.Amount)
             .SumAsync(cancellationToken);
 
+    public Task<decimal> GetSharedInterestPoolAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+        SharedInterestPoolQuery.RawAsync(dbContext, savingPeriodId, cancellationToken);
+
     public async Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(Guid savingPeriodId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Transactions
@@ -64,6 +67,7 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
             Domain.Enums.TransactionType.Performance => await GetPerformanceDetailAsync(transaction, cancellationToken),
             Domain.Enums.TransactionType.Activity => await GetActivityDetailAsync(transaction, cancellationToken),
             Domain.Enums.TransactionType.ActivitySale => await GetActivityAssignmentDetailAsync(transaction, cancellationToken),
+            Domain.Enums.TransactionType.ExtraCost => await GetExtraCostDetailAsync(transaction, cancellationToken),
             _ => throw new InvalidOperationException($"Unsupported transaction type: {transaction.Type}.")
         };
     }
@@ -102,6 +106,12 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
     {
         var assignment = await dbContext.ActivityAssignments.Include(item => item.Activity).Include(item => item.User).SingleAsync(item => item.TransactionId == transaction.Id, cancellationToken);
         return Build(transaction, new TransactionSourceDetail { Entity = "ActivityAssignment", EntityId = assignment.Id, MemberName = assignment.User.FirstName + " " + assignment.User.LastName, Status = assignment.Status.ToString(), PaidAt = assignment.PaidAt, ActivityName = assignment.Activity.Name, ActivityDescription = assignment.Activity.Description, ActivityQuantity = assignment.Activity.Quantity, QuantityAssigned = assignment.QuantityAssigned, UnitCost = assignment.Activity.UnitCost, UnitSalePrice = assignment.Activity.UnitSalePrice, StartDate = assignment.Activity.StartDate, AssignedAt = assignment.AssignedAt });
+    }
+
+    private async Task<TransactionDetailResponse> GetExtraCostDetailAsync(Transaction transaction, CancellationToken cancellationToken)
+    {
+        var cost = await dbContext.ExtraCosts.Include(item => item.Activity).SingleAsync(item => item.TransactionId == transaction.Id, cancellationToken);
+        return Build(transaction, new TransactionSourceDetail { Entity = "ExtraCost", EntityId = cost.Id, Status = cost.Status.ToString(), PaidAt = cost.PaidAt, ActivityId = cost.ActivityId, ActivityName = cost.Activity.Name, ActivityDescription = cost.Description });
     }
 
     private static TransactionDetailResponse Build(Transaction transaction, TransactionSourceDetail source) => new(transaction.Id, transaction.Amount, transaction.Direction, transaction.Type, transaction.OccurredAt, transaction.Description, source, transaction.IsCancelled);

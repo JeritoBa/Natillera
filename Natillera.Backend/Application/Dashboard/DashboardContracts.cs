@@ -19,7 +19,9 @@ public sealed record DashboardSummaryResponse(
     decimal? ActivityEarnings,
     decimal? MyActivityEarnings,
     decimal? MyPerformanceShare,
-    PendingObligationsResponse? PendingObligations = null);
+    PendingObligationsResponse? PendingObligations = null,
+    decimal? SharedInterestPool = null,
+    decimal? PaidExtraCosts = null);
 
 public sealed record TopSellerItem(
     Guid UserId,

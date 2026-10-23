@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Application.Users;
 using Natillera.Backend.Domain.Enums;
 
@@ -25,10 +26,7 @@ public sealed class MemberDetailRepository(NatilleraDbContext dbContext) : IMemb
             .Select(assignment => (decimal?)(assignment.QuantityAssigned * (assignment.Activity.UnitSalePrice - assignment.Activity.UnitCost)))
             .SumAsync(cancellationToken) ?? 0m;
 
-        var paidPerformancesTotal = await dbContext.Performances.AsNoTracking()
-            .Where(performance => performance.Loan.SavingPeriodId == savingPeriodId && performance.Status == PaymentStatus.Paid)
-            .Select(performance => (decimal?)performance.Amount)
-            .SumAsync(cancellationToken) ?? 0m;
+        var sharedInterestPool = InterestPool.Net(await SharedInterestPoolQuery.RawAsync(dbContext, savingPeriodId, cancellationToken)); // DASH-12
 
         // PER-07: members have no period, the interest share is divided among those active today.
         var activeMembersCount = await dbContext.Users.AsNoTracking()
@@ -55,7 +53,7 @@ public sealed class MemberDetailRepository(NatilleraDbContext dbContext) : IMemb
                 transaction.Type, transaction.OccurredAt, transaction.Description))
             .ToArrayAsync(cancellationToken);
 
-        return new MemberDetailData(member, savings, activityEarnings, paidPerformancesTotal, activeMembersCount,
+        return new MemberDetailData(member, savings, activityEarnings, sharedInterestPool, activeMembersCount,
             pendingPayments, transactions);
     }
 }

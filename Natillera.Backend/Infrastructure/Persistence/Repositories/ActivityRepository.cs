@@ -31,6 +31,7 @@ public sealed class ActivityRepository(NatilleraDbContext dbContext) : IActivity
     public Task<Activity?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         dbContext.Activities.AsNoTracking()
             .Include(activity => activity.Assignments).ThenInclude(assignment => assignment.User)
+            .Include(activity => activity.ExtraCosts)
             .SingleOrDefaultAsync(activity => activity.Id == id && activity.SavingPeriodId == savingPeriodId, cancellationToken);
 
     public Task<Activity?> GetForUpdateAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
@@ -38,6 +39,7 @@ public sealed class ActivityRepository(NatilleraDbContext dbContext) : IActivity
             .Include(activity => activity.Transaction)
             .Include(activity => activity.Assignments).ThenInclude(assignment => assignment.Transaction)
             .Include(activity => activity.Assignments).ThenInclude(assignment => assignment.User)
+            .Include(activity => activity.ExtraCosts).ThenInclude(extraCost => extraCost.Transaction)
             .SingleOrDefaultAsync(activity => activity.Id == id && activity.SavingPeriodId == savingPeriodId, cancellationToken);
 
     public Task AddAsync(Activity activity, CancellationToken cancellationToken = default) =>
@@ -45,4 +47,7 @@ public sealed class ActivityRepository(NatilleraDbContext dbContext) : IActivity
 
     public Task AddAssignmentAsync(ActivityAssignment assignment, CancellationToken cancellationToken = default) =>
         dbContext.ActivityAssignments.AddAsync(assignment, cancellationToken).AsTask();
+
+    public Task AddExtraCostAsync(ExtraCost extraCost, CancellationToken cancellationToken = default) =>
+        dbContext.ExtraCosts.AddAsync(extraCost, cancellationToken).AsTask();
 }
