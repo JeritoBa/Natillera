@@ -13,16 +13,16 @@ import { StatCard } from '@/shared/ui/StatCard'
 import { cell, cellActions, cellAmount, cellFirst, cellLast, colDesktop, colTablet, eyeButton, headCell, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
 const typeLabel: Record<TransactionType, string> = {
-  MonthlyPayment: 'Cuota mensual', Activity: 'Actividad', ActivitySale: 'Venta', Loan: 'Préstamo', LoanPayment: 'Pago préstamo', Performance: 'Rendimiento',
+  MonthlyPayment: 'Cuota mensual', Activity: 'Actividad', ActivitySale: 'Venta', Loan: 'Préstamo', LoanPayment: 'Pago préstamo', Performance: 'Rendimiento', ExtraCost: 'Costo extra',
 }
 const typeColor: Record<TransactionType, string> = {
-  MonthlyPayment: '#0a6635', Activity: '#9a6e00', ActivitySale: '#0074b3', Loan: '#c0392b', LoanPayment: '#0a6635', Performance: '#0074b3',
+  MonthlyPayment: '#0a6635', Activity: '#9a6e00', ActivitySale: '#0074b3', Loan: '#c0392b', LoanPayment: '#0a6635', Performance: '#0074b3', ExtraCost: '#9a6e00',
 }
 const typeBackground: Record<TransactionType, string> = {
-  MonthlyPayment: '#dcf5e8', Activity: '#fef6dc', ActivitySale: '#ddf0ff', Loan: '#fde8e4', LoanPayment: '#dcf5e8', Performance: '#ddf0ff',
+  MonthlyPayment: '#dcf5e8', Activity: '#fef6dc', ActivitySale: '#ddf0ff', Loan: '#fde8e4', LoanPayment: '#dcf5e8', Performance: '#ddf0ff', ExtraCost: '#fef6dc',
 }
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
-const typeOrder: TransactionType[] = ['MonthlyPayment', 'Loan', 'LoanPayment', 'Performance', 'Activity', 'ActivitySale']
+const typeOrder: TransactionType[] = ['MonthlyPayment', 'Loan', 'LoanPayment', 'Performance', 'Activity', 'ActivitySale', 'ExtraCost']
 
 export function TransactionsPage() {
   const { session } = useAuth()

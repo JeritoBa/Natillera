@@ -2,17 +2,20 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { appName } from '@/app/useDocumentTitle'
 import {
-  cancelActivityAssignment, createActivityAssignment, getActivityDetail, updateActivityAssignment,
-  type ActivityAssignmentResponse, type ActivityDetail,
+  cancelActivityAssignment, cancelExtraCost, createActivityAssignment, createExtraCost, getActivityDetail, updateActivityAssignment, updateExtraCost,
+  type ActivityAssignmentResponse, type ActivityDetail, type ExtraCost,
 } from '@/features/activities/api/activitiesApi'
 import { getActivitySummary } from '@/features/activities/model/activitySummary'
+import { EXTRA_COST_DESCRIPTION_MAX_LENGTH, extraCostCounterState, extraCostTotals, sortExtraCosts, validateExtraCostForm } from '@/features/activities/model/extraCosts'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { ApiError, getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
+import { toMoneyInputValue } from '@/shared/lib/money'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 import { Modal } from '@/shared/ui/Modal'
+import { MoneyInput } from '@/shared/ui/MoneyInput'
 import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
 import { cell, cellActions, cellAmount, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll } from '@/shared/ui/tableStyles'
 
@@ -25,6 +28,10 @@ const headings: [string, string, boolean][] = [
   ['Pagada', `${cell} ${colDesktop}`, false], ['Estado', `${cell} ${colTablet}`, false], ['Acciones', `${cellLast} w-px whitespace-nowrap`, true],
 ]
 const shortDate = (value: string) => new Date(value).toLocaleDateString('es-CO')
+const counterClass = { normal: 'text-[#4e7460]', near: 'text-[#9a6e00]', limit: 'text-[#c0392b] font-semibold' } as const
+const extraCostHeadings: [string, string, boolean][] = [
+  ['Descripción', cellFirst, false], ['Monto', cell, true], ['Estado', `${cell} ${colTablet}`, false], ['Fecha', `${cell} ${colDesktop}`, false],
+]
 
 export function ActivityDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -45,6 +52,12 @@ export function ActivityDetailPage() {
   const [status, setStatus] = useState<'Pending' | 'Paid'>('Pending')
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [costModal, setCostModal] = useState(false)
+  const [editingCost, setEditingCost] = useState<ExtraCost | null>(null)
+  const [costDescription, setCostDescription] = useState('')
+  const [costAmount, setCostAmount] = useState('')
+  const [costStatus, setCostStatus] = useState<'Pending' | 'Paid'>('Pending')
+  const [costError, setCostError] = useState<string | null>(null)
   const requestId = useRef(0)
 
   const load = useCallback(async () => {
@@ -146,6 +159,48 @@ export function ActivityDetailPage() {
     } catch (requestError) { setActionError(getFriendlyApiError(requestError)) }
   }
 
+  const extraCosts = activity.extraCosts ?? []
+  const sortedCosts = sortExtraCosts(extraCosts)
+  const costTotals = extraCostTotals(extraCosts)
+
+  const openCostModal = (cost: ExtraCost | null) => {
+    setEditingCost(cost); setCostDescription(cost?.description ?? ''); setCostAmount(cost ? toMoneyInputValue(cost.amount) : '')
+    setCostStatus(cost?.status === 'Paid' ? 'Paid' : 'Pending'); setCostError(null); setSuccess(null); setActionError(null); setCostModal(true)
+  }
+  const saveCost = async () => {
+    if (saving) return
+    setCostError(null)
+    const validation = validateExtraCostForm(costDescription, costAmount)
+    if (validation) return setCostError(validation)
+    if (!session) return
+    setSaving(true)
+    try {
+      const request = { description: costDescription.trim(), amount: Number(costAmount), status: costStatus }
+      if (editingCost) {
+        await updateExtraCost(session.accessToken, activity.id, editingCost.id, request)
+        setSuccess(editingCost.status === 'Pending' && costStatus === 'Paid' ? 'El costo extra se marcó como pagado.' : 'El costo extra se actualizó correctamente.')
+      } else {
+        await createExtraCost(session.accessToken, activity.id, request)
+        setSuccess('El costo extra se registró correctamente.')
+      }
+      setCostModal(false)
+      await refresh()
+    } catch (requestError) { setCostError(getFriendlyApiError(requestError)) }
+    finally { setSaving(false) }
+  }
+  const cancelCost = async (cost: ExtraCost) => {
+    if (!session) return
+    setSuccess(null); setActionError(null)
+    try {
+      await cancelExtraCost(session.accessToken, activity.id, cost.id)
+      setSuccess('El costo extra se anuló correctamente.')
+      await refresh()
+    } catch (requestError) { setActionError(getFriendlyApiError(requestError)) }
+  }
+  const costConfirmMessage = (cost: ExtraCost) => cost.status === 'Paid'
+    ? `¿Anular el costo extra «${cost.description}»? El costo y su egreso quedarán anulados y se devolverá a los intereses que se reparten.`
+    : `¿Anular el costo extra «${cost.description}»? Quedará anulado.`
+
   const info: [string, ReactNode][] = [
     ['Nombre', activity.name], ['Descripción', activity.description], ['Fecha de inicio', longDate(activity.startDate)], ['Estado', <Badge status={activity.status.toLowerCase()} />],
     ['Cantidad total', activity.quantity], ['Costo unitario', formatCurrency(activity.unitCost)], ['Precio de venta unitario', formatCurrency(activity.unitSalePrice)],
@@ -241,6 +296,42 @@ export function ActivityDetailPage() {
           </tbody></table></div>}
       </section>
 
+      <section aria-labelledby="activity-extra-costs-title" className="rounded-xl overflow-hidden" style={cardStyle}>
+        <div className="px-5 py-3 border-b flex items-center justify-between gap-3 flex-wrap" style={{ borderColor: '#eef4f0' }}>
+          <h2 id="activity-extra-costs-title" className="text-sm font-semibold text-[#0c1a12]">Costos extra <span className="text-[#4e7460] font-normal">({costTotals.activeCount})</span></h2>
+          {canManage && !isCancelled && <button onClick={() => openCostModal(null)} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Agregar costo extra</button>}
+        </div>
+        {sortedCosts.length > 0 && <p className="px-5 pt-3 text-xs text-[#4e7460]">Pagado <span className="mono">{formatCurrency(costTotals.paid)}</span> · Pendiente <span className="mono">{formatCurrency(costTotals.pending)}</span></p>}
+        <p className="px-5 pt-3 text-xs text-[#4e7460]">Se descuentan de los intereses que se reparten entre los socios. No cambian la ganancia de esta actividad.</p>
+        {sortedCosts.length === 0
+          ? <div className="px-5 py-10 text-center text-sm text-[#4e7460]">
+            <p>Esta actividad no tiene costos extra.</p>
+            {canManage && !isCancelled && <p>Usa «Agregar costo extra» para registrar gastos como domicilios o transporte.</p>}
+          </div>
+          : <div className={`${tableScroll} mt-3`}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+            {extraCostHeadings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
+            {canManage && <th className={`${headCell} ${cellLast} w-px whitespace-nowrap text-right`}>Acciones</th>}
+          </tr></thead><tbody>
+            {sortedCosts.map(cost => {
+              const cancelledCost = cost.status === 'Cancelled'
+              return <tr key={cost.id} className="table-row">
+                <td className={`${cellFirst} py-3.5 ${cellMain}`}>
+                  <span title={cost.description} className={`font-medium block truncate sm:whitespace-normal ${cancelledCost ? 'text-[#4e7460]' : 'text-[#0c1a12]'}`}>{cost.description}</span>
+                  <p className={subMobile}><Badge status={cost.status.toLowerCase()} /><span className="mono">{shortDate(cost.paidAt ?? cost.createdAt)}</span></p>
+                  <p className={subTablet}><span className="whitespace-nowrap">Registrado {shortDate(cost.createdAt)}</span><span className="whitespace-nowrap">· Pagado {cost.paidAt ? shortDate(cost.paidAt) : '—'}</span></p>
+                </td>
+                <td className={`${cell} py-3.5 ${cellAmount} ${cancelledCost ? 'text-[#4e7460] line-through' : 'text-[#0c1a12]'}`}>{formatCurrency(cost.amount)}</td>
+                <td className={`${cell} ${colTablet} py-3.5`}><Badge status={cost.status.toLowerCase()} /></td>
+                <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{shortDate(cost.paidAt ?? cost.createdAt)}</td>
+                {canManage && <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
+                  {!isCancelled && !cancelledCost && <button onClick={() => openCostModal(cost)} className={iconButton} aria-label={`Editar costo extra «${cost.description}»`}><Icon.Edit /></button>}
+                  {!isCancelled && !cancelledCost && <button onClick={() => { if (window.confirm(costConfirmMessage(cost))) void cancelCost(cost) }} className={dangerButton} aria-label={`Anular costo extra «${cost.description}»`}><Icon.Trash /></button>}
+                </div></td>}
+              </tr>
+            })}
+          </tbody></table></div>}
+      </section>
+
       <section aria-labelledby="activity-info-title" className="rounded-xl overflow-hidden" style={cardStyle}>
         <div className="px-5 py-3 border-b" style={{ borderColor: '#eef4f0' }}>
           <h2 id="activity-info-title" className="text-sm font-semibold text-[#4e7460]">Detalles de la actividad</h2>
@@ -250,6 +341,22 @@ export function ActivityDetailPage() {
         </dl>
       </section>
     </div>
+
+    {costModal && <Modal title={editingCost ? 'Editar costo extra' : 'Agregar costo extra'} onClose={() => !saving && setCostModal(false)}><form noValidate onSubmit={event => { event.preventDefault(); void saveCost() }} className="space-y-4">
+      <div>
+        <label htmlFor="extra-cost-description" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción</label>
+        <input type="text" id="extra-cost-description" maxLength={EXTRA_COST_DESCRIPTION_MAX_LENGTH} aria-describedby="extra-cost-description-help extra-cost-description-count" value={costDescription} onChange={event => setCostDescription(event.target.value)} placeholder="Ej.: domicilio de los pedidos" className="w-full px-3 py-2.5 rounded-lg text-sm" />
+        <div className="flex items-start justify-between gap-3 mt-1.5">
+          <p id="extra-cost-description-help" className="text-xs text-[#4e7460]">Qué se pagó. La ven todos los socios.</p>
+          <p id="extra-cost-description-count" aria-hidden="true" className={`text-xs mono shrink-0 ${counterClass[extraCostCounterState(costDescription.length)]}`}>{costDescription.length >= EXTRA_COST_DESCRIPTION_MAX_LENGTH ? `${EXTRA_COST_DESCRIPTION_MAX_LENGTH}/${EXTRA_COST_DESCRIPTION_MAX_LENGTH} · Límite alcanzado` : `${costDescription.length}/${EXTRA_COST_DESCRIPTION_MAX_LENGTH}`}</p>
+        </div>
+      </div>
+      <div><label htmlFor="extra-cost-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto</label><MoneyInput id="extra-cost-amount" value={costAmount} onChange={setCostAmount} placeholder="20000" /></div>
+      <StatusRadioGroup name="extra-cost-status" legend="Estado" value={costStatus} onChange={setCostStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no sale de la caja', disabled: editingCost?.status === 'Paid' }, { value: 'Paid', badge: 'paid', hint: 'Registra el egreso en la caja' }]} note={editingCost?.status === 'Paid' ? 'Un costo pagado no puede volver a pendiente.' : undefined} />
+      <p className="text-xs text-[#4e7460] rounded-lg bg-[#f8fbf8] border border-[#eef4f0] px-3 py-2">Al marcarlo como pagado, el monto se resta del dinero disponible y de los intereses de préstamos que se reparten entre los socios (rendimientos). No puede superar ninguno de los dos.</p>
+      {costError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{costError}</p>}
+      <div className="flex gap-3 pt-1"><button type="button" onClick={() => setCostModal(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
+    </form></Modal>}
 
     {modal && <Modal title={editing ? 'Editar asignación' : 'Asignar miembro'} onClose={() => !saving && setModal(false)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4">
       {editing

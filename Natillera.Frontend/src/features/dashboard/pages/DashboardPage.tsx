@@ -66,7 +66,7 @@ export function DashboardPage() {
             <p className="text-xs text-[#4e7460]">Dinero total de la natillera</p>
             <p className="text-xs text-[#4e7460]">Disponible + prestado + actividades</p>
             {!loading && <dl className="mt-4 space-y-2 text-sm">
-              <div className={rowClass}><dt><span className="text-[#0c1a12]">Rendimientos de préstamos</span><span className="block text-xs text-[#4e7460]">Intereses pagados</span></dt><dd className="mono text-[#0a6635]">{formatCurrency(summary?.loanInterestEarned ?? 0)}</dd></div>
+              <div className={rowClass}><dt><span className="text-[#0c1a12]">Rendimientos de préstamos</span><span className="block text-xs text-[#4e7460]">{(summary?.paidExtraCosts ?? 0) > 0 ? `Intereses pagados ${formatCurrency(summary?.loanInterestEarned ?? 0)} − costos extra ${formatCurrency(summary?.paidExtraCosts ?? 0)}` : 'Intereses pagados'}</span></dt><dd className="mono text-[#0a6635]">{formatCurrency(summary?.sharedInterestPool ?? 0)}</dd></div>
               <div className={rowClass}><dt><span className="text-[#0c1a12]">Ganancias de actividades</span><span className="block text-xs text-[#4e7460]">Ventas pagadas</span></dt><dd className="mono text-[#0a6635]">{formatCurrency(summary?.activityEarnings ?? 0)}</dd></div>
             </dl>}
           </> : <>

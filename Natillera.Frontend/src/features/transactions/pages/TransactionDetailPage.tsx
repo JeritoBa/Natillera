@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { getTransactionDetail, type TransactionDetail } from '@/features/transactions/api/transactionsApi'
 import { ApiError, getFriendlyApiError } from '@/shared/api/apiError'
@@ -31,7 +31,7 @@ export function TransactionDetailPage() {
   const fields = ([
     ['Fecha de creación', new Date(transaction.occurredAt).toLocaleString('es-CO')], ['Dirección', <Badge status={transaction.direction === 'Income' ? 'income' : 'expense'} />], ['Tipo', typeBadge], ['Descripción', transaction.description],
     ['Miembro', source.memberName], ['Estado', source.status ? <Badge status={source.status.toLowerCase()} /> : null], ['Año', source.year], ['Mes', source.month ? formatMonth(source.month) : null],
-    ['Fecha de pago', source.paidAt ? new Date(source.paidAt).toLocaleDateString('es-CO') : null], ['Actividad', source.activityName], ['Descripción actividad', source.activityDescription],
+    ['Fecha de pago', source.paidAt ? new Date(source.paidAt).toLocaleDateString('es-CO') : null], ['Actividad', source.activityId && source.activityName ? <Link to={`/activities/${source.activityId}`} className="text-[#0a6635] underline">{source.activityName}</Link> : source.activityName], ['Descripción actividad', source.activityDescription],
     ['Cantidad asignada', source.quantityAssigned], ['Costo unitario', source.unitCost ? formatCurrency(source.unitCost) : null], ['Precio de venta', source.unitSalePrice ? formatCurrency(source.unitSalePrice) : null],
     ['Método de pago', source.paymentMethod], ['Monto inicial préstamo', source.initialAmount ? formatCurrency(source.initialAmount) : null], ['Tasa de interés', source.interestRate ? `${source.interestRate}%` : null],
   ] as [string, ReactNode][]).filter(([, value]) => value !== null && value !== undefined && value !== '')

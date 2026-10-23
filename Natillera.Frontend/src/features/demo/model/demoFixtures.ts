@@ -94,7 +94,7 @@ interface LogRecord {
 }
 
 const emptySource = (entity: string, entityId: string): TransactionSourceDetail => ({
-  entity, entityId, memberName: null, year: null, month: null, status: null, paidAt: null, activityName: null, activityDescription: null,
+  entity, entityId, memberName: null, year: null, month: null, status: null, paidAt: null, activityId: null, activityName: null, activityDescription: null,
   activityQuantity: null, quantityAssigned: null, unitCost: null, unitSalePrice: null, startDate: null, assignedAt: null, initialAmount: null,
   interestRate: null, loanStartDate: null, loanEndDate: null, paymentMethod: null,
 })
@@ -166,7 +166,7 @@ export function buildDemoFixtures(now: Date): DemoFixtures {
       transactionId = addTx(seed.member, name, seed.amount, 'Income', 'MonthlyPayment', paidAt, `Monthly payment - ${mmyyyy(seed.offset)} - ${name}`, source, seed.status === 'Cancelled')
     }
     const createdAt = paidAt ?? at(seed.offset, seed.day, 9)
-    const summary: LogEntitySummary = { memberName: name, year, month, status: seed.status, amount: seed.amount, transactionId }
+    const summary: LogEntitySummary = { memberName: name, year, month, status: seed.status, amount: seed.amount, transactionId, activityId: null, activityName: null }
     addLog('MonthlyPayment', id, 'Create', createdAt, null, seed.amount, summary)
     if (seed.status === 'Cancelled') addLog('MonthlyPayment', id, 'Delete', at(seed.offset, seed.day + 1), seed.amount, null, summary)
     return { id, userId: seedByKey[seed.member].id, transactionId, amount: seed.amount, year, month, paidAt, status: seed.status, memberName: name }
@@ -302,6 +302,7 @@ export function buildDemoFixtures(now: Date): DemoFixtures {
         assignment(S3, 'sofia', 8, 80000, 'Pending', at(-1, 25), null, null),
         assignment(S4, 'laura', 10, 100000, 'Paid', s4Assigned, s4Paid, s4Tx),
       ],
+      extraCosts: [], // spec 020: extra costs are not part of the demo
     },
   }
   const activities: ActivityListItem[] = [activityList]
@@ -314,7 +315,7 @@ export function buildDemoFixtures(now: Date): DemoFixtures {
   )
 
   // ---- Logs (newest first) -------------------------------------------------------------------
-  const emptySummary: LogEntitySummary = { memberName: null, year: null, month: null, status: null, amount: null, transactionId: null }
+  const emptySummary: LogEntitySummary = { memberName: null, year: null, month: null, status: null, amount: null, transactionId: null, activityId: null, activityName: null }
   const sortedLogs = [...logRecords].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.seq - a.seq)
   const logId = (record: LogRecord) => guid(500 + record.seq)
   const logs: LogListItem[] = sortedLogs.map(record => ({
@@ -388,13 +389,13 @@ export function buildDemoFixtures(now: Date): DemoFixtures {
     role: 'Admin', availableMoney: 740000, totalNatilleraBalance: 988000, lentMoney: 200000, pendingActivitiesInvestment: 48000,
     mySavings: null, myEarnings: null, pendingPayments: null, recentTransactions, topSellers, myPaidMonthlyPayments: null,
     loanInterestEarned: 10000, activityEarnings: 88000, myActivityEarnings: null, myPerformanceShare: null,
-    pendingObligations: null,
+    pendingObligations: null, sharedInterestPool: 10000, paidExtraCosts: 0,
   }
   const memberSummary: DashboardSummary = {
     role: 'Member', availableMoney: 740000, totalNatilleraBalance: null, lentMoney: null, pendingActivitiesInvestment: null,
     mySavings: 192000, myEarnings: 42000, pendingPayments: 1, recentTransactions, topSellers, myPaidMonthlyPayments: 150000,
     loanInterestEarned: null, activityEarnings: null, myActivityEarnings: 40000, myPerformanceShare: 2000,
-    pendingObligations: memberDetails[seedByKey[DEMO_MEMBER].id].pendingObligations,
+    pendingObligations: memberDetails[seedByKey[DEMO_MEMBER].id].pendingObligations, sharedInterestPool: null, paidExtraCosts: null,
   }
 
   return {

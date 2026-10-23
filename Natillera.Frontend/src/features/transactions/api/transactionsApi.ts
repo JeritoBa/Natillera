@@ -1,7 +1,7 @@
 import { apiRequest } from '@/shared/api/apiClient'
 
 export type TransactionDirection = 'Income' | 'Expense'
-export type TransactionType = 'MonthlyPayment' | 'Activity' | 'ActivitySale' | 'Loan' | 'LoanPayment' | 'Performance'
+export type TransactionType = 'MonthlyPayment' | 'Activity' | 'ActivitySale' | 'Loan' | 'LoanPayment' | 'Performance' | 'ExtraCost'
 
 export interface RealTransaction {
   id: string
@@ -38,6 +38,7 @@ export interface TransactionSourceDetail {
   loanStartDate: string | null
   loanEndDate: string | null
   paymentMethod: string | null
+  activityId: string | null
 }
 
 export interface TransactionDetail extends RealTransaction {
