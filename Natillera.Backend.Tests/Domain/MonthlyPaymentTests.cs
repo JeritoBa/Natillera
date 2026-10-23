@@ -6,22 +6,23 @@ namespace Natillera.Backend.Tests.Domain;
 
 public class MonthlyPaymentTests
 {
-    private static MonthlyPayment Create() => new(50000m, 2025, 6, Guid.NewGuid());
+    private static MonthlyPayment Create() => new(50000m, 6, Guid.NewGuid(), Guid.NewGuid());
 
     [Fact]
     public void Constructor_Valid_IsPendingWithoutTransactionOrPaidAt()
     {
         var userId = Guid.NewGuid();
+        var periodId = Guid.NewGuid();
 
-        var p = new MonthlyPayment(50000m, 2025, 6, userId);
+        var p = new MonthlyPayment(50000m, 6, userId, periodId);
 
         Assert.Equal(PaymentStatus.Pending, p.Status);
         Assert.Null(p.TransactionId);
         Assert.Null(p.PaidAt);
         Assert.Equal(50000m, p.Amount);
-        Assert.Equal(2025, p.Year);
         Assert.Equal(6, p.Month);
         Assert.Equal(userId, p.UserId);
+        Assert.Equal(periodId, p.SavingPeriodId);
     }
 
     [Theory]
@@ -29,7 +30,7 @@ public class MonthlyPaymentTests
     [InlineData(-5)]
     public void Constructor_NonPositiveAmount_Throws(double amount)
     {
-        Assert.Throws<DomainException>(() => new MonthlyPayment((decimal)amount, 2025, 6, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => new MonthlyPayment((decimal)amount, 6, Guid.NewGuid(), Guid.NewGuid()));
     }
 
     [Theory]
@@ -38,13 +39,7 @@ public class MonthlyPaymentTests
     [InlineData(-1)]
     public void Constructor_InvalidMonth_Throws(int month)
     {
-        Assert.Throws<DomainException>(() => new MonthlyPayment(10m, 2025, month, Guid.NewGuid()));
-    }
-
-    [Fact]
-    public void Constructor_InvalidYear_Throws()
-    {
-        Assert.Throws<DomainException>(() => new MonthlyPayment(10m, 0, 5, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => new MonthlyPayment(10m, month, Guid.NewGuid(), Guid.NewGuid()));
     }
 
     [Theory]
@@ -52,7 +47,7 @@ public class MonthlyPaymentTests
     [InlineData(12)]
     public void Constructor_BoundaryMonths_Accepted(int month)
     {
-        var p = new MonthlyPayment(10m, 2025, month, Guid.NewGuid());
+        var p = new MonthlyPayment(10m, month, Guid.NewGuid(), Guid.NewGuid());
 
         Assert.Equal(month, p.Month);
     }
@@ -98,10 +93,9 @@ public class MonthlyPaymentTests
         var p = Create();
         var newUser = Guid.NewGuid();
 
-        p.UpdateDetails(70000m, 2026, 1, newUser);
+        p.UpdateDetails(70000m, 1, newUser);
 
         Assert.Equal(70000m, p.Amount);
-        Assert.Equal(2026, p.Year);
         Assert.Equal(1, p.Month);
         Assert.Equal(newUser, p.UserId);
     }
@@ -112,7 +106,7 @@ public class MonthlyPaymentTests
         var p = Create();
         p.Cancel();
 
-        Assert.Throws<DomainException>(() => p.UpdateDetails(1m, 2025, 1, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => p.UpdateDetails(1m, 1, Guid.NewGuid()));
     }
 
     [Fact]
@@ -120,7 +114,7 @@ public class MonthlyPaymentTests
     {
         var p = Create();
 
-        Assert.Throws<DomainException>(() => p.UpdateDetails(0m, 2025, 1, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => p.UpdateDetails(0m, 1, Guid.NewGuid()));
         Assert.Equal(50000m, p.Amount);
     }
 

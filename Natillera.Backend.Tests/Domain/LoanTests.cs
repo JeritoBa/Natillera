@@ -1,13 +1,14 @@
 using Natillera.Backend.Domain.Entities;
 using Natillera.Backend.Domain.Enums;
 using Natillera.Backend.Domain.Exceptions;
+using Natillera.Backend.Tests.Fakes;
 
 namespace Natillera.Backend.Tests.Domain;
 
 public class LoanTests
 {
     private static Loan Create(decimal amount = 1000m, decimal rate = 5m) =>
-        new(amount, rate, new DateTime(2025, 1, 15, 13, 45, 0), Guid.NewGuid(), Guid.NewGuid());
+        new(amount, rate, new DateTime(2025, 1, 15, 13, 45, 0), Guid.NewGuid(), Guid.NewGuid(), TestPeriods.Y2025);
 
     [Fact]
     public void Constructor_Valid_IsActiveWithDateOnlyStart()
@@ -327,7 +328,7 @@ public class LoanTests
         var loan = Create();
         var borrower = Guid.NewGuid();
 
-        loan.UpdateDetails(2000m, 3m, new DateTime(2025, 2, 2, 10, 0, 0), borrower);
+        loan.UpdateDetails(2000m, 3m, new DateTime(2025, 2, 2, 10, 0, 0), borrower, TestPeriods.Y2025);
 
         Assert.Equal(2000m, loan.InitialAmount);
         Assert.Equal(3m, loan.InterestRate);
@@ -342,7 +343,7 @@ public class LoanTests
         var loan = Create();
         loan.RegisterPayment(10m, PaymentMethod.Cash, Guid.NewGuid());
 
-        Assert.Throws<DomainException>(() => loan.UpdateDetails(2000m, 3m, DateTime.UtcNow, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => loan.UpdateDetails(2000m, 3m, new DateTime(2025, 6, 1), Guid.NewGuid(), TestPeriods.Y2025));
     }
 
     [Fact]
@@ -351,7 +352,7 @@ public class LoanTests
         var loan = Create();
         loan.Cancel();
 
-        Assert.Throws<DomainException>(() => loan.UpdateDetails(2000m, 3m, DateTime.UtcNow, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => loan.UpdateDetails(2000m, 3m, new DateTime(2025, 6, 1), Guid.NewGuid(), TestPeriods.Y2025));
     }
 
     [Fact]
@@ -359,7 +360,65 @@ public class LoanTests
     {
         var loan = Create();
 
-        Assert.Throws<DomainException>(() => loan.UpdateDetails(0m, 3m, DateTime.UtcNow, Guid.NewGuid()));
+        Assert.Throws<DomainException>(() => loan.UpdateDetails(0m, 3m, new DateTime(2025, 6, 1), Guid.NewGuid(), TestPeriods.Y2025));
+        Assert.Equal(1000m, loan.InitialAmount);
+    }
+
+    private static Loan CreateWithDescription(string? description) =>
+        new(1000m, 5m, new DateTime(2025, 1, 15), Guid.NewGuid(), Guid.NewGuid(), TestPeriods.Y2025, description);
+
+    [Fact]
+    public void Constructor_Description_IsTrimmed_LOAN11()
+    {
+        var loan = CreateWithDescription("  Para la moto.\nPaga el 15.  ");
+
+        Assert.Equal("Para la moto.\nPaga el 15.", loan.Description);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   \n  ")]
+    public void Constructor_WhitespaceDescription_StoredAsNull_LOAN11(string? description)
+    {
+        Assert.Null(CreateWithDescription(description).Description);
+    }
+
+    [Fact]
+    public void Constructor_Description500Chars_IsAccepted_LOAN11()
+    {
+        var loan = CreateWithDescription(new string('a', 500));
+
+        Assert.Equal(500, loan.Description!.Length);
+    }
+
+    [Fact]
+    public void Constructor_Description501Chars_Throws_LOAN11()
+    {
+        Assert.Throws<DomainException>(() => CreateWithDescription(new string('a', 501)));
+    }
+
+    [Fact]
+    public void UpdateDetails_ChangesAndClearsDescription_LOAN11()
+    {
+        var loan = CreateWithDescription("Original");
+        var borrower = loan.BorrowerId;
+
+        loan.UpdateDetails(1000m, 5m, new DateTime(2025, 1, 15), borrower, TestPeriods.Y2025, " Nueva ");
+        Assert.Equal("Nueva", loan.Description);
+
+        loan.UpdateDetails(1000m, 5m, new DateTime(2025, 1, 15), borrower, TestPeriods.Y2025, "  ");
+        Assert.Null(loan.Description);
+    }
+
+    [Fact]
+    public void UpdateDetails_Description501Chars_Throws_LOAN11()
+    {
+        var loan = CreateWithDescription("Original");
+
+        Assert.Throws<DomainException>(() =>
+            loan.UpdateDetails(2000m, 5m, new DateTime(2025, 1, 15), loan.BorrowerId, TestPeriods.Y2025, new string('a', 501)));
+        Assert.Equal("Original", loan.Description);
         Assert.Equal(1000m, loan.InitialAmount);
     }
 }

@@ -1,6 +1,7 @@
 using Natillera.Backend.Domain.Entities;
 using Natillera.Backend.Domain.Enums;
 using Natillera.Backend.Domain.Exceptions;
+using Natillera.Backend.Tests.Fakes;
 
 namespace Natillera.Backend.Tests.Domain;
 
@@ -74,7 +75,7 @@ public class LogTests
         var entity = Guid.NewGuid();
         var at = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        var log = new Log(user, LogEntityType.Loan, entity, LogAction.Update, 1m, 2m, at);
+        var log = new Log(user, LogEntityType.Loan, entity, LogAction.Update, Guid.NewGuid(), 1m, 2m, at);
 
         Assert.Equal(user, log.UserId);
         Assert.Equal(entity, log.EntityId);
@@ -88,21 +89,21 @@ public class LogTests
     [Fact]
     public void Constructor_EmptyUser_Throws()
     {
-        Assert.Throws<DomainException>(() => new Log(Guid.Empty, LogEntityType.Loan, Guid.NewGuid(), LogAction.Create));
+        Assert.Throws<DomainException>(() => new Log(Guid.Empty, LogEntityType.Loan, Guid.NewGuid(), LogAction.Create, Guid.NewGuid()));
     }
 
     [Fact]
     public void Constructor_EmptyEntity_Throws()
     {
-        Assert.Throws<DomainException>(() => new Log(Guid.NewGuid(), LogEntityType.Loan, Guid.Empty, LogAction.Create));
+        Assert.Throws<DomainException>(() => new Log(Guid.NewGuid(), LogEntityType.Loan, Guid.Empty, LogAction.Create, Guid.NewGuid()));
     }
 
     [Fact]
     public void Constructor_UndefinedEnums_Throw()
     {
         Assert.Throws<DomainException>(() =>
-            new Log(Guid.NewGuid(), (LogEntityType)999, Guid.NewGuid(), LogAction.Create));
+            new Log(Guid.NewGuid(), (LogEntityType)999, Guid.NewGuid(), LogAction.Create, Guid.NewGuid()));
         Assert.Throws<DomainException>(() =>
-            new Log(Guid.NewGuid(), LogEntityType.Loan, Guid.NewGuid(), (LogAction)999));
+            new Log(Guid.NewGuid(), LogEntityType.Loan, Guid.NewGuid(), (LogAction)999, Guid.NewGuid()));
     }
 }

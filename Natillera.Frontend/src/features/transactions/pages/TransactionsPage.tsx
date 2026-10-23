@@ -1,6 +1,7 @@
 import { Icon } from '@/shared/ui/Icon'
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { Link, useNavigate } from 'react-router-dom'
 import { getTransactions, type RealTransaction, type TransactionType } from '@/features/transactions/api/transactionsApi'
 import { transactionTotals } from '@/features/transactions/model/transactionTotals'
@@ -12,19 +13,20 @@ import { StatCard } from '@/shared/ui/StatCard'
 import { cell, cellActions, cellAmount, cellFirst, cellLast, colDesktop, colTablet, eyeButton, headCell, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
 const typeLabel: Record<TransactionType, string> = {
-  MonthlyPayment: 'Cuota mensual', Activity: 'Actividad', ActivitySale: 'Venta', Loan: 'Préstamo', LoanPayment: 'Pago préstamo', Performance: 'Rendimiento',
+  MonthlyPayment: 'Cuota mensual', Activity: 'Actividad', ActivitySale: 'Venta', Loan: 'Préstamo', LoanPayment: 'Pago préstamo', Performance: 'Rendimiento', ExtraCost: 'Costo extra',
 }
 const typeColor: Record<TransactionType, string> = {
-  MonthlyPayment: '#0a6635', Activity: '#9a6e00', ActivitySale: '#0074b3', Loan: '#c0392b', LoanPayment: '#0a6635', Performance: '#0074b3',
+  MonthlyPayment: '#0a6635', Activity: '#9a6e00', ActivitySale: '#0074b3', Loan: '#c0392b', LoanPayment: '#0a6635', Performance: '#0074b3', ExtraCost: '#9a6e00',
 }
 const typeBackground: Record<TransactionType, string> = {
-  MonthlyPayment: '#dcf5e8', Activity: '#fef6dc', ActivitySale: '#ddf0ff', Loan: '#fde8e4', LoanPayment: '#dcf5e8', Performance: '#ddf0ff',
+  MonthlyPayment: '#dcf5e8', Activity: '#fef6dc', ActivitySale: '#ddf0ff', Loan: '#fde8e4', LoanPayment: '#dcf5e8', Performance: '#ddf0ff', ExtraCost: '#fef6dc',
 }
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
-const typeOrder: TransactionType[] = ['MonthlyPayment', 'Loan', 'LoanPayment', 'Performance', 'Activity', 'ActivitySale']
+const typeOrder: TransactionType[] = ['MonthlyPayment', 'Loan', 'LoanPayment', 'Performance', 'Activity', 'ActivitySale', 'ExtraCost']
 
 export function TransactionsPage() {
   const { session } = useAuth()
+  const { selected } = useSavingPeriod()
   const navigate = useNavigate()
   const [transactions, setTransactions] = useState<RealTransaction[]>([])
   const [filter, setFilter] = useState<TransactionType | 'all'>('all')
@@ -55,7 +57,7 @@ export function TransactionsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
-      <div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Transacciones</h1><p className="text-[#4e7460] text-sm">Historial real de movimientos</p></div>
+      <div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Transacciones</h1><p className="text-[#4e7460] text-sm">Historial real de movimientos{selected ? ` · Periodo ${selected.year}` : ''}</p></div>
       <dl className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
         <StatCard label={`Ingresos totales${filterSuffix}`} value={formatShortCurrency(income)} tone="positive" />
         <StatCard label={`Egresos totales${filterSuffix}`} value={formatShortCurrency(expense)} tone="negative" />

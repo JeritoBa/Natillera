@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
+import { defaultDateForPeriod, isDateInPeriodYear, periodDateBounds } from '@/features/settings/model/savingPeriod'
 import { cancelLoan, createLoan, getLoans, updateLoan, type LoanListItem } from '@/features/loans/api/loansApi'
+import { descriptionCounterState, isLoanDescriptionValid, LOAN_DESCRIPTION_MAX_LENGTH, normalizeLoanDescription } from '@/features/loans/model/loanDescription'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
 import { countLoansByStatus, filterLoans, loanStartMonth, type LoanStatusFilter } from '@/features/loans/model/loanFilters'
 import { useMembers } from '@/features/members/hooks/useMembers'
@@ -14,12 +17,14 @@ import { toMoneyInputValue } from '@/shared/lib/money'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
 import { cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
-interface LoanForm { borrowerId: string, initialAmount: string, interestRate: string, startDate: string }
-const emptyForm: LoanForm = { borrowerId: '', initialAmount: '', interestRate: '', startDate: '' }
+interface LoanForm { borrowerId: string, initialAmount: string, interestRate: string, startDate: string, description: string }
+const emptyForm: LoanForm = { borrowerId: '', initialAmount: '', interestRate: '', startDate: '', description: '' }
+const counterClass = { normal: 'text-[#4e7460]', near: 'text-[#9a6e00]', limit: 'text-[#c0392b] font-semibold' } as const
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
 
 export function LoansPage() {
   const { session, isDemo } = useAuth()
+  const { selected } = useSavingPeriod()
   const { members } = useMembers()
   const navigate = useNavigate()
   const canManage = session?.user.role === 'Admin'
@@ -48,10 +53,13 @@ export function LoansPage() {
     return () => window.clearTimeout(timer)
   }, [load])
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setModalError(null); setSuccess(null); setError(null); setModal('create') }
+  // PER-05: the start date must fall inside the period year; an edited loan keeps its own period year.
+  const periodYear = editing ? Number(editing.startDate.slice(0, 4)) : selected?.year
+  const bounds = periodYear ? periodDateBounds(periodYear) : undefined
+  const openCreate = () => { setEditing(null); setForm({ ...emptyForm, startDate: selected ? defaultDateForPeriod(selected.year, new Date()) : '' }); setModalError(null); setSuccess(null); setError(null); setModal('create') }
   const openEdit = (loan: LoanListItem) => {
     setEditing(loan)
-    setForm({ borrowerId: loan.borrowerId, initialAmount: toMoneyInputValue(loan.initialAmount), interestRate: String(loan.interestRate), startDate: toDateInput(loan.startDate) })
+    setForm({ borrowerId: loan.borrowerId, initialAmount: toMoneyInputValue(loan.initialAmount), interestRate: String(loan.interestRate), startDate: toDateInput(loan.startDate), description: loan.description ?? '' })
     setModalError(null); setSuccess(null); setError(null); setModal('edit')
   }
 
@@ -64,10 +72,12 @@ export function LoansPage() {
     if (!Number.isFinite(initialAmount) || initialAmount <= 0) return setModalError('Ingresa un monto inicial válido.')
     if (form.interestRate === '' || !Number.isFinite(interestRate) || interestRate < 0 || interestRate > 100) return setModalError('Ingresa una tasa de interés válida.')
     if (!form.startDate) return setModalError('Selecciona la fecha de inicio.')
+    if (periodYear && !isDateInPeriodYear(form.startDate, periodYear)) return setModalError(`La fecha de inicio debe estar dentro de ${periodYear}. Para registrar en otro año, cambia el periodo en Configuración.`)
+    if (!isLoanDescriptionValid(form.description)) return setModalError('La descripción no puede superar 500 caracteres.')
     if (!session) return
     setSaving(true); setModalError(null)
     try {
-      const request = { borrowerId: form.borrowerId, initialAmount, interestRate, startDate: form.startDate }
+      const request = { borrowerId: form.borrowerId, initialAmount, interestRate, startDate: form.startDate, description: normalizeLoanDescription(form.description) }
       if (editing) await updateLoan(session.accessToken, editing.id, request)
       else await createLoan(session.accessToken, request)
       setModal(null)
@@ -111,7 +121,7 @@ export function LoansPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
-        <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Préstamos</h1><p className="text-[#4e7460] text-sm">{canManage ? 'Gestiona los créditos internos de la natillera' : 'Créditos internos de la natillera'}</p></div>
+        <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Préstamos</h1><p className="text-[#4e7460] text-sm">{canManage ? 'Gestiona los créditos internos de la natillera' : 'Créditos internos de la natillera'}{selected ? ` · Periodo ${selected.year}` : ''}</p></div>
         {canManage && <button onClick={openCreate} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Nuevo préstamo</button>}
       </div>
       {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
@@ -175,7 +185,16 @@ export function LoansPage() {
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Deudor</label><select value={form.borrowerId} onChange={event => setForm(current => ({ ...current, borrowerId: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un deudor</option>{borrowers.map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div>
         <div><label htmlFor="loan-initial-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto inicial</label><MoneyInput id="loan-initial-amount" value={form.initialAmount} onChange={value => setForm(current => ({ ...current, initialAmount: value }))} placeholder="500000" /></div>
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Tasa de interés (%)</label><input type="number" min="0" max="100" step="0.01" value={form.interestRate} onChange={event => setForm(current => ({ ...current, interestRate: event.target.value }))} placeholder="2" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Fecha de inicio</label><input type="date" value={form.startDate} onChange={event => setForm(current => ({ ...current, startDate: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
+        <div><label htmlFor="loan-start-date" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Fecha de inicio</label><input id="loan-start-date" type="date" min={bounds?.min} max={bounds?.max} aria-describedby={periodYear ? 'loan-start-date-help' : undefined} value={form.startDate} onChange={event => setForm(current => ({ ...current, startDate: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm" />{periodYear && <p id="loan-start-date-help" className="text-xs text-[#4e7460] mt-1.5">Debe ser una fecha de {periodYear}, el periodo seleccionado.</p>}</div>
+        <div>
+          <label htmlFor="loan-description" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción (opcional)</label>
+          <textarea id="loan-description" rows={4} maxLength={LOAN_DESCRIPTION_MAX_LENGTH} aria-describedby="loan-description-help loan-description-count" value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} placeholder="Ej.: para arreglo de la moto. Acordó pagar los días 15." className="w-full px-3 py-2.5 rounded-lg text-sm leading-relaxed resize-y min-h-24 max-h-64" />
+          <div className="flex items-start justify-between gap-3 mt-1.5">
+            <p id="loan-description-help" className="text-xs text-[#4e7460]">Para qué es el préstamo o acuerdos con el deudor. La ven todos los socios.</p>
+            <p id="loan-description-count" aria-hidden="true" className={`text-xs mono shrink-0 ${counterClass[descriptionCounterState(form.description.length)]}`}>{form.description.length >= LOAN_DESCRIPTION_MAX_LENGTH ? `${LOAN_DESCRIPTION_MAX_LENGTH}/${LOAN_DESCRIPTION_MAX_LENGTH} · Límite alcanzado` : `${form.description.length}/${LOAN_DESCRIPTION_MAX_LENGTH}`}</p>
+          </div>
+          {form.description.length >= 450 && <span aria-live="polite" className="sr-only">Te quedan {LOAN_DESCRIPTION_MAX_LENGTH - form.description.length} caracteres</span>}
+        </div>
         {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
         <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
       </form></Modal>}

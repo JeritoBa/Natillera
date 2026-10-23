@@ -12,6 +12,7 @@ const sectionTitles: Record<string, { list: string, detail?: string }> = {
   activities: { list: 'Actividades', detail: 'Detalle de actividad' },
   loans: { list: 'Préstamos', detail: 'Detalle de préstamo' },
   transactions: { list: 'Transacciones', detail: 'Detalle de transacción' },
+  settings: { list: 'Configuración' },
   logs: { list: 'Logs', detail: 'Detalle de log' },
 }
 

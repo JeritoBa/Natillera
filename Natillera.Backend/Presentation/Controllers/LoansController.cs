@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Natillera.Backend.Presentation.Filters;
 using System.Security.Claims;
 using Natillera.Backend.Application.Loans;
 using Natillera.Backend.Domain.Enums;
@@ -9,20 +10,21 @@ namespace Natillera.Backend.Presentation.Controllers;
 
 [ApiController]
 [Route("api/loans")]
+[SavingPeriodScoped]
 [Authorize]
 public sealed class LoansController(LoanService loanService) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyCollection<LoanListItem>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<LoanListItem>>> Get(CancellationToken cancellationToken) =>
-        Ok(await loanService.GetListAsync(cancellationToken));
+        Ok(await loanService.GetListAsync(this.SavingPeriod(), cancellationToken));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(LoanDetailResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LoanDetailResponse>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var loan = await loanService.GetDetailAsync(id, cancellationToken);
+        var loan = await loanService.GetDetailAsync(id, this.SavingPeriod(), cancellationToken);
         return loan is null ? NotFound() : Ok(loan);
     }
 
@@ -40,7 +42,7 @@ public sealed class LoansController(LoanService loanService) : ControllerBase
 
         try
         {
-            var loan = await loanService.CreateLoanAsync(request, userId, cancellationToken);
+            var loan = await loanService.CreateLoanAsync(request, userId, this.SavingPeriod(), cancellationToken);
             return Created($"/api/loans/{loan.Id}", loan);
         }
         catch (DomainException exception)
@@ -62,7 +64,7 @@ public sealed class LoansController(LoanService loanService) : ControllerBase
 
         try
         {
-            return Ok(await loanService.UpdateLoanAsync(id, request, userId, cancellationToken));
+            return Ok(await loanService.UpdateLoanAsync(id, request, userId, this.SavingPeriod(), cancellationToken));
         }
         catch (DomainException exception)
         {
@@ -84,7 +86,7 @@ public sealed class LoansController(LoanService loanService) : ControllerBase
 
         try
         {
-            await loanService.CancelLoanAsync(id, userId, cancellationToken);
+            await loanService.CancelLoanAsync(id, userId, this.SavingPeriod(), cancellationToken);
             return NoContent();
         }
         catch (DomainException exception)
@@ -98,7 +100,7 @@ public sealed class LoansController(LoanService loanService) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<LoanPaymentResponse>> GetPayment(Guid loanId, Guid paymentId, CancellationToken cancellationToken)
     {
-        var payment = await loanService.GetPaymentAsync(loanId, paymentId, cancellationToken);
+        var payment = await loanService.GetPaymentAsync(loanId, paymentId, this.SavingPeriod(), cancellationToken);
         return payment is null ? NotFound() : Ok(payment);
     }
 
@@ -115,7 +117,7 @@ public sealed class LoansController(LoanService loanService) : ControllerBase
 
         try
         {
-            var payment = await loanService.CreatePaymentAsync(loanId, request, userId, cancellationToken);
+            var payment = await loanService.CreatePaymentAsync(loanId, request, userId, this.SavingPeriod(), cancellationToken);
             return Created($"/api/loans/{loanId}/payments/{payment.Id}", payment);
         }
         catch (DomainException exception)
@@ -137,7 +139,7 @@ public sealed class LoansController(LoanService loanService) : ControllerBase
 
         try
         {
-            return Ok(await loanService.UpdatePaymentAsync(loanId, paymentId, request, userId, cancellationToken));
+            return Ok(await loanService.UpdatePaymentAsync(loanId, paymentId, request, userId, this.SavingPeriod(), cancellationToken));
         }
         catch (DomainException exception)
         {
@@ -158,7 +160,7 @@ public sealed class LoansController(LoanService loanService) : ControllerBase
 
         try
         {
-            await loanService.CancelPaymentAsync(loanId, paymentId, userId, cancellationToken);
+            await loanService.CancelPaymentAsync(loanId, paymentId, userId, this.SavingPeriod(), cancellationToken);
             return NoContent();
         }
         catch (DomainException exception)
@@ -172,7 +174,7 @@ public sealed class LoansController(LoanService loanService) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<InterestPaymentResponse>> GetInterest(Guid loanId, Guid interestId, CancellationToken cancellationToken)
     {
-        var interest = await loanService.GetInterestAsync(loanId, interestId, cancellationToken);
+        var interest = await loanService.GetInterestAsync(loanId, interestId, this.SavingPeriod(), cancellationToken);
         return interest is null ? NotFound() : Ok(interest);
     }
 
@@ -189,7 +191,7 @@ public sealed class LoansController(LoanService loanService) : ControllerBase
 
         try
         {
-            var interest = await loanService.CreateInterestAsync(loanId, request, userId, cancellationToken);
+            var interest = await loanService.CreateInterestAsync(loanId, request, userId, this.SavingPeriod(), cancellationToken);
             return Created($"/api/loans/{loanId}/interest-payments/{interest.Id}", interest);
         }
         catch (DomainException exception)
@@ -211,7 +213,7 @@ public sealed class LoansController(LoanService loanService) : ControllerBase
 
         try
         {
-            return Ok(await loanService.UpdateInterestAsync(loanId, interestId, request, userId, cancellationToken));
+            return Ok(await loanService.UpdateInterestAsync(loanId, interestId, request, userId, this.SavingPeriod(), cancellationToken));
         }
         catch (DomainException exception)
         {
@@ -232,7 +234,7 @@ public sealed class LoansController(LoanService loanService) : ControllerBase
 
         try
         {
-            await loanService.CancelInterestAsync(loanId, interestId, userId, cancellationToken);
+            await loanService.CancelInterestAsync(loanId, interestId, userId, this.SavingPeriod(), cancellationToken);
             return NoContent();
         }
         catch (DomainException exception)

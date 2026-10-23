@@ -13,9 +13,12 @@ public sealed class MonthlyPaymentConfiguration : IEntityTypeConfiguration<Month
         builder.Property(payment => payment.Id).ValueGeneratedNever();
         builder.Property(payment => payment.Amount).HasPrecision(18, 2).IsRequired();
         builder.Property(payment => payment.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
-        builder.HasIndex(payment => new { payment.UserId, payment.Year, payment.Month }).IsUnique()
+        builder.HasIndex(payment => new { payment.UserId, payment.SavingPeriodId, payment.Month }).IsUnique()
             .HasFilter("\"Status\" <> 'Cancelled'");
         builder.HasIndex(payment => payment.TransactionId).IsUnique();
+        builder.HasIndex(payment => payment.SavingPeriodId);
+        builder.HasOne(payment => payment.SavingPeriod).WithMany()
+            .HasForeignKey(payment => payment.SavingPeriodId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(payment => payment.User).WithMany(user => user.MonthlyPayments)
             .HasForeignKey(payment => payment.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(payment => payment.Transaction).WithOne()

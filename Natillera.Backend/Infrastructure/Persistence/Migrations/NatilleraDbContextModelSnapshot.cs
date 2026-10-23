@@ -43,6 +43,9 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<Guid>("SavingPeriodId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -63,6 +66,8 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SavingPeriodId");
 
                     b.HasIndex("TransactionId")
                         .IsUnique();
@@ -110,6 +115,47 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.ToTable("activity_assignments", (string)null);
                 });
 
+            modelBuilder.Entity("Natillera.Backend.Domain.Entities.ExtraCost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("TransactionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityId");
+
+                    b.HasIndex("TransactionId")
+                        .IsUnique();
+
+                    b.ToTable("extra_costs", (string)null);
+                });
+
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.Loan", b =>
                 {
                     b.Property<Guid>("Id")
@@ -121,6 +167,10 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<DateTime?>("EndDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -131,6 +181,9 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("InterestRate")
                         .HasPrecision(9, 4)
                         .HasColumnType("numeric(9,4)");
+
+                    b.Property<Guid>("SavingPeriodId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("timestamp with time zone");
@@ -149,6 +202,8 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BorrowerId");
+
+                    b.HasIndex("SavingPeriodId");
 
                     b.HasIndex("TransactionId")
                         .IsUnique();
@@ -223,12 +278,17 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<Guid>("SavingPeriodId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("OccurredAt");
+
+                    b.HasIndex("SavingPeriodId");
 
                     b.HasIndex("UserId");
 
@@ -255,6 +315,9 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("PaidAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("SavingPeriodId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -266,15 +329,14 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("Year")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
+
+                    b.HasIndex("SavingPeriodId");
 
                     b.HasIndex("TransactionId")
                         .IsUnique();
 
-                    b.HasIndex("UserId", "Year", "Month")
+                    b.HasIndex("UserId", "SavingPeriodId", "Month")
                         .IsUnique()
                         .HasFilter("\"Status\" <> 'Cancelled'");
 
@@ -322,6 +384,22 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.ToTable("performances", (string)null);
                 });
 
+            modelBuilder.Entity("Natillera.Backend.Domain.Entities.SavingPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Year")
+                        .IsUnique();
+
+                    b.ToTable("saving_periods", (string)null);
+                });
+
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.Transaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -347,6 +425,9 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("SavingPeriodId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -355,6 +436,8 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OccurredAt");
+
+                    b.HasIndex("SavingPeriodId");
 
                     b.ToTable("transactions", (string)null);
                 });
@@ -413,11 +496,19 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.Activity", b =>
                 {
+                    b.HasOne("Natillera.Backend.Domain.Entities.SavingPeriod", "SavingPeriod")
+                        .WithMany()
+                        .HasForeignKey("SavingPeriodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Natillera.Backend.Domain.Entities.Transaction", "Transaction")
                         .WithOne()
                         .HasForeignKey("Natillera.Backend.Domain.Entities.Activity", "TransactionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("SavingPeriod");
 
                     b.Navigation("Transaction");
                 });
@@ -448,11 +539,35 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Natillera.Backend.Domain.Entities.ExtraCost", b =>
+                {
+                    b.HasOne("Natillera.Backend.Domain.Entities.Activity", "Activity")
+                        .WithMany("ExtraCosts")
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Natillera.Backend.Domain.Entities.Transaction", "Transaction")
+                        .WithOne()
+                        .HasForeignKey("Natillera.Backend.Domain.Entities.ExtraCost", "TransactionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Activity");
+
+                    b.Navigation("Transaction");
+                });
+
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.Loan", b =>
                 {
                     b.HasOne("Natillera.Backend.Domain.Entities.User", "Borrower")
                         .WithMany()
                         .HasForeignKey("BorrowerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Natillera.Backend.Domain.Entities.SavingPeriod", "SavingPeriod")
+                        .WithMany()
+                        .HasForeignKey("SavingPeriodId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -463,6 +578,8 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Borrower");
+
+                    b.Navigation("SavingPeriod");
 
                     b.Navigation("Transaction");
                 });
@@ -488,17 +605,31 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.Log", b =>
                 {
+                    b.HasOne("Natillera.Backend.Domain.Entities.SavingPeriod", "SavingPeriod")
+                        .WithMany()
+                        .HasForeignKey("SavingPeriodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Natillera.Backend.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("SavingPeriod");
+
                     b.Navigation("User");
                 });
 
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.MonthlyPayment", b =>
                 {
+                    b.HasOne("Natillera.Backend.Domain.Entities.SavingPeriod", "SavingPeriod")
+                        .WithMany()
+                        .HasForeignKey("SavingPeriodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Natillera.Backend.Domain.Entities.Transaction", "Transaction")
                         .WithOne()
                         .HasForeignKey("Natillera.Backend.Domain.Entities.MonthlyPayment", "TransactionId")
@@ -509,6 +640,8 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("SavingPeriod");
 
                     b.Navigation("Transaction");
 
@@ -533,9 +666,22 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.Navigation("Transaction");
                 });
 
+            modelBuilder.Entity("Natillera.Backend.Domain.Entities.Transaction", b =>
+                {
+                    b.HasOne("Natillera.Backend.Domain.Entities.SavingPeriod", "SavingPeriod")
+                        .WithMany()
+                        .HasForeignKey("SavingPeriodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SavingPeriod");
+                });
+
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.Activity", b =>
                 {
                     b.Navigation("Assignments");
+
+                    b.Navigation("ExtraCosts");
                 });
 
             modelBuilder.Entity("Natillera.Backend.Domain.Entities.Loan", b =>

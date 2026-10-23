@@ -9,15 +9,19 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
     public Task AddAsync(Transaction transaction, CancellationToken cancellationToken = default) =>
         dbContext.Transactions.AddAsync(transaction, cancellationToken).AsTask();
 
-    public async Task<decimal> GetAvailableMoneyAsync(CancellationToken cancellationToken = default) =>
+    public async Task<decimal> GetAvailableMoneyAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         await dbContext.Transactions
-            .Where(transaction => !transaction.IsCancelled)
+            .Where(transaction => transaction.SavingPeriodId == savingPeriodId && !transaction.IsCancelled)
             .Select(transaction => transaction.Direction == Domain.Enums.TransactionDirection.Income ? transaction.Amount : -transaction.Amount)
             .SumAsync(cancellationToken);
 
-    public async Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(CancellationToken cancellationToken = default)
+    public Task<decimal> GetSharedInterestPoolAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+        SharedInterestPoolQuery.RawAsync(dbContext, savingPeriodId, cancellationToken);
+
+    public async Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(Guid savingPeriodId, CancellationToken cancellationToken = default)
     {
         return await dbContext.Transactions
+            .Where(transaction => transaction.SavingPeriodId == savingPeriodId)
             .OrderByDescending(transaction => transaction.OccurredAt)
             .Select(transaction => new TransactionListItem(
                 transaction.Id,
@@ -50,9 +54,9 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<TransactionDetailResponse?> GetDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<TransactionDetailResponse?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default)
     {
-        var transaction = await dbContext.Transactions.SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        var transaction = await dbContext.Transactions.SingleOrDefaultAsync(item => item.Id == id && item.SavingPeriodId == savingPeriodId, cancellationToken);
         if (transaction is null) return null;
 
         return transaction.Type switch
@@ -63,14 +67,15 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
             Domain.Enums.TransactionType.Performance => await GetPerformanceDetailAsync(transaction, cancellationToken),
             Domain.Enums.TransactionType.Activity => await GetActivityDetailAsync(transaction, cancellationToken),
             Domain.Enums.TransactionType.ActivitySale => await GetActivityAssignmentDetailAsync(transaction, cancellationToken),
+            Domain.Enums.TransactionType.ExtraCost => await GetExtraCostDetailAsync(transaction, cancellationToken),
             _ => throw new InvalidOperationException($"Unsupported transaction type: {transaction.Type}.")
         };
     }
 
     private async Task<TransactionDetailResponse> GetMonthlyPaymentDetailAsync(Transaction transaction, CancellationToken cancellationToken)
     {
-        var payment = await dbContext.MonthlyPayments.Include(item => item.User).SingleAsync(item => item.TransactionId == transaction.Id, cancellationToken);
-        return Build(transaction, new TransactionSourceDetail { Entity = "MonthlyPayment", EntityId = payment.Id, MemberName = payment.User.FirstName + " " + payment.User.LastName, Year = payment.Year, Month = payment.Month, Status = payment.Status.ToString(), PaidAt = payment.PaidAt });
+        var payment = await dbContext.MonthlyPayments.Include(item => item.User).Include(item => item.SavingPeriod).SingleAsync(item => item.TransactionId == transaction.Id, cancellationToken);
+        return Build(transaction, new TransactionSourceDetail { Entity = "MonthlyPayment", EntityId = payment.Id, MemberName = payment.User.FirstName + " " + payment.User.LastName, Year = payment.SavingPeriod.Year, Month = payment.Month, Status = payment.Status.ToString(), PaidAt = payment.PaidAt });
     }
 
     private async Task<TransactionDetailResponse> GetLoanDetailAsync(Transaction transaction, CancellationToken cancellationToken)
@@ -101,6 +106,12 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
     {
         var assignment = await dbContext.ActivityAssignments.Include(item => item.Activity).Include(item => item.User).SingleAsync(item => item.TransactionId == transaction.Id, cancellationToken);
         return Build(transaction, new TransactionSourceDetail { Entity = "ActivityAssignment", EntityId = assignment.Id, MemberName = assignment.User.FirstName + " " + assignment.User.LastName, Status = assignment.Status.ToString(), PaidAt = assignment.PaidAt, ActivityName = assignment.Activity.Name, ActivityDescription = assignment.Activity.Description, ActivityQuantity = assignment.Activity.Quantity, QuantityAssigned = assignment.QuantityAssigned, UnitCost = assignment.Activity.UnitCost, UnitSalePrice = assignment.Activity.UnitSalePrice, StartDate = assignment.Activity.StartDate, AssignedAt = assignment.AssignedAt });
+    }
+
+    private async Task<TransactionDetailResponse> GetExtraCostDetailAsync(Transaction transaction, CancellationToken cancellationToken)
+    {
+        var cost = await dbContext.ExtraCosts.Include(item => item.Activity).SingleAsync(item => item.TransactionId == transaction.Id, cancellationToken);
+        return Build(transaction, new TransactionSourceDetail { Entity = "ExtraCost", EntityId = cost.Id, Status = cost.Status.ToString(), PaidAt = cost.PaidAt, ActivityId = cost.ActivityId, ActivityName = cost.Activity.Name, ActivityDescription = cost.Description });
     }
 
     private static TransactionDetailResponse Build(Transaction transaction, TransactionSourceDetail source) => new(transaction.Id, transaction.Amount, transaction.Direction, transaction.Type, transaction.OccurredAt, transaction.Description, source, transaction.IsCancelled);

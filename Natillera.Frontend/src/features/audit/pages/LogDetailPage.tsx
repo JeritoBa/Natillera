@@ -23,7 +23,7 @@ export function LogDetailPage() {
     const load = async () => {
       try { setLog(await getLogDetail(session.accessToken, id)) }
       catch (requestError) {
-        setError(requestError instanceof ApiError && requestError.status === 404 ? 'No se encontró el log solicitado.' : getFriendlyApiError(requestError))
+        setError(requestError instanceof ApiError && requestError.status === 404 ? 'No se encontró el log solicitado. Puede pertenecer a otro periodo.' : getFriendlyApiError(requestError))
       }
     }
     void load()
@@ -44,6 +44,7 @@ export function LogDetailPage() {
     ['Miembro', summary.memberName], ['Año', summary.year], ['Mes', summary.month ? formatMonth(summary.month) : null],
     ['Estado', summary.status ? <Badge status={summary.status.toLowerCase()} /> : null],
     ['Monto actual', summary.amount !== null ? formatCurrency(summary.amount) : null],
+    ['Actividad', summary.activityId && summary.activityName ? <Link to={`/activities/${summary.activityId}`} className="text-[#0a6635] underline">{summary.activityName}</Link> : null],
   ] as [string, ReactNode][]).filter(([, value]) => value !== null && value !== undefined && value !== '')
 
   return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl"><button onClick={() => navigate('/logs')} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver a logs</button><div className="mb-6"><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Detalle de log</h1><p className="text-[#4e7460] text-sm">Registro de auditoría de la operación</p></div><div className="rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4" style={card}>{fields.map(([label, value]) => cell(label, value))}</div>

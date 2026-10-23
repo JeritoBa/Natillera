@@ -323,6 +323,14 @@ Host=<neon-host>;Port=5432;Database=<db>;Username=<user>;Password=<password>;SSL
 
 **Normal deploy.** Work on `dev`, push, open a PR to `main`, wait for CI to be green, merge. Render deploys `main` automatically only after checks pass. If the change adds a migration, take a manual backup first (below).
 
+**Add a yearly saving period (PER-01).** Periods are created only by the developer, one EF Core migration per year, with a fixed `Id` (a constant GUID) and an idempotent insert, because development databases may already contain the year:
+
+```sql
+INSERT INTO saving_periods ("Id", "Year") VALUES ('<fixed-guid>', 2027) ON CONFLICT ("Year") DO NOTHING;
+```
+
+The app has no endpoint or screen to create periods. Until the current year has a period, users see the most recent one with a notice.
+
 **Rollback.** Render dashboard, service `natillera-api` (or `natillera-web`), Events/Deploys, pick a previous successful deploy and roll back. Rollback restores code only, not the database: an applied migration stays applied, so prefer backward-compatible migrations and never edit an applied migration. To undo a bad migration, restore a backup (below) after owner approval.
 
 **Manual backup (owner-managed, OPS-04).** Use `pg_dump` 18 against the **direct** Neon endpoint, periodically and always before deploying a migration:

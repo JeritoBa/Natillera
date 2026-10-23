@@ -2,7 +2,7 @@ Entities Properties Guide for AI Agent
 
 Source of truth: the EF Core model (Natillera.Backend/Domain/Entities and
 Natillera.Backend/Infrastructure/Persistence/Configurations) and its migrations.
-Last verified against migration 20261009154159_MonthlyPaymentPendingAndCancellation.
+Last verified against migration 20261022014859_AddLoanDescription.
 Rules live in docs/business-rules.md. Column names below are written in snake_case
 for readability; in the database they are PascalCase (FirstName, TransactionId...).
 
@@ -15,6 +15,10 @@ Important:
 - Foreign keys use ON DELETE RESTRICT: nothing is physically deleted. "Deleting" = status Cancelled
 - Rule: every business entity that moves money has exactly ONE Transaction (1:1, unique transaction_id).
   Pending items have NO Transaction until they are paid (transaction_id is POSSIBLE NULL there).
+- [018] Lines marked [018] come from spec 018 (saving periods), built in migration 20261022005557_AddSavingPeriods.
+- [020] Lines marked [020] are the model of spec 020 (activity extra costs), built.
+  Every root entity belongs to one SavingPeriod (required FK); children belong to their parent's period.
+  Every balance, list and guard is computed within one period (rule PER-06).
 
 User
 - id
@@ -28,13 +32,21 @@ User
 - created_at DATETIME (UTC, set by the domain)
 - updated_at DATETIME POSSIBLE NULL
 
+[018] SavingPeriod (one year of the natillera; created only by the developer with one migration per year)
+- id
+- year INT UNIQUE
+  Roots with saving_period_id: MonthlyPayment, Loan, Activity, Transaction, Log.
+  Children without own column (parent's period): LoanPayment, Performance -> Loan; ActivityAssignment -> Activity.
+  User has no period.
+
 Technical Entities
 
 Transaction
 - id
 - amount DECIMAL (always > 0; the sign comes from direction)
 - direction ENUM('Income', 'Expense')
-- type ENUM('MonthlyPayment', 'Activity', 'ActivitySale', 'Loan', 'LoanPayment', 'Performance')
+- type ENUM('MonthlyPayment', 'Activity', 'ActivitySale', 'Loan', 'LoanPayment', 'Performance', [020] 'ExtraCost')
+    [020] ExtraCost   = Expense (paid activity extra cost)
     MonthlyPayment = Income  (fee paid)
     Loan           = Expense (money lent)
     LoanPayment    = Income  (principal payment)
@@ -44,10 +56,11 @@ Transaction
 - occurred_at DATETIME
 - description VARCHAR(200)
 - is_cancelled BOOL DEFAULT false (a cancelled transaction is excluded from every balance but stays visible)
+- [018] saving_period_id FK WITH SavingPeriod (the period of its source entity; for a child, the parent's period)
 
 Log (immutable audit record; one per create/update/cancel, written in the same DB transaction as the change)
 - id
-- entity_type ENUM('MonthlyPayment', 'Activity', 'ActivityAssignment', 'Loan', 'LoanPayment', 'Performance', 'Transaction')
+- entity_type ENUM('MonthlyPayment', 'Activity', 'ActivityAssignment', 'Loan', 'LoanPayment', 'Performance', 'Transaction', [020] 'ExtraCost')
     ('ActivityAssignment' replaced the old 'ActivitySale'. 'Transaction' exists but no service writes it today.)
 - entity_id (UUID of the audited entity; not a database FK)
 - action ENUM('Create', 'Update', 'Delete')   -- 'Delete' means cancellation
@@ -55,6 +68,7 @@ Log (immutable audit record; one per create/update/cancel, written in the same D
 - old_value DECIMAL POSSIBLE NULL
 - new_value DECIMAL POSSIBLE NULL
 - user_id FK WITH User (the user who performed the operation, from the JWT)
+- [018] saving_period_id FK WITH SavingPeriod (the period of the audited entity; for a child, the parent's period)
 
 Business Entities
 
@@ -70,6 +84,7 @@ Activity
     Finished/Pending is automatic: Finished only when ALL units are assigned and every non-cancelled assignment is Paid.
 - created_at DATETIME
 - transaction_id FK WITH Transaction (UNIQUE; Expense created together with the activity)
+- [018] saving_period_id FK WITH SavingPeriod (start_date must fall inside the period's year)
 
 ActivityAssignment (replaces the planned ActivitySale entity: the assignment is the sale record)
 - id
@@ -93,7 +108,9 @@ Loan
 - created_at DATETIME
 - updated_at DATETIME POSSIBLE NULL
 - borrower_id FK WITH User
+- description VARCHAR(500) POSSIBLE NULL (spec 019; trimmed, empty = null)
 - transaction_id FK WITH Transaction (UNIQUE; Expense created together with the loan)
+- [018] saving_period_id FK WITH SavingPeriod (start_date must fall inside the period's year)
 
 LoanPayment (principal payment)
 - id
@@ -118,17 +135,30 @@ MonthlyPayment
 - id
 - amount DECIMAL (> 0 and >= NATILLERA_MIN_MONTHLY_PAYMENT)
 - paid_at DATETIME POSSIBLE NULL
-- year INT (>= 1)
+- year INT (>= 1)   [018] REMOVED: the fee's year is its period's year
 - month INT (1-12)
+- [018] saving_period_id FK WITH SavingPeriod
 - status ENUM('Pending', 'Paid', 'Cancelled')   (created as Pending or Paid; entity default is Pending)
 - created_at DATETIME
 - transaction_id FK WITH Transaction POSSIBLE NULL (UNIQUE; Income created when marked Paid)
 - user_id FK WITH User
 
+[020] ExtraCost (extra cost of an activity, e.g. delivery; belongs to the activity's period)
+- id
+- description VARCHAR(200)
+- amount DECIMAL (> 0)
+- status ENUM('Pending', 'Paid', 'Cancelled') (Paid -> Pending forbidden; Cancelled terminal)
+- created_at DATETIME
+- paid_at DATETIME POSSIBLE NULL
+- activity_id FK WITH Activity
+- transaction_id FK WITH Transaction POSSIBLE NULL (UNIQUE; Expense created when Paid)
+
 Derived values (never stored)
 - Loan outstanding principal = initial_amount - SUM(non-cancelled LoanPayment.amount)
 - Available money = SUM(Income) - SUM(Expense) over non-cancelled transactions
+  [018] of one saving period (nothing carries over between periods)
 - Member savings / earnings: see docs/business-rules.md (DASH-04, DASH-05, DASH-06)
+- [020] Shared interest pool of a period = SUM(Paid interest) - SUM(Paid extra costs), never below 0 (DASH-12)
 
 Not in the model (not implemented): ActivitySale, in-app payment records, loan requests/approvals,
 RowVersion concurrency tokens (planned, rule FIN-11).
@@ -136,6 +166,9 @@ RowVersion concurrency tokens (planned, rule FIN-11).
 Indexes (as created by the migrations / configurations):
 - User.email UNIQUE
 - MonthlyPayment(user_id, year, month) UNIQUE WHERE status <> 'Cancelled'   (partial index)
+  [018] becomes MonthlyPayment(user_id, saving_period_id, month) UNIQUE WHERE status <> 'Cancelled'
+- [018] SavingPeriod.year UNIQUE
+- [018] saving_period_id on MonthlyPayment, Loan, Activity, Transaction, Log
 - MonthlyPayment.transaction_id UNIQUE
 - Loan.transaction_id UNIQUE
 - LoanPayment.loan_id
@@ -146,6 +179,8 @@ Indexes (as created by the migrations / configurations):
 - ActivityAssignment.activity_id
 - ActivityAssignment.user_id
 - ActivityAssignment.transaction_id UNIQUE
+- [020] ExtraCost.activity_id
+- [020] ExtraCost.transaction_id UNIQUE
 - Transaction.occurred_at
 - Log(entity_type, entity_id)
 - Log.occurred_at

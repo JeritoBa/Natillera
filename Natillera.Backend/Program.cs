@@ -15,12 +15,14 @@ using Natillera.Backend.Application.Loans;
 using Natillera.Backend.Application.MonthlyPayments;
 using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Application.Security;
+using Natillera.Backend.Application.SavingPeriods;
 using Natillera.Backend.Application.Users;
 using Natillera.Backend.Infrastructure.Authentication;
 using Natillera.Backend.Infrastructure.Security;
 using Natillera.Backend.Infrastructure.Persistence;
 using Natillera.Backend.Infrastructure.Persistence.Repositories;
 using Natillera.Backend.Infrastructure.Persistence.Seed;
+using Natillera.Backend.Presentation;
 
 if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("JWT_SECRET")))
     DotNetEnv.Env.TraversePath().Load();
@@ -60,6 +62,7 @@ builder.Services.AddScoped<ILoanRepository, LoanRepository>();
 builder.Services.AddScoped<IActivityRepository, ActivityRepository>();
 builder.Services.AddScoped<ITransactionRepository,TransactionRepository>();
 builder.Services.AddScoped<ILogRepository, LogRepository>();
+builder.Services.AddScoped<ISavingPeriodRepository, SavingPeriodRepository>();
 builder.Services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<IMemberDetailRepository, MemberDetailRepository>();
@@ -71,6 +74,7 @@ builder.Services.AddScoped<LoanService>();
 builder.Services.AddScoped<ActivityService>();
 builder.Services.AddScoped<TransactionService>();
 builder.Services.AddScoped<LogService>();
+builder.Services.AddScoped<SavingPeriodService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<MemberDetailService>();
 
@@ -112,7 +116,13 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        // OPS-05: no framework error bodies; validation errors and bare status results use the app's format.
+        options.InvalidModelStateResponseFactory = ApiErrors.InvalidModelState;
+        options.SuppressMapClientErrors = true;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -163,6 +173,13 @@ else
 {
     app.Logger.LogInformation("Skipping database migrations and admin seed (NATILLERA_APPLY_MIGRATIONS is not true).");
 }
+
+// OPS-05: an unhandled exception returns a generic message (never a stack trace or exception page); it is still logged.
+app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
+{
+    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+    await context.Response.WriteAsJsonAsync(new { message = ApiErrors.Unexpected });
+}));
 
 if (app.Environment.IsDevelopment())
 {

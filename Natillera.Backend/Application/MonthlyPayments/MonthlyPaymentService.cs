@@ -17,12 +17,13 @@ public sealed class MonthlyPaymentService(
     IUnitOfWork unitOfWork,
     MonthlyPaymentOptions options)
 {
-    public Task<IReadOnlyCollection<MonthlyPaymentListItem>> GetOrderedAsync(bool includeNonPaid, CancellationToken cancellationToken) =>
-        paymentRepository.GetOrderedAsync(includeNonPaid, cancellationToken);
+    public Task<IReadOnlyCollection<MonthlyPaymentListItem>> GetOrderedAsync(bool includeNonPaid, SavingPeriod period, CancellationToken cancellationToken) =>
+        paymentRepository.GetOrderedAsync(includeNonPaid, period.Id, cancellationToken);
 
     public async Task<MonthlyPaymentResponse> CreateAsync(
         CreateMonthlyPaymentRequest request,
         Guid performedByUserId,
+        SavingPeriod period,
         CancellationToken cancellationToken)
     {
         var status = GetRequestedStatus(request.Status);
@@ -36,10 +37,10 @@ public sealed class MonthlyPaymentService(
         if (!member.IsActive)
             throw new DomainException("Only active members can receive a monthly payment.");
 
-        if (await paymentRepository.ExistsAsync(request.UserId, request.Year, request.Month, cancellationToken))
+        if (await paymentRepository.ExistsAsync(request.UserId, period.Id, request.Month, cancellationToken))
             throw new DomainException("A monthly payment already exists for this member and period.");
 
-        var payment = new MonthlyPayment(request.Amount, request.Year, request.Month, request.UserId);
+        var payment = new MonthlyPayment(request.Amount, request.Month, request.UserId, period.Id);
 
         try
         {
@@ -48,13 +49,13 @@ public sealed class MonthlyPaymentService(
                 await paymentRepository.AddAsync(payment, ct);
                 if (status == PaymentStatus.Paid)
                 {
-                    var transaction = NewTransaction(payment, member);
+                    var transaction = NewTransaction(payment, member, period.Year);
                     await transactionRepository.AddAsync(transaction, ct);
                     payment.MarkAsPaid(transaction.Id);
                 }
 
                 await logRepository.AddAsync(
-                    new Log(performedByUserId, LogEntityType.MonthlyPayment, payment.Id, LogAction.Create, null, payment.Amount),
+                    new Log(performedByUserId, LogEntityType.MonthlyPayment, payment.Id, LogAction.Create, payment.SavingPeriodId, null, payment.Amount),
                     ct);
             }, cancellationToken);
         }
@@ -63,17 +64,17 @@ public sealed class MonthlyPaymentService(
             throw new DomainException("A monthly payment already exists for this member and period.");
         }
 
-        return ToResponse(payment, member);
+        return ToResponse(payment, member, period.Year);
     }
 
-    public async Task<MonthlyPaymentResponse> UpdateAsync(Guid paymentId, UpdateMonthlyPaymentRequest request, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task<MonthlyPaymentResponse> UpdateAsync(Guid paymentId, UpdateMonthlyPaymentRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
         var status = GetRequestedStatus(request.Status);
 
         if (request.Amount < options.MinimumAmount)
             throw new DomainException($"Monthly payment must be at least {options.MinimumAmount:0.00}.");
 
-        var payment = await paymentRepository.GetByIdAsync(paymentId, cancellationToken)
+        var payment = await paymentRepository.GetByIdAsync(paymentId, period.Id, cancellationToken)
             ?? throw new DomainException("Monthly payment not found.");
 
         if (payment.Status == PaymentStatus.Cancelled)
@@ -86,19 +87,19 @@ public sealed class MonthlyPaymentService(
 
         if (!member.IsActive)
             throw new DomainException("Only active members can receive a monthly payment.");
-        if (await paymentRepository.ExistsForAnotherPaymentAsync(request.UserId, request.Year, request.Month, paymentId, cancellationToken))
+        if (await paymentRepository.ExistsForAnotherPaymentAsync(request.UserId, payment.SavingPeriodId, request.Month, paymentId, cancellationToken))
             throw new DomainException("A monthly payment already exists for this member and period.");
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {
             var wasPaid = payment.Status == PaymentStatus.Paid;
-            var available = wasPaid ? await transactionRepository.GetAvailableMoneyAsync(ct) : 0m;
+            var available = wasPaid ? await transactionRepository.GetAvailableMoneyAsync(payment.SavingPeriodId, ct) : 0m;
             var oldAmount = payment.Amount;
-            payment.UpdateDetails(request.Amount, request.Year, request.Month, request.UserId);
+            payment.UpdateDetails(request.Amount, request.Month, request.UserId);
             if (wasPaid)
             {
                 CashGuard.EnsureAvailable(available, oldAmount - payment.Amount); // FIN-13
-                payment.Transaction!.Update(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member));
+                payment.Transaction!.Update(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member, period.Year));
             }
             else if (status == PaymentStatus.Paid)
             {
@@ -107,28 +108,28 @@ public sealed class MonthlyPaymentService(
                     if (existing.IsCancelled)
                         throw new DomainException("Monthly payment transaction is cancelled and cannot be reused.");
 
-                    existing.Update(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member));
+                    existing.Update(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member, period.Year));
                     payment.MarkAsPaid(existing.Id);
                 }
                 else
                 {
-                    var transaction = NewTransaction(payment, member);
+                    var transaction = NewTransaction(payment, member, period.Year);
                     await transactionRepository.AddAsync(transaction, ct);
                     payment.MarkAsPaid(transaction.Id);
                 }
             }
 
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.MonthlyPayment, payment.Id, LogAction.Update, oldAmount, payment.Amount),
+                new Log(performedByUserId, LogEntityType.MonthlyPayment, payment.Id, LogAction.Update, payment.SavingPeriodId, oldAmount, payment.Amount),
                 ct);
         }, cancellationToken);
 
-        return ToResponse(payment, member);
+        return ToResponse(payment, member, period.Year);
     }
 
-    public async Task CancelAsync(Guid paymentId, Guid performedByUserId, CancellationToken cancellationToken)
+    public async Task CancelAsync(Guid paymentId, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var payment = await paymentRepository.GetByIdAsync(paymentId, cancellationToken)
+        var payment = await paymentRepository.GetByIdAsync(paymentId, period.Id, cancellationToken)
             ?? throw new DomainException("Monthly payment not found.");
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
@@ -138,7 +139,7 @@ public sealed class MonthlyPaymentService(
                 transaction.Cancel();
 
             await logRepository.AddAsync(
-                new Log(performedByUserId, LogEntityType.MonthlyPayment, payment.Id, LogAction.Delete, payment.Amount, null),
+                new Log(performedByUserId, LogEntityType.MonthlyPayment, payment.Id, LogAction.Delete, payment.SavingPeriodId, payment.Amount, null),
                 ct);
         }, cancellationToken);
     }
@@ -151,13 +152,14 @@ public sealed class MonthlyPaymentService(
         return status;
     }
 
-    private static string Description(MonthlyPayment payment, User member) =>
-        $"Monthly payment - {payment.Month:00}/{payment.Year} - {member.FirstName} {member.LastName}";
+    private static string Description(MonthlyPayment payment, User member, int year) =>
+        $"Monthly payment - {payment.Month:00}/{year} - {member.FirstName} {member.LastName}";
 
-    private static Transaction NewTransaction(MonthlyPayment payment, User member) =>
-        new(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member));
+    private static Transaction NewTransaction(MonthlyPayment payment, User member, int year) =>
+        new(payment.Amount, TransactionDirection.Income, TransactionType.MonthlyPayment, Description(payment, member, year),
+            payment.SavingPeriodId);
 
-    private static MonthlyPaymentResponse ToResponse(MonthlyPayment payment, User member) =>
-        new(payment.Id, payment.UserId, payment.TransactionId, payment.Amount, payment.Year, payment.Month,
+    private static MonthlyPaymentResponse ToResponse(MonthlyPayment payment, User member, int year) =>
+        new(payment.Id, payment.UserId, payment.TransactionId, payment.Amount, year, payment.Month,
             payment.PaidAt, payment.Status, member.FirstName + " " + member.LastName);
 }

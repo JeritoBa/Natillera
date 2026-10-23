@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Natillera.Backend.Presentation.Filters;
 using System.Security.Claims;
 using Natillera.Backend.Application.MonthlyPayments;
 using Natillera.Backend.Domain.Enums;
@@ -9,6 +10,7 @@ namespace Natillera.Backend.Presentation.Controllers;
 
 [ApiController]
 [Route("api/monthly-payments")]
+[SavingPeriodScoped]
 [Authorize]
 public sealed class MonthlyPaymentsController(MonthlyPaymentService monthlyPaymentService) : ControllerBase
 {
@@ -16,7 +18,7 @@ public sealed class MonthlyPaymentsController(MonthlyPaymentService monthlyPayme
     [Authorize]
     [ProducesResponseType(typeof(IReadOnlyCollection<MonthlyPaymentListItem>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<MonthlyPaymentListItem>>> Get(CancellationToken cancellationToken) =>
-        Ok(await monthlyPaymentService.GetOrderedAsync(User.IsInRole(nameof(UserRole.Admin)), cancellationToken));
+        Ok(await monthlyPaymentService.GetOrderedAsync(User.IsInRole(nameof(UserRole.Admin)), this.SavingPeriod(), cancellationToken));
 
     /// <summary>Creates a pending or paid monthly payment; a paid one also creates its income transaction atomically.</summary>
     [HttpPost]
@@ -34,7 +36,7 @@ public sealed class MonthlyPaymentsController(MonthlyPaymentService monthlyPayme
 
         try
         {
-            var payment = await monthlyPaymentService.CreateAsync(request, userId, cancellationToken);
+            var payment = await monthlyPaymentService.CreateAsync(request, userId, this.SavingPeriod(), cancellationToken);
             return Created($"/api/monthly-payments/{payment.Id}", payment);
         }
         catch (DomainException exception) when (exception.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
@@ -61,7 +63,7 @@ public sealed class MonthlyPaymentsController(MonthlyPaymentService monthlyPayme
 
         try
         {
-            return Ok(await monthlyPaymentService.UpdateAsync(id, request, userId, cancellationToken));
+            return Ok(await monthlyPaymentService.UpdateAsync(id, request, userId, this.SavingPeriod(), cancellationToken));
         }
         catch (DomainException exception) when (exception.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase))
         {
@@ -91,7 +93,7 @@ public sealed class MonthlyPaymentsController(MonthlyPaymentService monthlyPayme
 
         try
         {
-            await monthlyPaymentService.CancelAsync(id, userId, cancellationToken);
+            await monthlyPaymentService.CancelAsync(id, userId, this.SavingPeriod(), cancellationToken);
             return NoContent();
         }
         catch (DomainException exception) when (exception.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))

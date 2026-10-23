@@ -13,6 +13,7 @@ export interface LoanListItem {
   startDate: string
   status: LoanStatus
   outstandingPrincipal: number
+  description?: string | null
 }
 
 export interface LoanRequest {
@@ -20,6 +21,7 @@ export interface LoanRequest {
   initialAmount: number
   interestRate: number
   startDate: string
+  description?: string | null
 }
 
 export interface LoanPaymentResponse {
@@ -60,6 +62,7 @@ export interface LoanDetail {
   initialAmount: number
   interestRate: number
   startDate: string
+  description?: string | null
   endDate: string | null
   status: LoanStatus
   createdAt: string

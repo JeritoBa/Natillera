@@ -26,4 +26,5 @@ public sealed class TransactionSourceDetail
     public DateTime? LoanStartDate { get; init; }
     public DateTime? LoanEndDate { get; init; }
     public string? PaymentMethod { get; init; }
+    public Guid? ActivityId { get; init; }
 }

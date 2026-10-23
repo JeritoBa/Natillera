@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Natillera.Backend.Domain.Entities;
 using Natillera.Backend.Domain.Enums;
 
 namespace Natillera.Backend.Application.Loans;
@@ -16,6 +17,9 @@ public sealed class LoanRequest
 
     [Required]
     public DateTime StartDate { get; init; }
+
+    // LOAN-11: length is checked by the domain after trimming (message in the app's format, OPS-05).
+    public string? Description { get; init; }
 }
 
 public sealed class LoanPaymentRequest
@@ -47,7 +51,8 @@ public sealed record LoanListItem(
     decimal InterestRate,
     DateTime StartDate,
     LoanStatus Status,
-    decimal OutstandingPrincipal);
+    decimal OutstandingPrincipal,
+    string? Description = null);
 
 public sealed record LoanListData(
     Guid Id,
@@ -57,7 +62,8 @@ public sealed record LoanListData(
     decimal InterestRate,
     DateTime StartDate,
     LoanStatus Status,
-    decimal PrincipalPaid);
+    decimal PrincipalPaid,
+    string? Description = null);
 
 public sealed record LoanPaymentResponse(
     Guid Id,
@@ -94,6 +100,7 @@ public sealed record LoanDetailResponse(
     decimal InitialAmount,
     decimal InterestRate,
     DateTime StartDate,
+    string? Description,
     DateTime? EndDate,
     LoanStatus Status,
     DateTime CreatedAt,

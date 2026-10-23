@@ -25,7 +25,7 @@ public sealed record MemberDetailData(
     MemberInfoResponse Member,
     decimal Savings,
     decimal ActivityEarnings,
-    decimal PaidPerformancesTotal,
+    decimal SharedInterestPool,
     int ActiveMembersCount,
     IReadOnlyCollection<MemberPendingPaymentResponse> PendingPayments,
     IReadOnlyCollection<MemberTransactionResponse> Transactions);

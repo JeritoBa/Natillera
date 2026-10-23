@@ -11,7 +11,7 @@ const assignment = (status: AssignmentStatus, quantityAssigned: number, saleAmou
 const activity = (assignments: ActivityAssignmentResponse[], overrides: Partial<ActivityDetail> = {}): ActivityDetail => ({
   id: 'a1', name: 'Rifa', description: '', quantity: 100, unitCost: 1000, unitSalePrice: 2500, totalCost: 100000,
   assignedQuantity: 0, availableQuantity: 100, startDate: '2026-01-01', status: 'Pending',
-  transactionId: 't1', createdAt: '2026-01-01', assignments, ...overrides,
+  transactionId: 't1', createdAt: '2026-01-01', assignments, extraCosts: [], ...overrides,
 })
 
 describe('getActivitySummary', () => {

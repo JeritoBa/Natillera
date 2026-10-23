@@ -2,6 +2,7 @@ import { apiRequest } from '@/shared/api/apiClient'
 
 export type ActivityStatus = 'Pending' | 'Finished' | 'Cancelled'
 export type AssignmentStatus = 'Pending' | 'Paid' | 'Cancelled'
+export type ExtraCostStatus = 'Pending' | 'Paid' | 'Cancelled'
 
 export interface ActivityListItem {
   id: string
@@ -30,10 +31,22 @@ export interface ActivityAssignmentResponse {
   transactionId: string | null
 }
 
+export interface ExtraCost {
+  id: string
+  activityId: string
+  description: string
+  amount: number
+  status: ExtraCostStatus
+  createdAt: string
+  paidAt: string | null
+  transactionId: string | null
+}
+
 export interface ActivityDetail extends ActivityListItem {
   transactionId: string
   createdAt: string
   assignments: ActivityAssignmentResponse[]
+  extraCosts: ExtraCost[]
 }
 
 export interface ActivityRequest {
@@ -55,6 +68,12 @@ export interface ActivityAssignmentUpdateRequest {
   status: 'Pending' | 'Paid'
 }
 
+export interface ExtraCostRequest {
+  description: string
+  amount: number
+  status: 'Pending' | 'Paid'
+}
+
 const json = (method: string, token: string, body?: unknown) =>
   ({ method, token, ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
 
@@ -72,3 +91,10 @@ export const updateActivityAssignment = (token: string, activityId: string, assi
   apiRequest<ActivityAssignmentResponse>(`/api/activities/${activityId}/assignments/${assignmentId}`, json('PUT', token, request))
 export const cancelActivityAssignment = (token: string, activityId: string, assignmentId: string) =>
   apiRequest<void>(`/api/activities/${activityId}/assignments/${assignmentId}`, json('DELETE', token))
+
+export const createExtraCost = (token: string, activityId: string, request: ExtraCostRequest) =>
+  apiRequest<ExtraCost>(`/api/activities/${activityId}/extra-costs`, json('POST', token, request))
+export const updateExtraCost = (token: string, activityId: string, extraCostId: string, request: ExtraCostRequest) =>
+  apiRequest<ExtraCost>(`/api/activities/${activityId}/extra-costs/${extraCostId}`, json('PUT', token, request))
+export const cancelExtraCost = (token: string, activityId: string, extraCostId: string) =>
+  apiRequest<void>(`/api/activities/${activityId}/extra-costs/${extraCostId}`, json('DELETE', token))

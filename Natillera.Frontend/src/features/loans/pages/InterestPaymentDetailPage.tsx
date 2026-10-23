@@ -21,7 +21,7 @@ export function InterestPaymentDetailPage() {
     const load = async () => {
       try { setInterest(await getInterestPayment(session.accessToken, loanId, interestId)) }
       catch (requestError) {
-        setError(requestError instanceof ApiError && requestError.status === 404 ? 'No se encontró el interés solicitado.' : getFriendlyApiError(requestError))
+        setError(requestError instanceof ApiError && requestError.status === 404 ? 'No se encontró el interés solicitado. Puede pertenecer a otro periodo.' : getFriendlyApiError(requestError))
       }
     }
     void load()

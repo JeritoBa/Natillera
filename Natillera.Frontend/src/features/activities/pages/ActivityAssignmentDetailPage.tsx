@@ -21,7 +21,7 @@ export function ActivityAssignmentDetailPage() {
     const load = async () => {
       try { setAssignment(await getActivityAssignment(session.accessToken, activityId, assignmentId)) }
       catch (requestError) {
-        setError(requestError instanceof ApiError && requestError.status === 404 ? 'No se encontró la asignación solicitada.' : getFriendlyApiError(requestError))
+        setError(requestError instanceof ApiError && requestError.status === 404 ? 'No se encontró la asignación solicitada. Puede pertenecer a otro periodo.' : getFriendlyApiError(requestError))
       }
     }
     void load()

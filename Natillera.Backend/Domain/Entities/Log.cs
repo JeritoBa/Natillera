@@ -11,12 +11,14 @@ public class Log
     }
 
     public Log(Guid userId, LogEntityType entityType, Guid entityId, LogAction action,
-        decimal? oldValue = null, decimal? newValue = null, DateTime? occurredAt = null)
+        Guid savingPeriodId, decimal? oldValue = null, decimal? newValue = null, DateTime? occurredAt = null)
     {
         if (userId == Guid.Empty)
             throw new DomainException("Log user id is required.");
         if (entityId == Guid.Empty)
             throw new DomainException("Log entity id is required.");
+        if (savingPeriodId == Guid.Empty)
+            throw new DomainException("Saving period id is required.");
         if (!Enum.IsDefined(entityType))
             throw new DomainException("Log entity type is invalid.");
         if (!Enum.IsDefined(action))
@@ -27,6 +29,7 @@ public class Log
         EntityType = entityType;
         EntityId = entityId;
         Action = action;
+        SavingPeriodId = savingPeriodId;
         OldValue = oldValue;
         NewValue = newValue;
         OccurredAt = occurredAt ?? DateTime.UtcNow;
@@ -41,4 +44,6 @@ public class Log
     public decimal? NewValue { get; private set; }
     public Guid UserId { get; private set; }
     public User User { get; private set; } = null!;
+    public Guid SavingPeriodId { get; private set; }
+    public SavingPeriod SavingPeriod { get; private set; } = null!;
 }
