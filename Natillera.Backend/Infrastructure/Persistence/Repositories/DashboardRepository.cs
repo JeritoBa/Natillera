@@ -1,49 +1,49 @@
 using Microsoft.EntityFrameworkCore;
 using Natillera.Backend.Application.Dashboard;
+using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Domain.Enums;
 
 namespace Natillera.Backend.Infrastructure.Persistence.Repositories;
 
 public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboardRepository
 {
-    public async Task<DashboardSummaryResponse> GetSummaryAsync(Guid userId, string role, CancellationToken cancellationToken = default)
+    public async Task<DashboardSummaryResponse> GetSummaryAsync(Guid userId, string role, Guid savingPeriodId, CancellationToken cancellationToken = default)
     {
         var availableMoney = await dbContext.Transactions
-            .Where(transaction => !transaction.IsCancelled)
+            .Where(transaction => transaction.SavingPeriodId == savingPeriodId && !transaction.IsCancelled)
             .Select(transaction => transaction.Direction == TransactionDirection.Income ? transaction.Amount : -transaction.Amount)
             .SumAsync(cancellationToken);
 
         if (string.Equals(role, nameof(UserRole.Admin), StringComparison.OrdinalIgnoreCase))
-            return await GetAdminSummaryAsync(availableMoney, cancellationToken);
+            return await GetAdminSummaryAsync(availableMoney, savingPeriodId, cancellationToken);
 
-        return await GetMemberSummaryAsync(userId, availableMoney, cancellationToken);
+        return await GetMemberSummaryAsync(userId, availableMoney, savingPeriodId, cancellationToken);
     }
 
-    private async Task<DashboardSummaryResponse> GetAdminSummaryAsync(decimal availableMoney, CancellationToken cancellationToken)
+    private async Task<DashboardSummaryResponse> GetAdminSummaryAsync(decimal availableMoney, Guid savingPeriodId, CancellationToken cancellationToken)
     {
         var lentMoney = await dbContext.Loans
-            .Where(loan => loan.Status == LoanStatus.Active)
+            .Where(loan => loan.SavingPeriodId == savingPeriodId && loan.Status == LoanStatus.Active)
             .Select(loan => loan.InitialAmount - (dbContext.LoanPayments
                 .Where(payment => payment.LoanId == loan.Id && payment.Status != PaymentStatus.Cancelled)
                 .Select(payment => (decimal?)payment.Amount).Sum() ?? 0m))
             .SumAsync(cancellationToken);
 
         var pendingActivitiesInvestment = await dbContext.ActivityAssignments
-            .Where(assignment => assignment.Status == AssignmentStatus.Pending)
+            .Where(assignment => assignment.Activity.SavingPeriodId == savingPeriodId && assignment.Status == AssignmentStatus.Pending)
             .Select(assignment => assignment.QuantityAssigned * assignment.Activity.UnitCost)
             .SumAsync(cancellationToken);
 
-        var loanInterestEarned = await dbContext.Performances
-            .Where(performance => performance.Status == PaymentStatus.Paid)
-            .Select(performance => (decimal?)performance.Amount)
-            .SumAsync(cancellationToken) ?? 0m;
+        // DASH-12: gross paid interest stays as is; the net pool and the paid extra costs are reported next to it.
+        var loanInterestEarned = await SharedInterestPoolQuery.PaidTotalAsync(dbContext, savingPeriodId, TransactionType.Performance, cancellationToken);
+        var paidExtraCosts = await SharedInterestPoolQuery.PaidTotalAsync(dbContext, savingPeriodId, TransactionType.ExtraCost, cancellationToken);
 
-        var realizedActivityEarnings = await PaidAssignments()
+        var realizedActivityEarnings = await PaidAssignments(savingPeriodId)
             .Select(assignment => (decimal?)(assignment.QuantityAssigned * (assignment.Activity.UnitSalePrice - assignment.Activity.UnitCost)))
             .SumAsync(cancellationToken) ?? 0m;
 
-        var recentTransactions = await GetRecentTransactionsAsync(cancellationToken);
-        var topSellers = await GetTopSellersAsync(cancellationToken);
+        var recentTransactions = await GetRecentTransactionsAsync(savingPeriodId, cancellationToken);
+        var topSellers = await GetTopSellersAsync(savingPeriodId, cancellationToken);
         return new DashboardSummaryResponse(
             nameof(UserRole.Admin),
             availableMoney,
@@ -59,42 +59,41 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
             loanInterestEarned,
             realizedActivityEarnings,
             null,
-            null);
+            null,
+            null,
+            InterestPool.Net(loanInterestEarned - paidExtraCosts),
+            paidExtraCosts);
     }
 
-    private async Task<DashboardSummaryResponse> GetMemberSummaryAsync(Guid userId, decimal availableMoney, CancellationToken cancellationToken)
+    private async Task<DashboardSummaryResponse> GetMemberSummaryAsync(Guid userId, decimal availableMoney, Guid savingPeriodId, CancellationToken cancellationToken)
     {
         // Same definition as MemberDetailRepository/MemberDetailService (member balance.total).
         var paidMonthlyPayments = await dbContext.MonthlyPayments
-            .Where(payment => payment.UserId == userId && payment.Status == PaymentStatus.Paid)
+            .Where(payment => payment.SavingPeriodId == savingPeriodId && payment.UserId == userId && payment.Status == PaymentStatus.Paid)
             .Select(payment => (decimal?)payment.Amount)
             .SumAsync(cancellationToken) ?? 0m;
 
         var activityEarnings = await dbContext.ActivityAssignments
-            .Where(assignment => assignment.UserId == userId && assignment.Status != AssignmentStatus.Cancelled)
+            .Where(assignment => assignment.Activity.SavingPeriodId == savingPeriodId && assignment.UserId == userId && assignment.Status != AssignmentStatus.Cancelled)
             .Select(assignment => (decimal?)(assignment.QuantityAssigned * (assignment.Activity.UnitSalePrice - assignment.Activity.UnitCost)))
             .SumAsync(cancellationToken) ?? 0m;
 
-        var paidPerformancesTotal = await dbContext.Performances
-            .Where(performance => performance.Status == PaymentStatus.Paid)
-            .Select(performance => (decimal?)performance.Amount)
-            .SumAsync(cancellationToken) ?? 0m;
+        var sharedInterestPool = InterestPool.Net(await SharedInterestPoolQuery.RawAsync(dbContext, savingPeriodId, cancellationToken)); // DASH-12
 
+        // PER-07: members have no period, the interest share is divided among those active today.
         var activeMembersCount = await dbContext.Users
             .CountAsync(user => user.IsActive && user.Role == UserRole.Member, cancellationToken);
 
-        var performanceShare = activeMembersCount == 0
-            ? 0m
-            : Math.Round(paidPerformancesTotal / activeMembersCount, 2, MidpointRounding.AwayFromZero);
+        var performanceShare = InterestPool.Share(sharedInterestPool, activeMembersCount);
 
         var mySavings = paidMonthlyPayments + activityEarnings + performanceShare;
         var myEarnings = activityEarnings + performanceShare;
 
         var pendingPayments = await dbContext.MonthlyPayments
-            .CountAsync(payment => payment.UserId == userId && payment.Status == PaymentStatus.Pending, cancellationToken);
+            .CountAsync(payment => payment.SavingPeriodId == savingPeriodId && payment.UserId == userId && payment.Status == PaymentStatus.Pending, cancellationToken);
 
-        var recentTransactions = await GetRecentTransactionsAsync(cancellationToken);
-        var topSellers = await GetTopSellersAsync(cancellationToken);
+        var recentTransactions = await GetRecentTransactionsAsync(savingPeriodId, cancellationToken);
+        var topSellers = await GetTopSellersAsync(savingPeriodId, cancellationToken);
         return new DashboardSummaryResponse(
             nameof(UserRole.Member),
             availableMoney,
@@ -113,13 +112,13 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
             performanceShare);
     }
 
-    private IQueryable<Domain.Entities.ActivityAssignment> PaidAssignments() =>
+    private IQueryable<Domain.Entities.ActivityAssignment> PaidAssignments(Guid savingPeriodId) =>
         dbContext.ActivityAssignments.Where(assignment =>
-            assignment.Status == AssignmentStatus.Paid && assignment.Activity.Status != ActivityStatus.Cancelled);
+            assignment.Activity.SavingPeriodId == savingPeriodId && assignment.Status == AssignmentStatus.Paid && assignment.Activity.Status != ActivityStatus.Cancelled);
 
-    private async Task<TopSellerItem[]> GetTopSellersAsync(CancellationToken cancellationToken)
+    private async Task<TopSellerItem[]> GetTopSellersAsync(Guid savingPeriodId, CancellationToken cancellationToken)
     {
-        var totals = await PaidAssignments()
+        var totals = await PaidAssignments(savingPeriodId)
             .GroupBy(assignment => assignment.UserId)
             .Select(group => new
             {
@@ -146,9 +145,9 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
             .ToArray();
     }
 
-    private Task<DashboardTransactionResponse[]> GetRecentTransactionsAsync(CancellationToken cancellationToken)
+    private Task<DashboardTransactionResponse[]> GetRecentTransactionsAsync(Guid savingPeriodId, CancellationToken cancellationToken)
     {
-        var query = dbContext.Transactions.Where(transaction => !transaction.IsCancelled);
+        var query = dbContext.Transactions.Where(transaction => transaction.SavingPeriodId == savingPeriodId && !transaction.IsCancelled);
 
         return query.OrderByDescending(transaction => transaction.OccurredAt).Take(10)
             .Select(transaction => new DashboardTransactionResponse(

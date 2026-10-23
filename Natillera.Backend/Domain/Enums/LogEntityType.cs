@@ -8,5 +8,6 @@ public enum LogEntityType
     Loan,
     LoanPayment,
     Performance,
-    Transaction
+    Transaction,
+    ExtraCost
 }

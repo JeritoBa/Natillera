@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { DemoBanner } from '@/features/demo/components/DemoBanner'
 import { DemoWriteToast } from '@/features/demo/components/DemoWriteToast'
+import { PeriodChip } from '@/features/settings/components/PeriodChip'
+import { PeriodNotice } from '@/features/settings/components/PeriodNotice'
+import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import type { Page } from '@/shared/model/types'
 import { BrandLogo } from '@/shared/ui/BrandLogo'
 import { Icon } from '@/shared/ui/Icon'
@@ -42,6 +45,7 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
         <div className="flex items-center gap-2.5 px-5 py-4 border-b" style={{ borderColor: '#d6e8dc' }}>
           <Link to="/" onClick={() => { if (isDemo) exitDemo() }} aria-label="Ir a la página principal de Gallego Nanclares" className="inline-flex rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c5c38]"><BrandLogo /></Link>
         </div>
+        {!isDemo && <div className="hidden lg:block px-5 py-2 border-b" style={{ borderColor: '#d6e8dc' }}><PeriodChip /></div>}
 
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
           {visibleNav.map(({ id, label, Icon: NavIcon, disabled }) => (
@@ -71,6 +75,13 @@ function Sidebar({ page, setPage, sidebarOpen, setSidebarOpen }: SidebarProps) {
               <p className="text-[11px] text-[#4e7460]">{roleLabel}</p>
             </div>
           </div>
+          {!isDemo && <button
+            onClick={() => { setPage('settings'); setSidebarOpen(false) }}
+            className={`nav-item w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm ${page === 'settings' ? 'active' : ''}`}
+          >
+            <Icon.Settings />
+            <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 500 }}>Configuración</span>
+          </button>}
           <button
             onClick={() => { if (isDemo) { exitDemo(); setPage('landing') } else { logout(); setPage('auth') } }}
             className="nav-item w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm"
@@ -93,6 +104,7 @@ interface AppShellProps {
 export function AppShell({ page, setPage, children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { isDemo, exitDemo } = useAuth()
+  const { selected, notice, noticeDismissed, dismissNotice } = useSavingPeriod()
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#f5f7f5' }}>
@@ -107,8 +119,12 @@ export function AppShell({ page, setPage, children }: AppShellProps) {
             <Icon.Menu />
           </button>
           <Link to="/" onClick={() => { if (isDemo) exitDemo() }} aria-label="Ir a la página principal de Gallego Nanclares" className="inline-flex rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c5c38]"><BrandLogo className="h-7 w-auto" /></Link>
+          {!isDemo && <PeriodChip className="ml-auto" />}
         </header>
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="flex-1 overflow-y-auto">
+          {!isDemo && notice === 'currentYearMissing' && !noticeDismissed && selected && <PeriodNotice currentYear={new Date().getFullYear()} selectedYear={selected.year} onDismiss={dismissNotice} />}
+          {children}
+        </main>
       </div>
       {isDemo && <DemoWriteToast />}
     </div>

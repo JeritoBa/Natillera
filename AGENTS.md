@@ -2,7 +2,7 @@
 
 Single entry point for any AI coding agent (Claude Code, Copilot, Cursor, etc.). Read this first, then the documents it links. The owner talks to agents in **Spanish**; all repository documentation and code are in **English**.
 
-Last verified against the code: backend 310 tests and frontend 173 tests passing.
+Last verified against the code: backend 423 tests and frontend 217 tests passing.
 
 ---
 
@@ -59,7 +59,7 @@ Decisions and their rationale: [docs/architecture_decisions.md](docs/architectur
 
 - **Modular monolith**, **Clean Architecture** in a single backend project (`Domain` <- `Application` <- `Infrastructure` / `Presentation`; dependencies point inward, the Domain has no framework dependencies).
 - **REST/JSON API + JWT bearer**; React SPA; PostgreSQL; Docker Compose.
-- Controllers map `DomainException` to HTTP codes (message containing "not found" -> 404, "already exists" -> 409 where used, otherwise 400); the message body is `{ "message": "..." }` in English.
+- Controllers map `DomainException` to HTTP codes (message containing "not found" -> 404, "already exists" -> 409 where used, otherwise 400); the message body is `{ "message": "..." }` in English, and the framework never sends its own error bodies (OPS-05: no ProblemDetails, no exception pages).
 
 | Layer | Technologies (versions as in the project files) |
 |---|---|
@@ -122,8 +122,8 @@ Rebuild after code changes: `docker compose up -d --build backend web`. In `Deve
 **Test.**
 
 ```bash
-dotnet test Natillera.sln          # backend, ~310 tests, no DB/Docker needed
-cd Natillera.Frontend && npm test  # Vitest, ~173 tests, pure logic
+dotnet test Natillera.sln          # backend, ~423 tests, no DB/Docker needed
+cd Natillera.Frontend && npm test  # Vitest, ~217 tests, pure logic
 cd Natillera.Frontend && npm run lint && npm run build
 ```
 
@@ -204,7 +204,7 @@ From now on, **specs and rule IDs come before code**:
 5. **Tests reference rule IDs** in their names or in a comment when practical (e.g. `// MP-04`). Rule IDs are never reused or renumbered.
 6. If code and docs disagree, the owner decides which is right; fix the other and note it.
 
-Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, ACT (activities), DASH (dashboard), TX/AUD (transactions, audit), UI, OPS (operations, deployment), DEMO (public browser-only demo).
+Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, ACT (activities), DASH (dashboard), TX/AUD (transactions, audit), UI, OPS (operations, deployment), DEMO (public browser-only demo), PER (saving periods).
 
 ---
 
@@ -225,6 +225,8 @@ Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, A
 
 ### Pending changes
 
+- **Saving periods (spec 018, branch `v1.1.0`) change the logical structure of the app.** Every root entity (`MonthlyPayment`, `Loan`, `Activity`, `Transaction`, `Log`) belongs to one saving period (year); children follow their parent. Every balance, list and guard is computed **within the selected period**, nothing carries over between years (PER-06), and period-scoped requests carry `X-Saving-Id` (PER-04). New periods are added by the developer with one migration per year (PER-01). Read the PER rules before touching any balance, list or guard.
+- **Activity extra costs (spec 020, branch `v1.1.0`) change how members' earnings are computed:** the interest share divides the period's shared interest pool = Paid interest - Paid extra costs (DASH-12), guarded by FIN-14.
 - **MP-09 has no automated test:** list visibility (Admin sees all statuses, a Member sees only `Paid` payments) is enforced in `MonthlyPaymentsController.Get` -> `MonthlyPaymentRepository.GetOrderedAsync(includeNonPaid)` with no test. Add a test (likely as part of the integration tests, since it lives in the controller/repository).
 
 ### Other open items

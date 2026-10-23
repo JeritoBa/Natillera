@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { appName } from '@/app/useDocumentTitle'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { getMemberDetail, type MemberDetail } from '@/features/members/api/membersApi'
 import { PendingObligationsCard } from '@/features/members/components/PendingObligationsCard'
 import { typeLabel } from '@/features/transactions/model/labels'
@@ -22,6 +23,7 @@ export function MemberDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { session } = useAuth()
+  const { selected } = useSavingPeriod()
   const [detail, setDetail] = useState<MemberDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -90,6 +92,7 @@ export function MemberDetailPage() {
         <h1 className="text-xl font-bold text-[#0c1a12] break-words">{fullName}</h1>
         <Badge status={member.isActive ? 'active' : 'inactive'} />
       </div>
+      {selected && <p className="text-xs text-[#4e7460] mt-0.5">Periodo {selected.year}</p>}
       <p className="text-[#4e7460] text-sm mt-0.5">Miembro desde el {longDate(member.createdAt)}</p>
       {!member.isActive && <p role="status" className="mt-3 rounded-lg border border-[#d6e8dc] bg-[#eef4f0] px-3 py-2.5 text-sm text-[#4e7460]">Este miembro está inactivo. Su historial y sus ahorros se conservan.</p>}
     </div>

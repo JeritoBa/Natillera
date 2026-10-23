@@ -138,23 +138,23 @@ public class MemberDetailServiceTests
 {
     private sealed class StubRepo(MemberDetailData? data) : IMemberDetailRepository
     {
-        public Task<MemberDetailData?> GetDetailAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        public Task<MemberDetailData?> GetDetailAsync(Guid memberId, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
             Task.FromResult(data);
     }
 
-    private static MemberDetailData Data(decimal savings, decimal activity, decimal performances, int members) =>
+    private static MemberDetailData Data(decimal savings, decimal activity, decimal sharedPool, int members) =>
         new(new MemberInfoResponse(Guid.NewGuid(), "A", "B", "a@b.com", "1", UserRole.Member, true, DateTime.UtcNow, null),
-            savings, activity, performances, members, [], []);
+            savings, activity, sharedPool, members, [], []);
 
     private sealed class StubPendingRepo(PendingObligationsData data) : IPendingObligationsRepository
     {
-        public Task<PendingObligationsData> GetDataAsync(Guid memberId, CancellationToken cancellationToken = default) =>
+        public Task<PendingObligationsData> GetDataAsync(Guid memberId, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
             Task.FromResult(data);
     }
 
     private static Task<MemberDetailResponse?> Run(MemberDetailData? data, PendingObligationsData? pending = null) =>
         new MemberDetailService(new StubRepo(data), new StubPendingRepo(pending ?? new PendingObligationsData([], [], [], [])))
-            .GetDetailAsync(Guid.NewGuid(), default);
+            .GetDetailAsync(Guid.NewGuid(), TestPeriods.Y2026, default);
 
     [Fact]
     public async Task GetDetailAsync_IncludesPendingObligations_MEM10()
@@ -189,6 +189,15 @@ public class MemberDetailServiceTests
         var result = await Run(Data(100m, 0m, 300m, 3));
 
         Assert.Equal(100m, result!.Balance.PerformanceEarnings);
+    }
+
+    [Fact]
+    public async Task GetDetailAsync_ShareUsesSharedPool_DASH12()
+    {
+        // The repository hands over the net pool (paid interest 700 - paid extra costs 100); 600 / 3 = 200 each.
+        var result = await Run(Data(0m, 0m, 600m, 3));
+
+        Assert.Equal(200m, result!.Balance.PerformanceEarnings);
     }
 
     [Fact]

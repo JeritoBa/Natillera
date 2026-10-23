@@ -42,6 +42,18 @@ public sealed class ActivityAssignmentUpdateRequest
     public AssignmentStatus? Status { get; init; }
 }
 
+public sealed class ExtraCostRequest
+{
+    [Required, MaxLength(200)]
+    public string Description { get; init; } = string.Empty;
+
+    [Range(0.01, double.MaxValue)]
+    public decimal Amount { get; init; }
+
+    [Required]
+    public ExtraCostStatus? Status { get; init; }
+}
+
 public sealed record ActivityListData(
     Guid Id,
     string Name,
@@ -78,6 +90,16 @@ public sealed record ActivityAssignmentResponse(
     DateTime? PaidAt,
     Guid? TransactionId);
 
+public sealed record ExtraCostResponse(
+    Guid Id,
+    Guid ActivityId,
+    string Description,
+    decimal Amount,
+    ExtraCostStatus Status,
+    DateTime CreatedAt,
+    DateTime? PaidAt,
+    Guid? TransactionId);
+
 public sealed record ActivityDetailResponse(
     Guid Id,
     Guid TransactionId,
@@ -92,4 +114,5 @@ public sealed record ActivityDetailResponse(
     DateTime StartDate,
     ActivityStatus Status,
     DateTime CreatedAt,
-    IReadOnlyCollection<ActivityAssignmentResponse> Assignments);
+    IReadOnlyCollection<ActivityAssignmentResponse> Assignments,
+    IReadOnlyCollection<ExtraCostResponse> ExtraCosts);

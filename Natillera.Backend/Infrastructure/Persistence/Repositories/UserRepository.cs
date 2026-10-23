@@ -21,6 +21,7 @@ public sealed class UserRepository(NatilleraDbContext dbContext) : IUserReposito
     public Task<bool> IsActiveUserAsync(Guid id, CancellationToken cancellationToken = default) =>
         dbContext.Users.AnyAsync(user => user.Id == id && user.IsActive, cancellationToken);
 
+    // PER-07: deliberately NOT filtered by saving period; a member cannot be deactivated while owing anything, in any year.
     public async Task<MemberPendingObligations> GetPendingObligationsAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var pendingMonthlyPayments = await dbContext.MonthlyPayments

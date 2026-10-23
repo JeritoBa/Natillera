@@ -20,6 +20,9 @@ public sealed class LogConfiguration : IEntityTypeConfiguration<Log>
         builder.HasIndex(log => new { log.EntityType, log.EntityId });
         builder.HasIndex(log => log.OccurredAt);
         builder.HasIndex(log => log.UserId);
+        builder.HasIndex(log => log.SavingPeriodId);
+        builder.HasOne(log => log.SavingPeriod).WithMany()
+            .HasForeignKey(log => log.SavingPeriodId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(log => log.User).WithMany()
             .HasForeignKey(log => log.UserId).OnDelete(DeleteBehavior.Restrict);
     }

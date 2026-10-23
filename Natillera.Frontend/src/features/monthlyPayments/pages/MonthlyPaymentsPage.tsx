@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { formatDateOnly } from '@/features/loans/model/labels'
+import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { cancelMonthlyPayment, createMonthlyPayment, getMonthlyPayments, updateMonthlyPayment, type MonthlyPaymentResponse } from '@/features/monthlyPayments/api/monthlyPaymentsApi'
-import { getAvailableMonths, isValidFeeYear, resolveSelectedMonth } from '@/features/monthlyPayments/model/availableMonths'
+import { getAvailableMonths, resolveSelectedMonth } from '@/features/monthlyPayments/model/availableMonths'
 import { countPaymentsByStatus, filterPayments, paymentMemberOptions, paymentMonthOptions, type PaymentStatusFilter } from '@/features/monthlyPayments/model/paymentFilters'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth, formatShortCurrency } from '@/shared/lib/formatters'
@@ -34,13 +35,13 @@ const toRow = (payment: MonthlyPaymentResponse): MonthlyPaymentRow => ({
 export function MonthlyPaymentsPage() {
   const { session, isDemo } = useAuth()
   const { members, loading: membersLoading } = useMembers()
+  const { selected } = useSavingPeriod()
   const [searchParams] = useSearchParams()
   const [payments, setPayments] = useState<MonthlyPaymentRow[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<MonthlyPaymentRow | null>(null)
   const [memberId, setMemberId] = useState('')
   const [month, setMonth] = useState(new Date().getMonth() + 1)
-  const [year, setYear] = useState(new Date().getFullYear())
   const [amount, setAmount] = useState('')
   const [status, setStatus] = useState<'Pending' | 'Paid'>('Paid')
   const [saving, setSaving] = useState(false)
@@ -67,11 +68,12 @@ export function MonthlyPaymentsPage() {
 
   // MP-10: the Mes select only offers months without a non-cancelled fee for the member and year; the edited fee never blocks itself.
   const feePeriods = useMemo(() => payments.map(payment => ({ id: payment.backendId, userId: payment.userId, year: payment.year, month: payment.monthNumber, cancelled: payment.status === 'cancelled' })), [payments])
+  // MP-11: new fees belong to the selected period; an edited fee keeps its own year.
+  const year = editing?.year ?? selected?.year ?? new Date().getFullYear()
   const availableMonths = getAvailableMonths(feePeriods, memberId, year, editing?.backendId)
   const selectedMonth = resolveSelectedMonth(month, availableMonths, new Date())
   const memberOption = members.find(member => member.id === memberId)
   const memberName = memberOption ? `${memberOption.firstName} ${memberOption.lastName}` : ''
-  const yearValid = isValidFeeYear(year)
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
@@ -79,11 +81,11 @@ export function MonthlyPaymentsPage() {
   }, [load])
 
   const openCreate = () => {
-    setEditing(null); setMemberId(activeMembers[0]?.id ?? ''); setMonth(new Date().getMonth() + 1); setYear(new Date().getFullYear()); setAmount(''); setStatus('Paid'); setError(null); setModalError(null); setSuccess(null); setModalOpen(true)
+    setEditing(null); setMemberId(activeMembers[0]?.id ?? ''); setMonth(new Date().getMonth() + 1); setAmount(''); setStatus('Paid'); setError(null); setModalError(null); setSuccess(null); setModalOpen(true)
   }
 
   const openEdit = (payment: MonthlyPaymentRow) => {
-    setEditing(payment); setMemberId(payment.userId); setMonth(payment.monthNumber); setYear(payment.year); setAmount(toMoneyInputValue(payment.amount)); setStatus(payment.status === 'paid' ? 'Paid' : 'Pending'); setError(null); setModalError(null); setSuccess(null); setModalOpen(true)
+    setEditing(payment); setMemberId(payment.userId); setMonth(payment.monthNumber); setAmount(toMoneyInputValue(payment.amount)); setStatus(payment.status === 'paid' ? 'Paid' : 'Pending'); setError(null); setModalError(null); setSuccess(null); setModalOpen(true)
   }
 
   const save = async () => {
@@ -91,13 +93,12 @@ export function MonthlyPaymentsPage() {
     setModalError(null); setSuccess(null)
     const numericAmount = Number(amount)
     if (!memberId) return setModalError('Selecciona un miembro.')
-    if (!yearValid) return setModalError('Ingresa un año válido.')
     if (selectedMonth === null) return setModalError('Elige un mes sin cuota registrada.')
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) return setModalError('Ingresa un monto válido.')
     if (!session) return
     setSaving(true)
     try {
-      const request = { userId: memberId, year, month: selectedMonth, amount: numericAmount, status }
+      const request = { userId: memberId, month: selectedMonth, amount: numericAmount, status }
       if (editing) await updateMonthlyPayment(session.accessToken, editing.backendId, request)
       else await createMonthlyPayment(session.accessToken, request)
       await load()
@@ -134,7 +135,7 @@ export function MonthlyPaymentsPage() {
   const filterSuffix = hasFilters ? ' (filtro)' : ''
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
-      <div className="flex items-start justify-between mb-6 gap-4 flex-wrap"><div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Cuotas Mensuales</h1><p className="text-[#4e7460] text-sm">Aportes de cada miembro</p></div>{isAdmin && <button onClick={openCreate} disabled={membersLoading || listLoading || listError !== null || activeMembers.length === 0} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap disabled:opacity-50"><Icon.Plus /> Agregar cuota</button>}</div>
+      <div className="flex items-start justify-between mb-6 gap-4 flex-wrap"><div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Cuotas Mensuales</h1><p className="text-[#4e7460] text-sm">Aportes de cada miembro{selected ? ` · Periodo ${selected.year}` : ''}</p></div>{isAdmin && <button onClick={openCreate} disabled={membersLoading || listLoading || listError !== null || activeMembers.length === 0} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap disabled:opacity-50"><Icon.Plus /> Agregar cuota</button>}</div>
       <dl className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
         <StatCard label={`Recaudado${filterSuffix}`} value={formatShortCurrency(paid.reduce((total, payment) => total + payment.amount, 0))} />
         <StatCard label={`Cuotas pagadas${filterSuffix}`} value={paid.length} />
@@ -184,7 +185,7 @@ export function MonthlyPaymentsPage() {
           {isAdmin && <td className={`${cellLast} py-3.5 pl-1 ${cellActions}`}>{payment.status !== 'cancelled' && <div className="flex justify-end"><button onClick={() => openEdit(payment)} className={iconButton} aria-label="Editar cuota"><Icon.Edit /></button><button onClick={() => void cancel(payment)} className={dangerButton} aria-label="Anular cuota"><Icon.Trash /></button></div>}</td>}
         </tr>)}
       </tbody></table></div></div>
-      {modalOpen && <Modal title={editing ? 'Editar cuota mensual' : 'Nueva cuota mensual'} onClose={() => !saving && setModalOpen(false)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4"><div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><select value={memberId} onChange={event => setMemberId(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un miembro</option>{members.filter(member => editing ? true : member.isActive).map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div><div className="grid grid-cols-2 gap-3"><div><label htmlFor="payment-month" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Mes</label><select id="payment-month" aria-describedby="payment-month-help" value={selectedMonth ?? ''} onChange={event => setMonth(Number(event.target.value))} disabled={!memberId || !yearValid || availableMonths.length === 0} className="w-full px-3 py-2.5 rounded-lg text-sm">{!memberId ? <option value="">Primero elige un miembro</option> : !yearValid ? <option value="">—</option> : availableMonths.length === 0 ? <option value="">Sin meses disponibles</option> : availableMonths.map(value => <option key={value} value={value}>{formatMonth(value)}</option>)}</select></div><div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Año</label><input type="number" min="1" value={year} onChange={event => setYear(Number(event.target.value))} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div></div><p id="payment-month-help" aria-live="polite" className="text-xs text-[#4e7460] -mt-2">{!memberId || !yearValid ? '' : availableMonths.length === 0 ? `${memberName} ya tiene cuota en todos los meses de ${year}. Prueba con otro año.` : `Solo se muestran los meses de ${year} en que ${memberName} no tiene cuota.`}</p><div><label htmlFor="payment-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto</label><MoneyInput id="payment-amount" value={amount} onChange={setAmount} placeholder="50000" /></div><StatusRadioGroup name="payment-status" legend="Estado" value={status} onChange={setStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja', disabled: editing?.status === 'paid' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} note={editing?.status === 'paid' ? 'Una cuota pagada no puede volver a pendiente.' : undefined} />{modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}<div className="flex gap-3 pt-1"><button type="button" onClick={() => setModalOpen(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : editing ? 'Actualizar cuota' : 'Guardar cuota'}</button></div></form></Modal>}
+      {modalOpen && <Modal title={editing ? 'Editar cuota mensual' : 'Nueva cuota mensual'} onClose={() => !saving && setModalOpen(false)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4"><div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><select value={memberId} onChange={event => setMemberId(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un miembro</option>{members.filter(member => editing ? true : member.isActive).map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div><div><label htmlFor="payment-month" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Mes</label><select id="payment-month" aria-describedby="payment-month-help" value={selectedMonth ?? ''} onChange={event => setMonth(Number(event.target.value))} disabled={!memberId || availableMonths.length === 0} className="w-full px-3 py-2.5 rounded-lg text-sm">{!memberId ? <option value="">Primero elige un miembro</option> : availableMonths.length === 0 ? <option value="">Sin meses disponibles</option> : availableMonths.map(value => <option key={value} value={value}>{formatMonth(value)}</option>)}</select><p className="text-xs text-[#4e7460] mt-1.5">Se registra en el periodo <strong>{year}</strong>.</p></div><p id="payment-month-help" aria-live="polite" className="text-xs text-[#4e7460] -mt-2">{!memberId ? '' : availableMonths.length === 0 ? `${memberName} ya tiene cuota en todos los meses de ${year}. Para otro año, cambia el periodo en Configuración.` : `Solo se muestran los meses de ${year} en que ${memberName} no tiene cuota.`}</p><div><label htmlFor="payment-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto</label><MoneyInput id="payment-amount" value={amount} onChange={setAmount} placeholder="50000" /></div><StatusRadioGroup name="payment-status" legend="Estado" value={status} onChange={setStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja', disabled: editing?.status === 'paid' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} note={editing?.status === 'paid' ? 'Una cuota pagada no puede volver a pendiente.' : undefined} />{modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}<div className="flex gap-3 pt-1"><button type="button" onClick={() => setModalOpen(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : editing ? 'Actualizar cuota' : 'Guardar cuota'}</button></div></form></Modal>}
     </div>
   )
 }

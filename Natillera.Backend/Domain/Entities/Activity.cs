@@ -6,15 +6,17 @@ namespace Natillera.Backend.Domain.Entities;
 public class Activity
 {
     private readonly List<ActivityAssignment> _assignments = [];
+    private readonly List<ExtraCost> _extraCosts = [];
 
     private Activity()
     {
     }
 
     public Activity(string name, string description, int quantity, decimal unitCost, decimal unitSalePrice,
-        DateTime startDate, Guid transactionId)
+        DateTime startDate, Guid transactionId, SavingPeriod savingPeriod)
     {
         Validate(name, description, quantity, unitCost, unitSalePrice);
+        savingPeriod.EnsureContains(startDate); // PER-05
 
         Id = Guid.NewGuid();
         Name = name.Trim();
@@ -26,6 +28,7 @@ public class Activity
         Status = ActivityStatus.Pending;
         CreatedAt = DateTime.UtcNow;
         TransactionId = transactionId;
+        SavingPeriodId = savingPeriod.Id;
     }
 
     public Guid Id { get; private set; }
@@ -38,8 +41,11 @@ public class Activity
     public ActivityStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public Guid TransactionId { get; private set; }
+    public Guid SavingPeriodId { get; private set; }
+    public SavingPeriod SavingPeriod { get; private set; } = null!;
     public Transaction Transaction { get; private set; } = null!;
     public IReadOnlyCollection<ActivityAssignment> Assignments => _assignments;
+    public IReadOnlyCollection<ExtraCost> ExtraCosts => _extraCosts;
 
     public decimal TotalCost() => Quantity * UnitCost;
 
@@ -60,10 +66,13 @@ public class Activity
     }
 
     public void UpdateDetails(string name, string description, int quantity, decimal unitCost, decimal unitSalePrice,
-        DateTime startDate)
+        DateTime startDate, SavingPeriod savingPeriod)
     {
         EnsureNotCancelled();
         Validate(name, description, quantity, unitCost, unitSalePrice);
+        if (savingPeriod.Id != SavingPeriodId)
+            throw new DomainException("An activity cannot move to another saving period.");
+        savingPeriod.EnsureContains(startDate); // PER-05
 
         if (quantity < AssignedQuantity())
             throw new DomainException("Activity quantity cannot be lower than the assigned quantity.");
@@ -96,12 +105,29 @@ public class Activity
         assignment.UpdateQuantity(quantity);
     }
 
+    // ACT-14, ACT-15: extra costs never touch the activity's own figures (cost, quantities, status).
+    public ExtraCost AddExtraCost(string description, decimal amount)
+    {
+        EnsureNotCancelled();
+        var cost = new ExtraCost(description, amount, Id);
+        _extraCosts.Add(cost);
+        return cost;
+    }
+
+    public void UpdateExtraCost(ExtraCost cost, string description, decimal amount)
+    {
+        EnsureNotCancelled();
+        cost.UpdateDetails(description, amount);
+    }
+
     public void Cancel()
     {
         if (Status == ActivityStatus.Cancelled)
             throw new DomainException("Activity is already cancelled.");
         if (_assignments.Any(assignment => assignment.Status != AssignmentStatus.Cancelled))
             throw new DomainException("Activity cannot be cancelled because it has active assignments.");
+        if (_extraCosts.Any(cost => cost.Status != ExtraCostStatus.Cancelled))
+            throw new DomainException("Activity cannot be cancelled because it has extra costs.");
 
         Status = ActivityStatus.Cancelled;
     }

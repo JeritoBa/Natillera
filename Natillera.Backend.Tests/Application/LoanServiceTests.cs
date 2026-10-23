@@ -24,7 +24,7 @@ public class LoanServiceTests
     }
 
     private static LoanRequest LoanReq(Guid borrower, decimal amount = 1000m, decimal rate = 5m) =>
-        new() { BorrowerId = borrower, InitialAmount = amount, InterestRate = rate, StartDate = new DateTime(2025, 1, 1) };
+        new() { BorrowerId = borrower, InitialAmount = amount, InterestRate = rate, StartDate = new DateTime(2026, 1, 1) };
 
     private static LoanPaymentRequest PayReq(decimal amount) =>
         new() { Amount = amount, PaymentMethod = PaymentMethod.Cash };
@@ -35,7 +35,7 @@ public class LoanServiceTests
     /// <summary>Creates a loan through the service and links the navigations EF would populate.</summary>
     private async Task<Loan> SeedLoanAsync(User borrower, decimal amount = 1000m)
     {
-        var response = await _service.CreateLoanAsync(LoanReq(borrower.Id, amount), Admin, default);
+        var response = await _service.CreateLoanAsync(LoanReq(borrower.Id, amount), Admin, TestPeriods.Y2026, default);
         var loan = _loans.Loans.Single(l => l.Id == response.Id);
         loan.Set("Borrower", borrower).Set("Transaction", _transactions.Transactions.Single(t => t.Id == loan.TransactionId));
         _logs.Logs.Clear();
@@ -55,7 +55,7 @@ public class LoanServiceTests
     {
         var borrower = _users.AddUser();
 
-        var response = await _service.CreateLoanAsync(LoanReq(borrower.Id, 2500m), Admin, default);
+        var response = await _service.CreateLoanAsync(LoanReq(borrower.Id, 2500m), Admin, TestPeriods.Y2026, default);
 
         var tx = Assert.Single(_transactions.Transactions);
         Assert.Equal(TransactionDirection.Expense, tx.Direction);
@@ -73,7 +73,7 @@ public class LoanServiceTests
     {
         var borrower = _users.AddUser(active: false);
 
-        await Assert.ThrowsAsync<DomainException>(() => _service.CreateLoanAsync(LoanReq(borrower.Id), Admin, default));
+        await Assert.ThrowsAsync<DomainException>(() => _service.CreateLoanAsync(LoanReq(borrower.Id), Admin, TestPeriods.Y2026, default));
         Assert.Empty(_transactions.Transactions);
         Assert.Empty(_loans.Loans);
     }
@@ -81,7 +81,7 @@ public class LoanServiceTests
     [Fact]
     public async Task CreateLoanAsync_UnknownBorrower_Throws()
     {
-        await Assert.ThrowsAsync<DomainException>(() => _service.CreateLoanAsync(LoanReq(Guid.NewGuid()), Admin, default));
+        await Assert.ThrowsAsync<DomainException>(() => _service.CreateLoanAsync(LoanReq(Guid.NewGuid()), Admin, TestPeriods.Y2026, default));
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public class LoanServiceTests
     {
         var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
 
-        var response = await _service.CreatePaymentAsync(loan.Id, PayReq(400m), Admin, default);
+        var response = await _service.CreatePaymentAsync(loan.Id, PayReq(400m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(400m, response.Amount);
         Assert.Equal(600m, loan.OutstandingPrincipal());
@@ -109,7 +109,7 @@ public class LoanServiceTests
     {
         var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
 
-        await _service.CreatePaymentAsync(loan.Id, PayReq(1000m), Admin, default);
+        await _service.CreatePaymentAsync(loan.Id, PayReq(1000m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(LoanStatus.Paid, loan.Status);
     }
@@ -118,11 +118,11 @@ public class LoanServiceTests
     public async Task CreatePaymentAsync_ExceedsOutstanding_RejectedWithoutSideEffects()
     {
         var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
-        await _service.CreatePaymentAsync(loan.Id, PayReq(900m), Admin, default);
+        await _service.CreatePaymentAsync(loan.Id, PayReq(900m), Admin, TestPeriods.Y2026, default);
         var txCount = _transactions.Transactions.Count;
         var logCount = _logs.Logs.Count;
 
-        await Assert.ThrowsAsync<DomainException>(() => _service.CreatePaymentAsync(loan.Id, PayReq(100.01m), Admin, default));
+        await Assert.ThrowsAsync<DomainException>(() => _service.CreatePaymentAsync(loan.Id, PayReq(100.01m), Admin, TestPeriods.Y2026, default));
 
         Assert.Single(loan.Payments);
         Assert.Equal(logCount, _logs.Logs.Count);
@@ -136,18 +136,18 @@ public class LoanServiceTests
         var loan = await SeedLoanAsync(_users.AddUser());
 
         await Assert.ThrowsAsync<DomainException>(() => _service.CreatePaymentAsync(
-            loan.Id, new LoanPaymentRequest { Amount = 10m, PaymentMethod = null }, Admin, default));
+            loan.Id, new LoanPaymentRequest { Amount = 10m, PaymentMethod = null }, Admin, TestPeriods.Y2026, default));
     }
 
     [Fact]
     public async Task UpdatePaymentAsync_IncreaseWithinPrincipal_UpdatesPaymentAndTransaction()
     {
         var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
-        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(400m), Admin, default);
+        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(400m), Admin, TestPeriods.Y2026, default);
         LinkPaymentTransactions(loan);
         _logs.Logs.Clear();
 
-        await _service.UpdatePaymentAsync(loan.Id, created.Id, PayReq(1000m), Admin, default);
+        await _service.UpdatePaymentAsync(loan.Id, created.Id, PayReq(1000m), Admin, TestPeriods.Y2026, default);
 
         var payment = loan.Payments.Single();
         Assert.Equal(1000m, payment.Amount);
@@ -163,11 +163,11 @@ public class LoanServiceTests
     public async Task UpdatePaymentAsync_ExceedsPrincipal_Throws()
     {
         var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
-        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(400m), Admin, default);
+        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(400m), Admin, TestPeriods.Y2026, default);
         LinkPaymentTransactions(loan);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdatePaymentAsync(loan.Id, created.Id, PayReq(1000.01m), Admin, default));
+            _service.UpdatePaymentAsync(loan.Id, created.Id, PayReq(1000.01m), Admin, TestPeriods.Y2026, default));
         Assert.Equal(400m, loan.Payments.Single().Amount);
     }
 
@@ -175,11 +175,11 @@ public class LoanServiceTests
     public async Task CancelPaymentAsync_CancelsPaymentAndTransactionAndReopensLoan()
     {
         var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
-        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(1000m), Admin, default);
+        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(1000m), Admin, TestPeriods.Y2026, default);
         LinkPaymentTransactions(loan);
         _logs.Logs.Clear();
 
-        await _service.CancelPaymentAsync(loan.Id, created.Id, Admin, default);
+        await _service.CancelPaymentAsync(loan.Id, created.Id, Admin, TestPeriods.Y2026, default);
 
         var payment = loan.Payments.Single();
         Assert.Equal(PaymentStatus.Cancelled, payment.Status);
@@ -196,7 +196,7 @@ public class LoanServiceTests
         var loan = await SeedLoanAsync(_users.AddUser());
         var before = _transactions.Transactions.Count;
 
-        var response = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending), Admin, default);
+        var response = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(PaymentStatus.Pending, response.Status);
         Assert.Null(response.TransactionId);
@@ -211,7 +211,7 @@ public class LoanServiceTests
     {
         var loan = await SeedLoanAsync(_users.AddUser());
 
-        var response = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 75m), Admin, default);
+        var response = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 75m), Admin, TestPeriods.Y2026, default);
 
         var tx = _transactions.Transactions.Last();
         Assert.Equal(TransactionDirection.Income, tx.Direction);
@@ -227,18 +227,18 @@ public class LoanServiceTests
         var loan = await SeedLoanAsync(_users.AddUser());
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Cancelled), Admin, default));
+            _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Cancelled), Admin, TestPeriods.Y2026, default));
     }
 
     [Fact]
     public async Task UpdateInterestAsync_PendingToPaid_CreatesTransactionAndLog()
     {
         var loan = await SeedLoanAsync(_users.AddUser());
-        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending), Admin, default);
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending), Admin, TestPeriods.Y2026, default);
         _logs.Logs.Clear();
         var before = _transactions.Transactions.Count;
 
-        var response = await _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Paid), Admin, default);
+        var response = await _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Paid), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(PaymentStatus.Paid, response.Status);
         Assert.Equal(before + 1, _transactions.Transactions.Count);
@@ -250,21 +250,21 @@ public class LoanServiceTests
     public async Task UpdateInterestAsync_PaidToPending_Throws()
     {
         var loan = await SeedLoanAsync(_users.AddUser());
-        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid), Admin, default);
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid), Admin, TestPeriods.Y2026, default);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Pending), Admin, default));
+            _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Pending), Admin, TestPeriods.Y2026, default));
     }
 
     [Fact]
     public async Task CancelInterestAsync_Paid_CancelsTransaction()
     {
         var loan = await SeedLoanAsync(_users.AddUser());
-        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid), Admin, default);
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid), Admin, TestPeriods.Y2026, default);
         LinkPaymentTransactions(loan);
         _logs.Logs.Clear();
 
-        await _service.CancelInterestAsync(loan.Id, created.Id, Admin, default);
+        await _service.CancelInterestAsync(loan.Id, created.Id, Admin, TestPeriods.Y2026, default);
 
         var performance = loan.Performances.Single();
         Assert.Equal(PaymentStatus.Cancelled, performance.Status);
@@ -272,13 +272,89 @@ public class LoanServiceTests
         Assert.Equal(LogAction.Delete, Assert.Single(_logs.Logs).Action);
     }
 
+    private void SeedExtraCostPaid(decimal amount) =>
+        _transactions.Transactions.Add(new Transaction(amount, TransactionDirection.Expense, TransactionType.ExtraCost, "Activity extra cost - QA", TestPeriods.Y2026.Id));
+
+    [Fact]
+    public async Task CancelInterestAsync_Paid_LeavingPoolNegative_Throws_FIN14()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 500m), Admin, TestPeriods.Y2026, default);
+        LinkPaymentTransactions(loan);
+        SeedExtraCostPaid(200m); // pool 300 < 500
+        _logs.Logs.Clear();
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            _service.CancelInterestAsync(loan.Id, created.Id, Admin, TestPeriods.Y2026, default));
+
+        Assert.Equal("This change would leave the shared interest pool below zero. Pool: 300; reduction: 500.", ex.Message);
+        Assert.Equal(PaymentStatus.Paid, loan.Performances.Single().Status);
+        Assert.False(loan.Performances.Single().Transaction!.IsCancelled);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task CancelInterestAsync_Paid_PoolCovers_Succeeds_FIN14()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 500m), Admin, TestPeriods.Y2026, default);
+        LinkPaymentTransactions(loan);
+        _transactions.Transactions.Add(new Transaction(300m, TransactionDirection.Income, TransactionType.Performance, "Loan interest - QA", TestPeriods.Y2026.Id));
+        SeedExtraCostPaid(300m); // pool 500 = amount being cancelled
+
+        await _service.CancelInterestAsync(loan.Id, created.Id, Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal(PaymentStatus.Cancelled, loan.Performances.Single().Status);
+    }
+
+    [Fact]
+    public async Task UpdateInterestAsync_PaidLowered_BelowExtraCosts_Throws_FIN14()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 500m), Admin, TestPeriods.Y2026, default);
+        LinkPaymentTransactions(loan);
+        SeedExtraCostPaid(400m); // pool 100
+        _logs.Logs.Clear();
+
+        await Assert.ThrowsAsync<DomainException>(() =>
+            _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Paid, 300m), Admin, TestPeriods.Y2026, default)); // reduction 200 > pool 100
+
+        Assert.Equal(500m, loan.Performances.Single().Transaction!.Amount);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task UpdateInterestAsync_PaidRaised_IsNotPoolChecked_FIN14()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 500m), Admin, TestPeriods.Y2026, default);
+        LinkPaymentTransactions(loan);
+        SeedExtraCostPaid(500m); // pool 0
+
+        await _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Paid, 800m), Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal(800m, loan.Performances.Single().Transaction!.Amount);
+    }
+
+    [Fact]
+    public async Task CancelInterestAsync_Pending_NoPoolCheck_FIN14()
+    {
+        var loan = await SeedLoanAsync(_users.AddUser());
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending, 500m), Admin, TestPeriods.Y2026, default);
+        SeedExtraCostPaid(900m); // pool negative (legacy data)
+
+        await _service.CancelInterestAsync(loan.Id, created.Id, Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal(PaymentStatus.Cancelled, loan.Performances.Single().Status);
+    }
+
     [Fact]
     public async Task CancelInterestAsync_Pending_CancelsWithoutTouchingOtherTransactions()
     {
         var loan = await SeedLoanAsync(_users.AddUser());
-        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending), Admin, default);
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending), Admin, TestPeriods.Y2026, default);
 
-        await _service.CancelInterestAsync(loan.Id, created.Id, Admin, default);
+        await _service.CancelInterestAsync(loan.Id, created.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(PaymentStatus.Cancelled, loan.Performances.Single().Status);
         Assert.All(_transactions.Transactions, t => Assert.False(t.IsCancelled));
@@ -288,10 +364,10 @@ public class LoanServiceTests
     public async Task CancelLoanAsync_WithPayments_Throws()
     {
         var loan = await SeedLoanAsync(_users.AddUser());
-        await _service.CreatePaymentAsync(loan.Id, PayReq(100m), Admin, default);
+        await _service.CreatePaymentAsync(loan.Id, PayReq(100m), Admin, TestPeriods.Y2026, default);
         _logs.Logs.Clear();
 
-        await Assert.ThrowsAsync<DomainException>(() => _service.CancelLoanAsync(loan.Id, Admin, default));
+        await Assert.ThrowsAsync<DomainException>(() => _service.CancelLoanAsync(loan.Id, Admin, TestPeriods.Y2026, default));
 
         Assert.Equal(LoanStatus.Active, loan.Status);
         Assert.False(loan.Transaction.IsCancelled);
@@ -303,7 +379,7 @@ public class LoanServiceTests
     {
         var loan = await SeedLoanAsync(_users.AddUser());
 
-        await _service.CancelLoanAsync(loan.Id, Admin, default);
+        await _service.CancelLoanAsync(loan.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(LoanStatus.Cancelled, loan.Status);
         Assert.True(loan.Transaction.IsCancelled);
@@ -318,7 +394,7 @@ public class LoanServiceTests
         var borrower = _users.AddUser();
         var loan = await SeedLoanAsync(borrower, 1000m);
 
-        await _service.UpdateLoanAsync(loan.Id, LoanReq(borrower.Id, 1500m), Admin, default);
+        await _service.UpdateLoanAsync(loan.Id, LoanReq(borrower.Id, 1500m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(1500m, loan.InitialAmount);
         Assert.Equal(1500m, loan.Transaction.Amount);
@@ -332,10 +408,10 @@ public class LoanServiceTests
     {
         var borrower = _users.AddUser();
         var loan = await SeedLoanAsync(borrower, 1000m);
-        await _service.CreatePaymentAsync(loan.Id, PayReq(100m), Admin, default);
+        await _service.CreatePaymentAsync(loan.Id, PayReq(100m), Admin, TestPeriods.Y2026, default);
 
         await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateLoanAsync(loan.Id, LoanReq(borrower.Id, 1500m), Admin, default));
+            _service.UpdateLoanAsync(loan.Id, LoanReq(borrower.Id, 1500m), Admin, TestPeriods.Y2026, default));
         Assert.Equal(1000m, loan.InitialAmount);
     }
 
@@ -343,7 +419,7 @@ public class LoanServiceTests
     public async Task CreatePaymentAsync_LoanNotFound_Throws()
     {
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.CreatePaymentAsync(Guid.NewGuid(), PayReq(10m), Admin, default));
+            _service.CreatePaymentAsync(Guid.NewGuid(), PayReq(10m), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal("Loan not found.", ex.Message);
     }
@@ -358,7 +434,7 @@ public class LoanServiceTests
         var borrower = _users.AddUser();
         _transactions.SetAvailableMoney(1_000_000m);
 
-        var ex = await Assert.ThrowsAsync<DomainException>(() => _service.CreateLoanAsync(LoanReq(borrower.Id, 1_500_000m), Admin, default));
+        var ex = await Assert.ThrowsAsync<DomainException>(() => _service.CreateLoanAsync(LoanReq(borrower.Id, 1_500_000m), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal(string.Format(Insufficient, "1,000,000", "1,500,000"), ex.Message);
         Assert.Empty(_transactions.Transactions);
@@ -372,7 +448,7 @@ public class LoanServiceTests
         var borrower = _users.AddUser();
         _transactions.SetAvailableMoney(1_000_000m);
 
-        await _service.CreateLoanAsync(LoanReq(borrower.Id, 1_000_000m), Admin, default);
+        await _service.CreateLoanAsync(LoanReq(borrower.Id, 1_000_000m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(0m, _transactions.Available());
         Assert.Single(_logs.Logs);
@@ -385,7 +461,7 @@ public class LoanServiceTests
         _transactions.SetAvailableMoney(100_000m);
 
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateLoanAsync(loan.Id, LoanReq(loan.BorrowerId, 500_000m), Admin, default));
+            _service.UpdateLoanAsync(loan.Id, LoanReq(loan.BorrowerId, 500_000m), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal(string.Format(Insufficient, "100,000", "200,000"), ex.Message);
         Assert.Equal(300_000m, loan.Transaction.Amount);
@@ -398,7 +474,7 @@ public class LoanServiceTests
         var loan = await SeedLoanAsync(_users.AddUser(), 300_000m);
         _transactions.SetAvailableMoney(100_000m);
 
-        await _service.UpdateLoanAsync(loan.Id, LoanReq(loan.BorrowerId, 400_000m), Admin, default);
+        await _service.UpdateLoanAsync(loan.Id, LoanReq(loan.BorrowerId, 400_000m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(400_000m, loan.Transaction.Amount);
         Assert.Equal(0m, _transactions.Available());
@@ -411,7 +487,7 @@ public class LoanServiceTests
         var loan = await SeedLoanAsync(_users.AddUser(), 300_000m);
         _transactions.SetAvailableMoney(0m);
 
-        await _service.UpdateLoanAsync(loan.Id, LoanReq(loan.BorrowerId, 100_000m), Admin, default);
+        await _service.UpdateLoanAsync(loan.Id, LoanReq(loan.BorrowerId, 100_000m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(100_000m, loan.Transaction.Amount);
     }
@@ -420,13 +496,13 @@ public class LoanServiceTests
     public async Task UpdatePaymentAsync_DecreaseAboveAvailable_Throws_FIN13()
     {
         var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
-        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(600m), Admin, default);
+        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(600m), Admin, TestPeriods.Y2026, default);
         LinkPaymentTransactions(loan);
         _logs.Logs.Clear();
         _transactions.SetAvailableMoney(100m);
 
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdatePaymentAsync(loan.Id, created.Id, PayReq(100m), Admin, default));
+            _service.UpdatePaymentAsync(loan.Id, created.Id, PayReq(100m), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal(string.Format(Insufficient, "100", "500"), ex.Message);
         Assert.Equal(600m, loan.Payments.Single().Transaction.Amount);
@@ -437,11 +513,11 @@ public class LoanServiceTests
     public async Task UpdatePaymentAsync_IncreaseWithZeroCash_Succeeds_FIN13()
     {
         var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
-        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(100m), Admin, default);
+        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(100m), Admin, TestPeriods.Y2026, default);
         LinkPaymentTransactions(loan);
         _transactions.SetAvailableMoney(0m);
 
-        await _service.UpdatePaymentAsync(loan.Id, created.Id, PayReq(300m), Admin, default);
+        await _service.UpdatePaymentAsync(loan.Id, created.Id, PayReq(300m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(300m, loan.Payments.Single().Transaction.Amount);
     }
@@ -450,13 +526,13 @@ public class LoanServiceTests
     public async Task UpdateInterestAsync_PaidDecreaseAboveAvailable_Throws_FIN13()
     {
         var loan = await SeedLoanAsync(_users.AddUser());
-        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 500m), Admin, default);
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Paid, 500m), Admin, TestPeriods.Y2026, default);
         LinkPaymentTransactions(loan);
         _logs.Logs.Clear();
         _transactions.SetAvailableMoney(100m);
 
         var ex = await Assert.ThrowsAsync<DomainException>(() =>
-            _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Paid, 100m), Admin, default));
+            _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Paid, 100m), Admin, TestPeriods.Y2026, default));
 
         Assert.Equal(string.Format(Insufficient, "100", "400"), ex.Message);
         Assert.Equal(500m, loan.Performances.Single().Transaction!.Amount);
@@ -467,10 +543,10 @@ public class LoanServiceTests
     public async Task UpdateInterestAsync_PendingEditWithZeroCash_SkipsCheck_FIN13()
     {
         var loan = await SeedLoanAsync(_users.AddUser());
-        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending, 500m), Admin, default);
+        var created = await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending, 500m), Admin, TestPeriods.Y2026, default);
         _transactions.SetAvailableMoney(0m);
 
-        await _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Pending, 100m), Admin, default);
+        await _service.UpdateInterestAsync(loan.Id, created.Id, InterestReq(PaymentStatus.Pending, 100m), Admin, TestPeriods.Y2026, default);
 
         Assert.Equal(100m, loan.Performances.Single().Amount);
     }
@@ -481,7 +557,7 @@ public class LoanServiceTests
         var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
         _transactions.SetAvailableMoney(0m);
 
-        await _service.CancelLoanAsync(loan.Id, Admin, default);
+        await _service.CancelLoanAsync(loan.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.True(loan.Transaction.IsCancelled);
     }
@@ -490,13 +566,61 @@ public class LoanServiceTests
     public async Task CancelPaymentAsync_IsNotCheckedWhenCashGoesNegative_FIN13()
     {
         var loan = await SeedLoanAsync(_users.AddUser(), 1000m);
-        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(600m), Admin, default);
+        var created = await _service.CreatePaymentAsync(loan.Id, PayReq(600m), Admin, TestPeriods.Y2026, default);
         LinkPaymentTransactions(loan);
         _transactions.SetAvailableMoney(100m);
 
-        await _service.CancelPaymentAsync(loan.Id, created.Id, Admin, default);
+        await _service.CancelPaymentAsync(loan.Id, created.Id, Admin, TestPeriods.Y2026, default);
 
         Assert.True(loan.Payments.Single().Transaction.IsCancelled);
         Assert.True(_transactions.Available() < 0m);
+    }
+
+    private static LoanRequest LoanReqWithDescription(Guid borrower, string? description, decimal amount = 1000m) =>
+        new() { BorrowerId = borrower, InitialAmount = amount, InterestRate = 5m, StartDate = new DateTime(2026, 1, 1), Description = description };
+
+    [Fact]
+    public async Task CreateLoanAsync_WithDescription_StoresTrimmedDescriptionInDetail_LOAN11()
+    {
+        var borrower = _users.AddUser();
+
+        var response = await _service.CreateLoanAsync(
+            LoanReqWithDescription(borrower.Id, "  Linea 1\nLinea 2  "), Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal("Linea 1\nLinea 2", response.Description);
+        Assert.Equal("Linea 1\nLinea 2", _loans.Loans.Single().Description);
+    }
+
+    [Fact]
+    public async Task UpdateLoanAsync_ChangesDescription_KeepsTransactionAmountAndWritesOneUpdateLog_LOAN11()
+    {
+        var borrower = _users.AddUser();
+        var loan = await SeedLoanAsync(borrower, 1000m);
+
+        var response = await _service.UpdateLoanAsync(
+            loan.Id, LoanReqWithDescription(borrower.Id, "Para la moto"), Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal("Para la moto", response.Description);
+        Assert.Equal(1000m, loan.Transaction.Amount);
+        var log = Assert.Single(_logs.Logs);
+        Assert.Equal(LogAction.Update, log.Action);
+        Assert.Equal(1000m, log.OldValue);
+        Assert.Equal(1000m, log.NewValue);
+    }
+
+    [Fact]
+    public async Task UpdateLoanAsync_EmptyDescription_ClearsIt_LOAN11()
+    {
+        var borrower = _users.AddUser();
+        var created = await _service.CreateLoanAsync(
+            LoanReqWithDescription(borrower.Id, "Algo"), Admin, TestPeriods.Y2026, default);
+        var loan = _loans.Loans.Single(l => l.Id == created.Id);
+        loan.Set("Borrower", borrower).Set("Transaction", _transactions.Transactions.Single(t => t.Id == loan.TransactionId));
+
+        var response = await _service.UpdateLoanAsync(
+            loan.Id, LoanReqWithDescription(borrower.Id, "   "), Admin, TestPeriods.Y2026, default);
+
+        Assert.Null(response.Description);
+        Assert.Null(loan.Description);
     }
 }

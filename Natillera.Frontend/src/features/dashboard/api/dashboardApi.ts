@@ -2,7 +2,7 @@ import type { PendingObligations } from '@/features/members/api/membersApi'
 import { apiRequest } from '@/shared/api/apiClient'
 
 export type DashboardDirection = 'Income' | 'Expense'
-export type DashboardTransactionType = 'MonthlyPayment' | 'Activity' | 'ActivitySale' | 'Loan' | 'LoanPayment' | 'Performance'
+export type DashboardTransactionType = 'MonthlyPayment' | 'Activity' | 'ActivitySale' | 'Loan' | 'LoanPayment' | 'Performance' | 'ExtraCost'
 
 export interface DashboardTransaction {
   id: string
@@ -31,6 +31,8 @@ export interface DashboardSummary {
   myActivityEarnings: number | null
   myPerformanceShare: number | null
   pendingObligations: PendingObligations | null
+  sharedInterestPool: number | null
+  paidExtraCosts: number | null
 }
 
 export interface TopSeller {

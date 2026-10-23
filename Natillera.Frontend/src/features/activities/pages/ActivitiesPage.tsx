@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { cancelActivity, createActivity, getActivities, updateActivity, type ActivityListItem } from '@/features/activities/api/activitiesApi'
 import { useAuth } from '@/features/auth/hooks/useAuth'
+import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
+import { defaultDateForPeriod, isDateInPeriodYear, periodDateBounds } from '@/features/settings/model/savingPeriod'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
@@ -18,6 +20,7 @@ const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
 
 export function ActivitiesPage() {
   const { session, isDemo } = useAuth()
+  const { selected } = useSavingPeriod()
   const navigate = useNavigate()
   const canManage = session?.user.role === 'Admin'
   const [activities, setActivities] = useState<ActivityListItem[]>([])
@@ -43,7 +46,10 @@ export function ActivitiesPage() {
     return () => window.clearTimeout(timer)
   }, [load])
 
-  const openCreate = () => { setEditing(null); setForm(emptyForm); setModalError(null); setSuccess(null); setError(null); setModal('create') }
+  // PER-05: the start date must fall inside the period year; an edited activity keeps its own period year.
+  const periodYear = editing ? Number(editing.startDate.slice(0, 4)) : selected?.year
+  const bounds = periodYear ? periodDateBounds(periodYear) : undefined
+  const openCreate = () => { setEditing(null); setForm({ ...emptyForm, startDate: selected ? defaultDateForPeriod(selected.year, new Date()) : '' }); setModalError(null); setSuccess(null); setError(null); setModal('create') }
   const openEdit = (activity: ActivityListItem) => {
     setEditing(activity)
     setForm({
@@ -66,6 +72,7 @@ export function ActivitiesPage() {
     if (!Number.isFinite(unitSalePrice) || unitSalePrice <= 0) return setModalError('Ingresa un precio de venta válido.')
     if (unitSalePrice < unitCost) return setModalError('El precio de venta debe ser mayor o igual al costo unitario.')
     if (!form.startDate) return setModalError('Selecciona la fecha de inicio.')
+    if (periodYear && !isDateInPeriodYear(form.startDate, periodYear)) return setModalError(`La fecha de inicio debe estar dentro de ${periodYear}. Para registrar en otro año, cambia el periodo en Configuración.`)
     if (editing && quantity < editing.assignedQuantity) return setModalError(`La cantidad no puede ser menor a las unidades ya asignadas (${editing.assignedQuantity}).`)
     if (!session) return
     setSaving(true); setModalError(null)
@@ -106,7 +113,7 @@ export function ActivitiesPage() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
-        <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Actividades</h1><p className="text-[#4e7460] text-sm">{canManage ? 'Gestiona las actividades de venta de la natillera' : 'Actividades de venta de la natillera'}</p></div>
+        <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Actividades</h1><p className="text-[#4e7460] text-sm">{canManage ? 'Gestiona las actividades de venta de la natillera' : 'Actividades de venta de la natillera'}{selected ? ` · Periodo ${selected.year}` : ''}</p></div>
         {canManage && <button onClick={openCreate} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Nueva actividad</button>}
       </div>
       {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
@@ -161,7 +168,7 @@ export function ActivitiesPage() {
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input type="number" min="1" step="1" value={form.quantity} onChange={event => setField('quantity', event.target.value)} placeholder="100" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         <div><label htmlFor="activity-unit-cost" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Costo unitario</label><MoneyInput id="activity-unit-cost" value={form.unitCost} onChange={value => setField('unitCost', value)} placeholder="5000" /></div>
         <div><label htmlFor="activity-unit-sale-price" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Precio de venta unitario</label><MoneyInput id="activity-unit-sale-price" value={form.unitSalePrice} onChange={value => setField('unitSalePrice', value)} placeholder="8000" /></div>
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Fecha de inicio</label><input type="date" value={form.startDate} onChange={event => setField('startDate', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
+        <div><label htmlFor="activity-start-date" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Fecha de inicio</label><input id="activity-start-date" type="date" min={bounds?.min} max={bounds?.max} aria-describedby={periodYear ? 'activity-start-date-help' : undefined} value={form.startDate} onChange={event => setField('startDate', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" />{periodYear && <p id="activity-start-date-help" className="text-xs text-[#4e7460] mt-1.5">Debe ser una fecha de {periodYear}, el periodo seleccionado.</p>}</div>
         {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
         <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
       </form></Modal>}

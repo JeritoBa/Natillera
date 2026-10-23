@@ -22,7 +22,7 @@ export function LoanPaymentDetailPage() {
     const load = async () => {
       try { setPayment(await getLoanPayment(session.accessToken, loanId, paymentId)) }
       catch (requestError) {
-        setError(requestError instanceof ApiError && requestError.status === 404 ? 'No se encontró el abono solicitado.' : getFriendlyApiError(requestError))
+        setError(requestError instanceof ApiError && requestError.status === 404 ? 'No se encontró el abono solicitado. Puede pertenecer a otro periodo.' : getFriendlyApiError(requestError))
       }
     }
     void load()

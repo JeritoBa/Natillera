@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Natillera.Backend.Presentation.Filters;
 using System.Security.Claims;
 using Natillera.Backend.Application.Activities;
 using Natillera.Backend.Domain.Enums;
@@ -9,20 +10,21 @@ namespace Natillera.Backend.Presentation.Controllers;
 
 [ApiController]
 [Route("api/activities")]
+[SavingPeriodScoped]
 [Authorize]
 public sealed class ActivitiesController(ActivityService activityService) : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyCollection<ActivityListItem>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyCollection<ActivityListItem>>> Get(CancellationToken cancellationToken) =>
-        Ok(await activityService.GetListAsync(cancellationToken));
+        Ok(await activityService.GetListAsync(this.SavingPeriod(), cancellationToken));
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(ActivityDetailResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ActivityDetailResponse>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var activity = await activityService.GetDetailAsync(id, cancellationToken);
+        var activity = await activityService.GetDetailAsync(id, this.SavingPeriod(), cancellationToken);
         return activity is null ? NotFound() : Ok(activity);
     }
 
@@ -39,7 +41,7 @@ public sealed class ActivitiesController(ActivityService activityService) : Cont
 
         try
         {
-            var activity = await activityService.CreateActivityAsync(request, userId, cancellationToken);
+            var activity = await activityService.CreateActivityAsync(request, userId, this.SavingPeriod(), cancellationToken);
             return Created($"/api/activities/{activity.Id}", activity);
         }
         catch (DomainException exception)
@@ -61,7 +63,7 @@ public sealed class ActivitiesController(ActivityService activityService) : Cont
 
         try
         {
-            return Ok(await activityService.UpdateActivityAsync(id, request, userId, cancellationToken));
+            return Ok(await activityService.UpdateActivityAsync(id, request, userId, this.SavingPeriod(), cancellationToken));
         }
         catch (DomainException exception)
         {
@@ -83,7 +85,7 @@ public sealed class ActivitiesController(ActivityService activityService) : Cont
 
         try
         {
-            await activityService.CancelActivityAsync(id, userId, cancellationToken);
+            await activityService.CancelActivityAsync(id, userId, this.SavingPeriod(), cancellationToken);
             return NoContent();
         }
         catch (DomainException exception)
@@ -97,7 +99,7 @@ public sealed class ActivitiesController(ActivityService activityService) : Cont
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ActivityAssignmentResponse>> GetAssignment(Guid activityId, Guid assignmentId, CancellationToken cancellationToken)
     {
-        var assignment = await activityService.GetAssignmentAsync(activityId, assignmentId, cancellationToken);
+        var assignment = await activityService.GetAssignmentAsync(activityId, assignmentId, this.SavingPeriod(), cancellationToken);
         return assignment is null ? NotFound() : Ok(assignment);
     }
 
@@ -114,7 +116,7 @@ public sealed class ActivitiesController(ActivityService activityService) : Cont
 
         try
         {
-            var assignment = await activityService.CreateAssignmentAsync(activityId, request, userId, cancellationToken);
+            var assignment = await activityService.CreateAssignmentAsync(activityId, request, userId, this.SavingPeriod(), cancellationToken);
             return Created($"/api/activities/{activityId}/assignments/{assignment.Id}", assignment);
         }
         catch (DomainException exception)
@@ -136,7 +138,7 @@ public sealed class ActivitiesController(ActivityService activityService) : Cont
 
         try
         {
-            return Ok(await activityService.UpdateAssignmentAsync(activityId, assignmentId, request, userId, cancellationToken));
+            return Ok(await activityService.UpdateAssignmentAsync(activityId, assignmentId, request, userId, this.SavingPeriod(), cancellationToken));
         }
         catch (DomainException exception)
         {
@@ -157,7 +159,91 @@ public sealed class ActivitiesController(ActivityService activityService) : Cont
 
         try
         {
-            await activityService.CancelAssignmentAsync(activityId, assignmentId, userId, cancellationToken);
+            await activityService.CancelAssignmentAsync(activityId, assignmentId, userId, this.SavingPeriod(), cancellationToken);
+            return NoContent();
+        }
+        catch (DomainException exception)
+        {
+            return DomainError(exception);
+        }
+    }
+
+    [HttpGet("{activityId:guid}/extra-costs")]
+    [ProducesResponseType(typeof(IReadOnlyCollection<ExtraCostResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyCollection<ExtraCostResponse>>> GetExtraCosts(Guid activityId, CancellationToken cancellationToken)
+    {
+        var extraCosts = await activityService.GetExtraCostsAsync(activityId, this.SavingPeriod(), cancellationToken);
+        return extraCosts is null ? NotFound() : Ok(extraCosts);
+    }
+
+    [HttpGet("{activityId:guid}/extra-costs/{extraCostId:guid}")]
+    [ProducesResponseType(typeof(ExtraCostResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ExtraCostResponse>> GetExtraCost(Guid activityId, Guid extraCostId, CancellationToken cancellationToken)
+    {
+        var extraCost = await activityService.GetExtraCostAsync(activityId, extraCostId, this.SavingPeriod(), cancellationToken);
+        return extraCost is null ? NotFound() : Ok(extraCost);
+    }
+
+    [HttpPost("{activityId:guid}/extra-costs")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [ProducesResponseType(typeof(ExtraCostResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ExtraCostResponse>> CreateExtraCost(Guid activityId, [FromBody] ExtraCostRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            var extraCost = await activityService.CreateExtraCostAsync(activityId, request, userId, this.SavingPeriod(), cancellationToken);
+            return Created($"/api/activities/{activityId}/extra-costs/{extraCost.Id}", extraCost);
+        }
+        catch (DomainException exception)
+        {
+            return DomainError(exception);
+        }
+    }
+
+    [HttpPut("{activityId:guid}/extra-costs/{extraCostId:guid}")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [ProducesResponseType(typeof(ExtraCostResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ExtraCostResponse>> UpdateExtraCost(Guid activityId, Guid extraCostId, [FromBody] ExtraCostRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            return Ok(await activityService.UpdateExtraCostAsync(activityId, extraCostId, request, userId, this.SavingPeriod(), cancellationToken));
+        }
+        catch (DomainException exception)
+        {
+            return DomainError(exception);
+        }
+    }
+
+    /// <summary>Cancels an extra cost and its transaction. Records are never physically deleted.</summary>
+    [HttpDelete("{activityId:guid}/extra-costs/{extraCostId:guid}")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CancelExtraCost(Guid activityId, Guid extraCostId, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            await activityService.CancelExtraCostAsync(activityId, extraCostId, userId, this.SavingPeriod(), cancellationToken);
             return NoContent();
         }
         catch (DomainException exception)

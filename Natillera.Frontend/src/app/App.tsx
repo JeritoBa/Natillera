@@ -21,13 +21,17 @@ import { LogsPage } from '@/features/audit/pages/LogsPage'
 import { LogDetailPage } from '@/features/audit/pages/LogDetailPage'
 import { TransactionsPage } from '@/features/transactions/pages/TransactionsPage'
 import { TransactionDetailPage } from '@/features/transactions/pages/TransactionDetailPage'
+import { SavingPeriodProvider } from '@/features/settings/context/SavingPeriodProvider'
+import { PeriodGate } from '@/features/settings/components/PeriodGate'
+import { SettingsPage } from '@/features/settings/pages/SettingsPage'
+import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import type { Page } from '@/shared/model/types'
 import { AppShell } from '@/shared/layout/AppShell'
 import { useDocumentTitle } from '@/app/useDocumentTitle'
 
 const pagePaths: Record<Page, string> = {
   landing: '/', auth: '/login', dashboard: '/dashboard', members: '/members', loans: '/loans',
-  activities: '/activities', payments: '/payments', transactions: '/transactions', logs: '/logs',
+  activities: '/activities', payments: '/payments', transactions: '/transactions', logs: '/logs', settings: '/settings',
 }
 type DashboardPage = Exclude<Page, 'landing' | 'auth'>
 
@@ -46,17 +50,24 @@ function LoginRoute() {
   return <AuthPage setPage={page => navigate(pagePaths[page])} />
 }
 
+// PER-03: refetch every period-scoped page when the selected period changes (the Outlet remounts); /settings stays mounted to keep its saved message.
+function PeriodOutlet() {
+  const { selected } = useSavingPeriod()
+  const { pathname } = useLocation()
+  return <PeriodGate><Outlet key={pathname === '/settings' ? 'settings' : selected?.id} /></PeriodGate>
+}
+
 function DashboardLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const pageBySection: Record<string, DashboardPage> = {
     dashboard: 'dashboard', members: 'members', loans: 'loans', activities: 'activities',
-    payments: 'payments', transactions: 'transactions', logs: 'logs',
+    payments: 'payments', transactions: 'transactions', logs: 'logs', settings: 'settings',
   }
   // Detail routes (/members/:id, /logs/:id...) keep their parent section highlighted in the sidebar.
   const page = pageBySection[location.pathname.split('/')[1]] ?? 'dashboard'
 
-  return <AppShell page={page} setPage={nextPage => navigate(pagePaths[nextPage])}><Outlet /></AppShell>
+  return <SavingPeriodProvider><AppShell page={page} setPage={nextPage => navigate(pagePaths[nextPage])}><PeriodOutlet /></AppShell></SavingPeriodProvider>
 }
 
 export default function App() {
@@ -70,6 +81,7 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/members" element={<MembersPage />} />
           <Route path="/loans" element={<LoansPage />} />
           <Route path="/loans/:id" element={<LoanDetailPage />} />
