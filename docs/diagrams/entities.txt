@@ -16,7 +16,7 @@ Important:
 - Rule: every business entity that moves money has exactly ONE Transaction (1:1, unique transaction_id).
   Pending items have NO Transaction until they are paid (transaction_id is POSSIBLE NULL there).
 - [018] Lines marked [018] come from spec 018 (saving periods), built in migration 20261022005557_AddSavingPeriods.
-- [020] Lines marked [020] are the target model of spec 020 (activity extra costs), not built yet.
+- [020] Lines marked [020] are the model of spec 020 (activity extra costs), built.
   Every root entity belongs to one SavingPeriod (required FK); children belong to their parent's period.
   Every balance, list and guard is computed within one period (rule PER-06).
 

@@ -1,6 +1,6 @@
 # 020 - Activity extra costs
 
-- **Status:** Approved (2026-10-21)
+- **Status:** Implemented (2026-10-23)
 - **Owner decision date / reference:** 2026-10-21 (branch `v1.1.0`; amount is decimal like every other amount; status Pending/Paid/Cancelled; managed from the activity detail)
 - **Related rules:** ACT-13, ACT-14, ACT-15, DASH-12, FIN-14 (new); DASH-03, DASH-04, DASH-06, DASH-09, FIN-06, FIN-07, FIN-08, FIN-13, ACT-03, ACT-11, PER-02, PER-06, TX-02, AUD-02
 
