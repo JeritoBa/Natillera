@@ -39,13 +39,13 @@ The Admin sees the total money of the natillera but not where it comes from: the
 
 ### 3. Loans list filter by borrower (needed by the links)
 12. The loans list gets a **"Deudor"** select filter (all members that have a loan in the period, "Todos los deudores" by default), combined with the existing filters and cleared by "Limpiar filtros".
-13. The loans list reads `?borrower={userId}&status=Active` once on load (as the payments list already does with `member`/`status`, spec 017); the URL is not written back.
+13. The loans list reads `?borrower={userId}&status=Active` once on load (as the payments list already does with `member`/`status`, spec 017); the URL is not written back. *(Superseded by spec 024, UI-15: the filters of every list are kept in the URL.)*
 
 ## Out of scope
 - Retry button on the dashboard error, sorting by clicking column headers, exporting the table (CSV/WhatsApp), clarifying the "al costo" label of the green block: proposed, not requested.
 - List pages for loan interest or activity assignments (they do not exist; those amounts link to the member detail, see UI).
 - Any change to the Member dashboard, to the member detail, or to how MEM-10, DASH-04, DASH-06 or DASH-12 are computed.
-- Writing filters back to the URL in other list pages.
+- Writing filters back to the URL in other list pages. *(Superseded by spec 024, UI-15.)*
 
 ## Business rules
 New: **DASH-13** (money by source, registered movements only), **DASH-14** (pending obligations per member for the Admin). Changed: **DASH-03** (the Admin's activity earnings become the sum of the activities' net profit, ACT-11). Used: DASH-02, DASH-12, MEM-10, ACT-11, ACT-15, FIN-09, FIN-14, PER-06, DEMO-06, UI-02, UI-06. See `../business-rules.md`.

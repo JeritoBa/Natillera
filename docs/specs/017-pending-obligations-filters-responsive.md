@@ -54,7 +54,7 @@ Redesign only the shared `features/members/components/PendingObligationsCard.tsx
 23. Dashboard: a negative available balance is shown with the "-" sign only, no red background (UI-02).
 
 ## Out of scope
-Backend changes; searching transactions by member; a hide-cancelled toggle; persisting filters in the URL beyond the initial read; showing values on mobile in the logs list; a monthly payment detail page; removing legacy files.
+Backend changes; searching transactions by member; a hide-cancelled toggle; persisting filters in the URL beyond the initial read (superseded by spec 024, UI-15); showing values on mobile in the logs list; a monthly payment detail page; removing legacy files.
 
 ## Business rules
 No new rules. "Enforced in" of UI-01, UI-02, UI-06 and TX-01 updated where the code moves.
