@@ -404,15 +404,71 @@ public class LoanServiceTests
     }
 
     [Fact]
-    public async Task UpdateLoanAsync_WithPayments_Throws()
+    public async Task UpdateLoanAsync_WithPayments_AmountChange_ThrowsWithoutLog_LOAN12()
     {
         var borrower = _users.AddUser();
         var loan = await SeedLoanAsync(borrower, 1000m);
         await _service.CreatePaymentAsync(loan.Id, PayReq(100m), Admin, TestPeriods.Y2026, default);
+        _logs.Logs.Clear();
 
         await Assert.ThrowsAsync<DomainException>(() =>
             _service.UpdateLoanAsync(loan.Id, LoanReq(borrower.Id, 1500m), Admin, TestPeriods.Y2026, default));
         Assert.Equal(1000m, loan.InitialAmount);
+        Assert.Equal(1000m, loan.Transaction.Amount);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task UpdateLoanAsync_WithPayments_ChangesRateAndDescription_KeepsTransactionAndInterest_LOAN12()
+    {
+        var borrower = _users.AddUser();
+        var loan = await SeedLoanAsync(borrower, 1000m);
+        await _service.CreatePaymentAsync(loan.Id, PayReq(100m), Admin, TestPeriods.Y2026, default);
+        await _service.CreateInterestAsync(loan.Id, InterestReq(PaymentStatus.Pending, 50m), Admin, TestPeriods.Y2026, default);
+        LinkPaymentTransactions(loan);
+        _logs.Logs.Clear();
+        var transactionsBefore = _transactions.Transactions.Count;
+
+        var response = await _service.UpdateLoanAsync(
+            loan.Id, new LoanRequest { BorrowerId = borrower.Id, InitialAmount = 1000m, InterestRate = 3m, StartDate = new DateTime(2026, 1, 1), Description = "Corregida" },
+            Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal(3m, response.InterestRate);
+        Assert.Equal("Corregida", response.Description);
+        Assert.Equal(1000m, loan.Transaction.Amount);
+        Assert.Equal(transactionsBefore, _transactions.Transactions.Count);
+        Assert.Equal(50m, Assert.Single(loan.Performances).Amount);
+        var log = Assert.Single(_logs.Logs);
+        Assert.Equal(LogAction.Update, log.Action);
+        Assert.Equal(1000m, log.OldValue);
+        Assert.Equal(1000m, log.NewValue);
+    }
+
+    [Fact]
+    public async Task UpdateLoanAsync_PaidLoanWithInactiveBorrower_ChangesDescription_LOAN12()
+    {
+        var borrower = _users.AddUser();
+        var loan = await SeedLoanAsync(borrower, 1000m);
+        await _service.CreatePaymentAsync(loan.Id, PayReq(1000m), Admin, TestPeriods.Y2026, default);
+        Assert.Equal(LoanStatus.Paid, loan.Status);
+        borrower.Deactivate();
+
+        await _service.UpdateLoanAsync(
+            loan.Id, LoanReqWithDescription(borrower.Id, "Solo descripcion"), Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal("Solo descripcion", loan.Description);
+    }
+
+    [Fact]
+    public async Task UpdateLoanAsync_ChangeToInactiveBorrower_Throws_MEM07()
+    {
+        var borrower = _users.AddUser();
+        var other = _users.AddUser(active: false);
+        var loan = await SeedLoanAsync(borrower, 1000m);
+
+        await Assert.ThrowsAsync<DomainException>(() =>
+            _service.UpdateLoanAsync(loan.Id, LoanReq(other.Id), Admin, TestPeriods.Y2026, default));
+        Assert.Equal(borrower.Id, loan.BorrowerId);
     }
 
     [Fact]

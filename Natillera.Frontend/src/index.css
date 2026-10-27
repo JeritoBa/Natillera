@@ -129,6 +129,11 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(12, 92, 56, 0.08);
 }
 input::placeholder, textarea::placeholder { color: #9dbdaa; }
+input:disabled, select:disabled, textarea:disabled {
+  background: #f0f7f3;
+  color: #4e7460;
+  cursor: not-allowed;
+}
 
 /* Table */
 .table-row {

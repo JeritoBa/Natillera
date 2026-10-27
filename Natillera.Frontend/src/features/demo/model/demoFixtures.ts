@@ -252,6 +252,7 @@ export function buildDemoFixtures(now: Date): DemoFixtures {
   const loans: LoanListItem[] = [loanDetails[L1], loanDetails[L2]].map(loan => ({
     id: loan.id, borrowerId: loan.borrowerId, borrowerName: loan.borrowerName, initialAmount: loan.initialAmount, interestRate: loan.interestRate,
     startDate: loan.startDate, status: loan.status, outstandingPrincipal: loan.summary.outstandingPrincipal,
+    hasMovements: loan.payments.some(payment => payment.status !== 'Cancelled') || loan.interestPayments.some(interest => interest.status !== 'Cancelled'),
   }))
   loans.sort((a, b) => b.startDate.localeCompare(a.startDate)) // startDate desc
 

@@ -3,7 +3,7 @@ import type { LoanListItem } from '@/features/loans/api/loansApi'
 import { countLoansByStatus, filterLoans, loanBorrowerOptions, loanStartMonth, loanStatusCounts, parseLoanBorrowerFilter, parseLoanMonthFilter, parseLoanStatusFilter } from '@/features/loans/model/loanFilters'
 
 const loan = (id: string, borrowerName: string, startDate: string, status: LoanListItem['status'] = 'Active'): LoanListItem => ({
-  id, borrowerId: `u-${id}`, borrowerName, initialAmount: 1000, interestRate: 2, startDate, status, outstandingPrincipal: 1000,
+  id, borrowerId: `u-${id}`, borrowerName, initialAmount: 1000, interestRate: 2, startDate, status, outstandingPrincipal: 1000, hasMovements: false,
 })
 
 const loans = [

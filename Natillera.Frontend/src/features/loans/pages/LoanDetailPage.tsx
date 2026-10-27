@@ -17,6 +17,7 @@ import { ConfirmSummary } from '@/shared/ui/ConfirmSummary'
 import { Icon } from '@/shared/ui/Icon'
 import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
+import { canEditLoan } from '@/features/loans/model/loanEdit'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
@@ -187,8 +188,8 @@ export function LoanDetailPage() {
     ['Intereses pendientes', formatCurrency(summary.outstandingInterest), summary.pendingInterestCount > 0 ? `${summary.pendingInterestCount} intereses sin pagar` : 'Nada pendiente'],
     ['Total pagado', formatCurrency(summary.totalPaid), 'Capital + intereses pagados'],
   ]
-  // Same condition as the loans list edit button (LOAN-07).
-  const canEditDescription = canManage && loan.status === 'Active' && summary.outstandingPrincipal === loan.initialAmount
+  // Same condition as the loans list edit button (LOAN-12): every non-cancelled loan.
+  const canEditDescription = canManage && canEditLoan(loan)
   return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
     {back}
     <div className="mb-7">

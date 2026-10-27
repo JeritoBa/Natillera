@@ -14,6 +14,7 @@ export interface LoanListItem {
   status: LoanStatus
   outstandingPrincipal: number
   description?: string | null
+  hasMovements: boolean
 }
 
 export interface LoanRequest {

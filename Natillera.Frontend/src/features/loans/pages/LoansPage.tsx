@@ -4,6 +4,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { defaultDateForPeriod, isDateInPeriodYear, periodDateBounds } from '@/features/settings/model/savingPeriod'
 import { cancelLoan, createLoan, getLoans, updateLoan, type LoanListItem } from '@/features/loans/api/loansApi'
+import { canEditLoan, LOAN_EDIT_LOCK_NOTE, loanEditLocks } from '@/features/loans/model/loanEdit'
 import { descriptionCounterState, isLoanDescriptionValid, LOAN_DESCRIPTION_MAX_LENGTH, normalizeLoanDescription } from '@/features/loans/model/loanDescription'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
 import { loanCancelConsequences } from '@/features/loans/model/cancelConfirm'
@@ -71,6 +72,7 @@ export function LoansPage() {
 
   // PER-05: the start date must fall inside the period year; an edited loan keeps its own period year.
   const periodYear = editing ? Number(editing.startDate.slice(0, 4)) : selected?.year
+  const locks = loanEditLocks(editing)
   const bounds = periodYear ? periodDateBounds(periodYear) : undefined
   const openCreate = () => { setEditing(null); setForm({ ...emptyForm, startDate: selected ? defaultDateForPeriod(selected.year, new Date()) : '' }); setModalError(null); setSuccess(null); setError(null); setModal('create') }
   const openEdit = (loan: LoanListItem) => {
@@ -199,8 +201,8 @@ export function LoansPage() {
             <td className={`${col('status')} py-3.5`}><Badge status={loan.status.toLowerCase()} /></td>
             <td className={`${col('actions')} py-3.5 text-right`}><div className="flex justify-end gap-1">
               <button onClick={() => navigate(`/loans/${loan.id}`)} className={eyeButton} aria-label={`Ver préstamo de ${loan.borrowerName}`}><Icon.Eye open /></button>
+              {canManage && canEditLoan(loan) && <button onClick={() => openEdit(loan)} className={iconButton} aria-label={`Editar préstamo de ${loan.borrowerName}`}><Icon.Edit /></button>}
               {canManage && loan.status === 'Active' && loan.outstandingPrincipal === loan.initialAmount && <>
-                <button onClick={() => openEdit(loan)} className={iconButton} aria-label={`Editar préstamo de ${loan.borrowerName}`}><Icon.Edit /></button>
                 <button onClick={() => { setSuccess(null); setError(null); setConfirmTarget(loan) }} className={dangerButton} aria-label={`Anular préstamo de ${loan.borrowerName}`}><Icon.Trash /></button>
               </>}
             </div></td>
@@ -208,10 +210,11 @@ export function LoansPage() {
         </tbody></table>
       </div></div>
       {modal && <Modal title={editing ? 'Editar préstamo' : 'Nuevo préstamo'} onClose={() => !saving && setModal(null)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4">
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Deudor</label><select value={form.borrowerId} onChange={event => setForm(current => ({ ...current, borrowerId: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un deudor</option>{borrowers.map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div>
-        <div><label htmlFor="loan-initial-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto inicial</label><MoneyInput id="loan-initial-amount" value={form.initialAmount} onChange={value => setForm(current => ({ ...current, initialAmount: value }))} placeholder="500000" /></div>
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Tasa de interés (%)</label><input type="number" min="0" max="100" step="0.01" value={form.interestRate} onChange={event => setForm(current => ({ ...current, interestRate: event.target.value }))} placeholder="2" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
-        <div><label htmlFor="loan-start-date" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Fecha de inicio</label><input id="loan-start-date" type="date" min={bounds?.min} max={bounds?.max} aria-describedby={periodYear ? 'loan-start-date-help' : undefined} value={form.startDate} onChange={event => setForm(current => ({ ...current, startDate: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm" />{periodYear && <p id="loan-start-date-help" className="text-xs text-[#4e7460] mt-1.5">Debe ser una fecha de {periodYear}, el periodo seleccionado.</p>}</div>
+        {editing && locks.amount && <p id="loan-edit-lock-note" className="text-xs sm:text-sm text-[#4e7460] rounded-lg px-3 py-2.5 bg-[#f0f7f3] break-words">{LOAN_EDIT_LOCK_NOTE}</p>}
+        <div><label htmlFor="loan-borrower" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Deudor</label><select id="loan-borrower" disabled={locks.borrower} aria-describedby={locks.borrower ? 'loan-edit-lock-note' : undefined} value={form.borrowerId} onChange={event => setForm(current => ({ ...current, borrowerId: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un deudor</option>{borrowers.map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div>
+        <div><label htmlFor="loan-initial-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto inicial</label><MoneyInput id="loan-initial-amount" value={form.initialAmount} onChange={value => setForm(current => ({ ...current, initialAmount: value }))} placeholder="500000" disabled={locks.amount} describedBy={locks.amount ? 'loan-edit-lock-note' : undefined} /></div>
+        <div><label htmlFor="loan-interest-rate" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Tasa de interés (%)</label><input id="loan-interest-rate" type="number" min="0" max="100" step="0.01" value={form.interestRate} onChange={event => setForm(current => ({ ...current, interestRate: event.target.value }))} placeholder="2" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
+        <div><label htmlFor="loan-start-date" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Fecha de inicio</label><input id="loan-start-date" type="date" min={bounds?.min} max={bounds?.max} disabled={locks.startDate} aria-describedby={locks.startDate ? 'loan-edit-lock-note' : periodYear ? 'loan-start-date-help' : undefined} value={form.startDate} onChange={event => setForm(current => ({ ...current, startDate: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm" />{periodYear && <p id="loan-start-date-help" className="text-xs text-[#4e7460] mt-1.5">Debe ser una fecha de {periodYear}, el periodo seleccionado.</p>}</div>
         <div>
           <label htmlFor="loan-description" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción (opcional)</label>
           <textarea id="loan-description" rows={4} maxLength={LOAN_DESCRIPTION_MAX_LENGTH} aria-describedby="loan-description-help loan-description-count" value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} placeholder="Ej.: para arreglo de la moto. Acordó pagar los días 15." className="w-full px-3 py-2.5 rounded-lg text-sm leading-relaxed resize-y min-h-24 max-h-64" />
