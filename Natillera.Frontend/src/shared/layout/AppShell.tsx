@@ -121,7 +121,8 @@ export function AppShell({ page, setPage, children }: AppShellProps) {
           <Link to="/" onClick={() => { if (isDemo) exitDemo() }} aria-label="Ir a la página principal de Gallego Nanclares" className="inline-flex rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0c5c38]"><BrandLogo className="h-7 w-auto" /></Link>
           {!isDemo && <PeriodChip className="ml-auto" />}
         </header>
-        <main className="flex-1 overflow-y-auto">
+        {/* relative: absolutely positioned descendants (sr-only texts) are clipped by this scroll box instead of growing the document. */}
+        <main className="relative flex-1 overflow-y-auto">
           {!isDemo && notice === 'currentYearMissing' && !noticeDismissed && selected && <PeriodNotice currentYear={new Date().getFullYear()} selectedYear={selected.year} onDismiss={dismissNotice} />}
           {children}
         </main>

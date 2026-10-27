@@ -61,6 +61,7 @@ export interface ActivityRequest {
 export interface ActivityAssignmentRequest {
   userId: string
   quantityAssigned: number
+  status: 'Pending' | 'Paid'
 }
 
 export interface ActivityAssignmentUpdateRequest {

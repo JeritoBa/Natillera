@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { getDashboardSummary, type DashboardSummary } from '@/features/dashboard/api/dashboardApi'
+import { MembersPendingSection } from '@/features/dashboard/components/MembersPendingSection'
+import { proportionLabel, proportionSegments, sourceRows } from '@/features/dashboard/model/sourceBreakdown'
 import { PendingObligationsCard } from '@/features/members/components/PendingObligationsCard'
 import { hasPendingObligations } from '@/features/members/model/pendingObligations'
+import { getMonthlyPayments, type MonthlyPaymentResponse } from '@/features/monthlyPayments/api/monthlyPaymentsApi'
+import { FeeLedger } from '@/features/monthlyPayments/components/FeeLedger'
+import { memberLedgerFees } from '@/features/monthlyPayments/model/feeLedger'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
 import { cell, cellAmount, cellFirst, cellLast, tableScroll } from '@/shared/ui/tableStyles'
@@ -18,6 +23,9 @@ export function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [fees, setFees] = useState<MonthlyPaymentResponse[] | null>(null)
+  const [feesLoading, setFeesLoading] = useState(true)
+  const [feesError, setFeesError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!session) return
@@ -29,12 +37,30 @@ export function DashboardPage() {
     void load()
   }, [session])
 
+  // MEM-11: Members see their own fee ledger; the fees load in parallel with the summary and fail on their own.
+  const isMember = session?.user.role === 'Member'
+  const loadFees = useCallback(async () => {
+    if (!session) return
+    setFeesLoading(true); setFeesError(null)
+    try { setFees(await getMonthlyPayments(session.accessToken)) }
+    catch (requestError) { setFees(null); setFeesError(getFriendlyApiError(requestError)) }
+    finally { setFeesLoading(false) }
+  }, [session])
+
+  useEffect(() => {
+    if (!isMember) return
+    const timer = window.setTimeout(() => { void loadFees() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [isMember, loadFees])
+
   const isAdmin = session?.user.role === 'Admin'
   const available = summary?.availableMoney ?? 0
   const sellers = summary?.topSellers ?? []
   const maxEarnings = Math.max(...sellers.map(seller => seller.earnings), 0)
   const transactions = (summary?.recentTransactions ?? []).slice(0, 5)
   const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
+  const sources = sourceRows(summary ?? { paidMonthlyPayments: null, activityEarnings: null, sharedInterestPool: null, loanInterestEarned: null, paidExtraCosts: null })
+  const segments = proportionSegments(sources)
   const rowClass = 'flex justify-between border-t border-[#eef4f0] pt-2'
 
   return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
@@ -61,14 +87,28 @@ export function DashboardPage() {
         </section>
         <section aria-labelledby="savings-title" aria-busy={loading} className="stat-card rounded-xl p-5 lg:col-span-2" style={{ border: '1px solid #0c5c38' }}>
           {isAdmin ? <>
-            <h2 id="savings-title" className="text-sm font-semibold text-[#0c1a12]">Rendimiento de la natillera</h2>
+            <h2 id="savings-title" className="text-sm font-semibold text-[#0c1a12]">Dinero total de la natillera</h2>
             <p className="mono text-2xl font-bold text-[#0a6635] mt-2 break-words">{loading ? '—' : formatCurrency(summary?.totalNatilleraBalance ?? 0)}</p>
-            <p className="text-xs text-[#4e7460]">Dinero total de la natillera</p>
             <p className="text-xs text-[#4e7460]">Disponible + prestado + actividades</p>
-            {!loading && <dl className="mt-4 space-y-2 text-sm">
-              <div className={rowClass}><dt><span className="text-[#0c1a12]">Rendimientos de préstamos</span><span className="block text-xs text-[#4e7460]">{(summary?.paidExtraCosts ?? 0) > 0 ? `Intereses pagados ${formatCurrency(summary?.loanInterestEarned ?? 0)} − costos extra ${formatCurrency(summary?.paidExtraCosts ?? 0)}` : 'Intereses pagados'}</span></dt><dd className="mono text-[#0a6635]">{formatCurrency(summary?.sharedInterestPool ?? 0)}</dd></div>
-              <div className={rowClass}><dt><span className="text-[#0c1a12]">Ganancias de actividades</span><span className="block text-xs text-[#4e7460]">Ventas pagadas</span></dt><dd className="mono text-[#0a6635]">{formatCurrency(summary?.activityEarnings ?? 0)}</dd></div>
-            </dl>}
+            {!loading && summary && <>
+              <h3 className="mt-4 text-xs font-medium uppercase tracking-wide text-[#4e7460]">De dónde viene</h3>
+              <dl className="mt-2 space-y-2 text-sm">
+                {sources.map(row => {
+                  const hasSegment = segments.some(segment => segment.row.key === row.key)
+                  const negative = row.amount < 0
+                  return <div key={row.key} className={`${rowClass} gap-3`}>
+                    <dt className="min-w-0 flex gap-2">
+                      <span aria-hidden="true" className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: hasSegment ? row.color : 'transparent' }} />
+                      <span className="min-w-0"><span className="text-[#0c1a12]">{row.label}</span><span className="block text-xs text-[#4e7460]">{row.detail}</span></span>
+                    </dt>
+                    <dd className="mono whitespace-nowrap text-right" style={{ color: row.key === 'activities' && negative ? '#0c1a12' : '#0a6635' }}>{negative ? `−${formatCurrency(row.amount)}` : formatCurrency(row.amount)}</dd>
+                  </div>
+                })}
+              </dl>
+              {segments.length > 0 && <div role="img" aria-label={proportionLabel(segments)} className="mt-3 flex h-2 w-full gap-0.5 overflow-hidden rounded-full">
+                {segments.map(segment => <div key={segment.row.key} style={{ flexGrow: segment.row.amount, flexBasis: 0, background: segment.row.color }} />)}
+              </div>}
+            </>}
           </> : <>
             <h2 id="savings-title" className="text-sm font-semibold text-[#0c1a12]">Mis ahorros</h2>
             <p className="mono text-2xl font-bold text-[#0a6635] mt-2 break-words">{loading ? '—' : formatCurrency(summary?.mySavings ?? 0)}</p>
@@ -84,6 +124,9 @@ export function DashboardPage() {
           </>}
         </section>
       </div>
+
+      {isMember && session && <FeeLedger year={selected?.year ?? new Date().getFullYear()} audience="member" memberId={session.user.id} titleId="dashboard-fees-title" loading={loading || feesLoading} error={feesError} onRetry={() => void loadFees()}
+        fees={fees === null ? null : memberLedgerFees(fees, summary?.pendingObligations?.monthlyPayments.items ?? [], session.user.id, selected?.year ?? new Date().getFullYear())} />}
 
       <section aria-labelledby="ranking-title" aria-busy={loading} className="rounded-xl overflow-hidden" style={cardStyle}>
         <div className="px-5 py-3.5 border-b" style={{ borderColor: '#eef4f0' }}>
@@ -102,6 +145,8 @@ export function DashboardPage() {
             <p className="mono text-sm font-semibold text-[#0a6635] text-right whitespace-nowrap">{formatCurrency(seller.earnings)}</p>
           </li>)}</ol>}
       </section>
+
+      {isAdmin && <MembersPendingSection rows={summary?.membersPendingObligations ?? []} loading={loading} />}
 
       <section aria-labelledby="recent-title" aria-busy={loading} className="rounded-xl overflow-hidden" style={cardStyle}>
         <div className="px-5 py-3 border-b flex items-center justify-between gap-3" style={{ borderColor: '#eef4f0' }}>

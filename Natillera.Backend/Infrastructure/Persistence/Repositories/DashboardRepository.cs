@@ -38,9 +38,21 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
         var loanInterestEarned = await SharedInterestPoolQuery.PaidTotalAsync(dbContext, savingPeriodId, TransactionType.Performance, cancellationToken);
         var paidExtraCosts = await SharedInterestPoolQuery.PaidTotalAsync(dbContext, savingPeriodId, TransactionType.ExtraCost, cancellationToken);
 
-        var realizedActivityEarnings = await PaidAssignments(savingPeriodId)
-            .Select(assignment => (decimal?)(assignment.QuantityAssigned * (assignment.Activity.UnitSalePrice - assignment.Activity.UnitCost)))
+        // DASH-13: Paid fees of the period (registered money only).
+        var paidMonthlyPayments = await dbContext.MonthlyPayments
+            .Where(payment => payment.SavingPeriodId == savingPeriodId && payment.Status == PaymentStatus.Paid)
+            .Select(payment => (decimal?)payment.Amount)
             .SumAsync(cancellationToken) ?? 0m;
+
+        // DASH-03 (spec 021) / ACT-11: net profit of the non-cancelled activities = collected - total cost; extra costs excluded (ACT-15).
+        var collectedByActivities = await PaidAssignments(savingPeriodId)
+            .Select(assignment => (decimal?)(assignment.QuantityAssigned * assignment.Activity.UnitSalePrice))
+            .SumAsync(cancellationToken) ?? 0m;
+        var activitiesTotalCost = await dbContext.Activities
+            .Where(activity => activity.SavingPeriodId == savingPeriodId && activity.Status != ActivityStatus.Cancelled)
+            .Select(activity => (decimal?)(activity.Quantity * activity.UnitCost))
+            .SumAsync(cancellationToken) ?? 0m;
+        var activityEarnings = collectedByActivities - activitiesTotalCost;
 
         var recentTransactions = await GetRecentTransactionsAsync(savingPeriodId, cancellationToken);
         var topSellers = await GetTopSellersAsync(savingPeriodId, cancellationToken);
@@ -57,12 +69,13 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
             topSellers,
             null,
             loanInterestEarned,
-            realizedActivityEarnings,
+            activityEarnings,
             null,
             null,
             null,
             InterestPool.Net(loanInterestEarned - paidExtraCosts),
-            paidExtraCosts);
+            paidExtraCosts,
+            PaidMonthlyPayments: paidMonthlyPayments);
     }
 
     private async Task<DashboardSummaryResponse> GetMemberSummaryAsync(Guid userId, decimal availableMoney, Guid savingPeriodId, CancellationToken cancellationToken)

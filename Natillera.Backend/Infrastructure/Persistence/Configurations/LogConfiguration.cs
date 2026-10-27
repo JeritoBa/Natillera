@@ -21,6 +21,7 @@ public sealed class LogConfiguration : IEntityTypeConfiguration<Log>
         builder.HasIndex(log => log.OccurredAt);
         builder.HasIndex(log => log.UserId);
         builder.HasIndex(log => log.SavingPeriodId);
+        builder.HasIndex(log => new { log.SavingPeriodId, log.OccurredAt }); // AUD-04: paginated list
         builder.HasOne(log => log.SavingPeriod).WithMany()
             .HasForeignKey(log => log.SavingPeriodId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(log => log.User).WithMany()

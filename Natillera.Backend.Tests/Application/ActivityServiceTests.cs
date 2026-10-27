@@ -26,8 +26,8 @@ public class ActivityServiceTests
     private static ActivityRequest ActivityReq(int quantity = 10, decimal cost = 1000m, decimal price = 1500m) =>
         new() { Name = "Rifa", Description = "Rifa anual", Quantity = quantity, UnitCost = cost, UnitSalePrice = price, StartDate = new DateTime(2026, 5, 5) };
 
-    private static ActivityAssignmentRequest AssignReq(Guid userId, int quantity) =>
-        new() { UserId = userId, QuantityAssigned = quantity };
+    private static ActivityAssignmentRequest AssignReq(Guid userId, int quantity, AssignmentStatus? status = AssignmentStatus.Pending) =>
+        new() { UserId = userId, QuantityAssigned = quantity, Status = status };
 
     private static ActivityAssignmentUpdateRequest UpdateReq(int quantity, AssignmentStatus? status) =>
         new() { QuantityAssigned = quantity, Status = status };
@@ -386,6 +386,78 @@ public class ActivityServiceTests
         Assert.Equal(LogEntityType.ActivityAssignment, log.EntityType);
         Assert.Equal(LogAction.Create, log.Action);
         Assert.Equal(response.Id, log.EntityId);
+    }
+
+    [Fact]
+    public async Task CreateAssignmentAsync_Paid_CreatesIncomeTransactionAndPaidAt_ACT16()
+    {
+        var activity = await SeedActivityAsync();
+        var member = _users.AddUser();
+
+        var response = await _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 4, AssignmentStatus.Paid), Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal(AssignmentStatus.Paid, response.Status);
+        Assert.NotNull(response.PaidAt);
+        Assert.Equal(2, _transactions.Transactions.Count); // activity expense + sale income
+        var sale = _transactions.Transactions.Single(t => t.Type == TransactionType.ActivitySale);
+        Assert.Equal(TransactionDirection.Income, sale.Direction);
+        Assert.Equal(6000m, sale.Amount);
+        Assert.Equal(TestPeriods.Y2026.Id, sale.SavingPeriodId);
+        Assert.Equal(sale.Id, activity.Assignments.Single().TransactionId);
+        var log = Assert.Single(_logs.Logs);
+        Assert.Equal(LogAction.Create, log.Action);
+        Assert.Equal(6000m, log.NewValue);
+    }
+
+    [Fact]
+    public async Task CreateAssignmentAsync_Pending_CreatesNoTransaction_ACT16()
+    {
+        var activity = await SeedActivityAsync();
+        var member = _users.AddUser();
+
+        var response = await _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 4), Admin, TestPeriods.Y2026, default);
+
+        Assert.Null(response.PaidAt);
+        Assert.DoesNotContain(_transactions.Transactions, t => t.Type == TransactionType.ActivitySale);
+        Assert.Single(_logs.Logs);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(AssignmentStatus.Cancelled)]
+    public async Task CreateAssignmentAsync_InvalidStatus_Throws_ACT16(AssignmentStatus? status)
+    {
+        var activity = await SeedActivityAsync();
+        var member = _users.AddUser();
+
+        await Assert.ThrowsAsync<DomainException>(() =>
+            _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 2, status), Admin, TestPeriods.Y2026, default));
+
+        Assert.Empty(activity.Assignments);
+        Assert.Single(_transactions.Transactions);
+        Assert.Empty(_logs.Logs);
+    }
+
+    [Fact]
+    public async Task CreateAssignmentAsync_PaidCoversAllUnits_FinishesActivity_ACT10()
+    {
+        var activity = await SeedActivityAsync(5);
+        var member = _users.AddUser();
+
+        await _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 5, AssignmentStatus.Paid), Admin, TestPeriods.Y2026, default);
+
+        Assert.Equal(ActivityStatus.Finished, activity.Status);
+    }
+
+    [Fact]
+    public async Task UpdateActivityAsync_ChangePriceAfterPaidCreation_Throws_ACT05()
+    {
+        var activity = await SeedActivityAsync();
+        var member = _users.AddUser();
+        await _service.CreateAssignmentAsync(activity.Id, AssignReq(member.Id, 2, AssignmentStatus.Paid), Admin, TestPeriods.Y2026, default);
+
+        await Assert.ThrowsAsync<DomainException>(() =>
+            _service.UpdateActivityAsync(activity.Id, ActivityReq(10, 1000m, 2000m), Admin, TestPeriods.Y2026, default));
     }
 
     [Fact]

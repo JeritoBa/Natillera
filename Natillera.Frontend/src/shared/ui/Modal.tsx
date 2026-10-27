@@ -6,11 +6,13 @@ interface ModalProps {
   onClose: () => void
   children: ReactNode
   describedBy?: string
+  role?: 'dialog' | 'alertdialog'
+  busy?: boolean
 }
 
 const focusableSelector = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-export function Modal({ title, onClose, children, describedBy }: ModalProps) {
+export function Modal({ title, onClose, children, describedBy, role = 'dialog', busy }: ModalProps) {
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -45,10 +47,11 @@ export function Modal({ title, onClose, children, describedBy }: ModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay" onClick={onClose}>
       <div
         ref={panelRef}
-        role="dialog"
+        role={role}
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={describedBy}
+        aria-busy={busy || undefined}
         tabIndex={-1}
         className="rounded-xl w-full max-w-lg mx-4 p-6 shadow-xl max-h-[calc(100dvh-2rem)] overflow-y-auto outline-none"
         style={{ background: '#fff', border: '1px solid #d6e8dc' }}

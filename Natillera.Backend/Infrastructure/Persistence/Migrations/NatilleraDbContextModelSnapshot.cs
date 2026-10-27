@@ -294,6 +294,8 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("EntityType", "EntityId");
 
+                    b.HasIndex("SavingPeriodId", "OccurredAt");
+
                     b.ToTable("logs", (string)null);
                 });
 
@@ -438,6 +440,8 @@ namespace Natillera.Backend.Infrastructure.Persistence.Migrations
                     b.HasIndex("OccurredAt");
 
                     b.HasIndex("SavingPeriodId");
+
+                    b.HasIndex("SavingPeriodId", "OccurredAt");
 
                     b.ToTable("transactions", (string)null);
                 });

@@ -21,7 +21,22 @@ public sealed record DashboardSummaryResponse(
     decimal? MyPerformanceShare,
     PendingObligationsResponse? PendingObligations = null,
     decimal? SharedInterestPool = null,
-    decimal? PaidExtraCosts = null);
+    decimal? PaidExtraCosts = null,
+    decimal? PaidMonthlyPayments = null,
+    IReadOnlyCollection<MemberPendingObligationsItem>? MembersPendingObligations = null);
+
+public sealed record PendingKindTotal(int Count, decimal Amount);
+
+/// <summary>DASH-14: one row per member with total pending greater than zero in the period.</summary>
+public sealed record MemberPendingObligationsItem(
+    Guid UserId,
+    string MemberName,
+    bool IsActive,
+    decimal Total,
+    PendingKindTotal MonthlyPayments,
+    PendingKindTotal Loans,
+    PendingKindTotal Interests,
+    PendingKindTotal ActivitySales);
 
 public sealed record TopSellerItem(
     Guid UserId,

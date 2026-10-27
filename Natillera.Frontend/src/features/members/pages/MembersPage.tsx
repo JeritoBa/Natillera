@@ -2,17 +2,21 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { countMembersByStatus, filterMembers, type MemberStatusFilter } from '@/features/members/model/memberFilters'
+import { filterMembers, memberStatusCounts, parseMemberStatusFilter } from '@/features/members/model/memberFilters'
 import type { Member, MemberFormValues } from '@/features/members/model/memberTypes'
 import { getFriendlyApiError } from '@/shared/api/apiError'
+import { useClearUrlParams, useUrlParam, useUrlTextParam } from '@/shared/lib/useUrlFilter'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
+import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { StatCard } from '@/shared/ui/StatCard'
 import { cell, cellActions, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableCardStyle, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 import { MemberStatusModal } from '@/features/members/components/MemberStatusModal'
 
 const emptyForm: MemberFormValues = { firstName: '', lastName: '', email: '', phone: '' }
+
+const filterKeys = ['q', 'status'] as const
 
 export function MembersPage() {
   const { members, loading, error, create, update, setStatus } = useMembers()
@@ -24,15 +28,19 @@ export function MembersPage() {
   const [form, setForm] = useState<MemberFormValues>(emptyForm)
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<MemberStatusFilter>('all')
+  const [submitCount, setSubmitCount] = useState(0)
+  // UI-15: the filters live in the URL (the search text is debounced).
+  const [search, setSearch, resetSearch] = useUrlTextParam('q')
+  const [statusFilter, setStatusFilter] = useUrlParam('status', parseMemberStatusFilter, 'active')
+  const clearUrlFilters = useClearUrlParams(filterKeys)
   const [statusTarget, setStatusTarget] = useState<Member | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const activeCount = members.filter(member => member.isActive).length
-  const counts = countMembersByStatus(members)
+  const counts = memberStatusCounts(members, search)
   const filtered = filterMembers(members, search, statusFilter)
-  const hasFilters = search.trim() !== '' || statusFilter !== 'all'
-  const clearFilters = () => { setSearch(''); setStatusFilter('all') }
+  const hasFilters = search.trim() !== '' || statusFilter !== 'active'
+  const statusTotal = members.filter(member => member.isActive === (statusFilter === 'active')).length
+  const clearFilters = () => { resetSearch(); clearUrlFilters() }
 
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModalError(null); setSuccess(null); setModal('create') }
   const openEdit = (member: Member) => {
@@ -44,6 +52,7 @@ export function MembersPage() {
   }
   const save = async () => {
     if (saving) return
+    setSubmitCount(count => count + 1)
     setModalError(null)
     if (!form.firstName.trim() || !form.lastName.trim() || !/^\S+@\S+\.\S+$/.test(form.email.trim()) || !form.phone.trim()) {
       setModalError('Completa todos los campos con datos válidos.')
@@ -86,12 +95,12 @@ export function MembersPage() {
             <input id="member-search" type="search" autoComplete="off" value={search} onChange={event => setSearch(event.target.value)} placeholder="Nombre, correo o teléfono" className="w-full px-3 py-2.5 rounded-lg text-sm" />
           </div>
           <div role="group" aria-label="Filtrar por estado" className="flex gap-1.5 flex-wrap">
-            {([['all', 'Todos', counts.all], ['active', 'Activos', counts.active], ['inactive', 'Inactivos', counts.inactive]] as const).map(([value, label, count]) =>
+            {([['active', 'Activos', counts.active], ['inactive', 'Inactivos', counts.inactive]] as const).map(([value, label, count]) =>
               <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`px-3 min-h-10 rounded-lg text-xs font-medium transition-all ${statusFilter === value ? 'bg-[#0c5c38] text-white' : 'btn-ghost'}`}>{label} ({count})</button>)}
           </div>
         </div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {members.length} miembros</p>
+          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {statusTotal} miembros</p>
           {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
         </div>
       </div>}
@@ -102,8 +111,8 @@ export function MembersPage() {
           {loading && <tr><td colSpan={canManage ? 5 : 4} className="px-5 py-12 text-center text-[#4e7460]">Cargando miembros...</td></tr>}
           {!loading && members.length === 0 && <tr><td colSpan={canManage ? 5 : 4} className="px-5 py-12 text-center text-[#4e7460]">No hay miembros registrados</td></tr>}
           {!loading && members.length > 0 && filtered.length === 0 && <tr><td colSpan={canManage ? 5 : 4} className="px-5 py-12 text-center text-[#4e7460]">
-            <p>No hay miembros que coincidan con la búsqueda.</p>
-            <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>
+            <p>{search.trim() !== '' ? 'No hay miembros que coincidan con la búsqueda.' : statusFilter === 'active' ? 'No hay miembros activos. Los inactivos se ven con el filtro «Inactivos».' : 'No hay miembros inactivos.'}</p>
+            {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>}
           </td></tr>}
           {!loading && filtered.map(member => <tr key={member.id} className="table-row">
             <td className={`${cellFirst} py-3.5 ${cellMain}`}>
@@ -122,7 +131,7 @@ export function MembersPage() {
       {modal && <Modal title={editing ? 'Editar miembro' : 'Nuevo miembro'} onClose={() => !saving && setModal(null)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4">
         {([['firstName', 'Nombre'], ['lastName', 'Apellido'], ['email', 'Correo'], ['phone', 'Teléfono']] as const).map(([field, label]) => <div key={field}><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">{label}</label><input type={field === 'email' ? 'email' : 'text'} value={form[field]} onChange={event => setForm(current => ({ ...current, [field]: event.target.value }))} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>)}
         <p className="text-xs text-[#4e7460]">El miembro recibirá la contraseña inicial configurada por el administrador.</p>
-        {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
+        <FormError message={modalError} revision={submitCount} />
         <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
       </form></Modal>}
       {statusTarget && <MemberStatusModal member={statusTarget} onClose={() => setStatusTarget(null)} onConfirm={confirmStatus} />}

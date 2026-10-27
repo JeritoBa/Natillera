@@ -51,7 +51,7 @@ public sealed class FakeLogRepository : ILogRepository
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyCollection<LogListItem>> GetAllAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+    public Task<PagedResult<LogListItem>> GetPageAsync(Guid savingPeriodId, LogListFilter filter, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
     public Task<LogDetailResponse?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
@@ -68,7 +68,7 @@ public sealed class FakeTransactionRepository : ITransactionRepository
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+    public Task<TransactionPageResponse> GetPageAsync(Guid savingPeriodId, TransactionListFilter filter, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
     public Task<TransactionDetailResponse?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default) =>

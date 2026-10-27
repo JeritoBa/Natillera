@@ -5,7 +5,8 @@ namespace Natillera.Backend.Application.Transactions;
 public interface ITransactionRepository
 {
     Task AddAsync(Transaction transaction, CancellationToken cancellationToken = default);
-    Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(Guid savingPeriodId, CancellationToken cancellationToken = default);
+    /// <summary>TX-03: one page of one period, newest first, filtered on the server.</summary>
+    Task<TransactionPageResponse> GetPageAsync(Guid savingPeriodId, TransactionListFilter filter, CancellationToken cancellationToken = default);
     Task<TransactionDetailResponse?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default);
 
     /// <summary>DASH-01 / PER-06: SUM(Income) - SUM(Expense) over the non-cancelled transactions of one period.</summary>

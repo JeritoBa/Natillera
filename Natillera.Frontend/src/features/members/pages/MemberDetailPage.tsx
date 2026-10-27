@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { appName } from '@/app/useDocumentTitle'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { getMemberDetail, type MemberDetail } from '@/features/members/api/membersApi'
 import { PendingObligationsCard } from '@/features/members/components/PendingObligationsCard'
+import { FeeLedger } from '@/features/monthlyPayments/components/FeeLedger'
+import { getMonthlyPayments, type MonthlyPaymentResponse } from '@/features/monthlyPayments/api/monthlyPaymentsApi'
 import { typeLabel } from '@/features/transactions/model/labels'
 import { ApiError, getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
@@ -22,6 +24,7 @@ const collapsedCount = 5
 export function MemberDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { hash } = useLocation()
   const { session } = useAuth()
   const { selected } = useSavingPeriod()
   const [detail, setDetail] = useState<MemberDetail | null>(null)
@@ -29,6 +32,10 @@ export function MemberDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [showAll, setShowAll] = useState(false)
+  const [fees, setFees] = useState<MonthlyPaymentResponse[] | null>(null)
+  const [feesLoading, setFeesLoading] = useState(true)
+  const [feesError, setFeesError] = useState<string | null>(null)
+  const feesRequestId = useRef(0)
   const requestId = useRef(0)
 
   const load = useCallback(async () => {
@@ -47,14 +54,39 @@ export function MemberDetailPage() {
     }
   }, [id, session])
 
+  // MEM-11: the fee ledger is requested in parallel with the detail; its failure does not hide the rest of the page.
+  const loadFees = useCallback(async () => {
+    if (!session) return
+    const current = ++feesRequestId.current
+    setFeesLoading(true); setFeesError(null)
+    try {
+      const result = await getMonthlyPayments(session.accessToken)
+      if (current === feesRequestId.current) setFees(result)
+    } catch (requestError) {
+      if (current === feesRequestId.current) { setFees(null); setFeesError(getFriendlyApiError(requestError)) }
+    } finally {
+      if (current === feesRequestId.current) setFeesLoading(false)
+    }
+  }, [session])
+
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
     return () => window.clearTimeout(timer)
   }, [load])
 
   useEffect(() => {
+    const timer = window.setTimeout(() => { void loadFees() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadFees])
+
+  useEffect(() => {
     if (detail) document.title = `${detail.member.firstName} ${detail.member.lastName} · ${appName}`
   }, [detail])
+
+  // Spec 021: the dashboard links to /members/{id}#pendientes; scroll once the detail has rendered.
+  useEffect(() => {
+    if (detail && hash === '#pendientes') document.getElementById('pendientes')?.scrollIntoView()
+  }, [detail, hash])
 
   const back = <button onClick={() => navigate('/members')} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver a miembros</button>
 
@@ -111,10 +143,12 @@ export function MemberDetailPage() {
           {balance.total === 0 && <p className="mt-3 text-xs text-[#4e7460]">Aún no tiene cuotas pagadas.</p>}
         </section>
 
-        <section aria-labelledby="member-pending-title" className="rounded-xl p-5" style={cardStyle}>
+        <section id="pendientes" aria-labelledby="member-pending-title" className="rounded-xl p-5 scroll-mt-4" style={cardStyle}>
           <PendingObligationsCard obligations={pendingObligations} audience="admin" titleId="member-pending-title" memberId={member.id} />
         </section>
       </div>
+
+      <FeeLedger year={selected?.year ?? new Date().getFullYear()} fees={fees} memberId={member.id} audience="admin" loading={feesLoading} error={feesError} onRetry={() => void loadFees()} titleId="member-fees-title" />
 
       <section aria-labelledby="member-recent-title" className="rounded-xl overflow-hidden" style={cardStyle}>
         <div className="px-5 py-3 border-b flex items-center justify-between gap-3" style={{ borderColor: '#eef4f0' }}>

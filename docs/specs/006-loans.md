@@ -15,6 +15,8 @@ The Admin lends fund money to members, registers principal payments and interest
 ## Scope
 Loan create/update/cancel; loan payment create/update/cancel; interest (`Performance`) create/update/cancel; automatic loan status (Active/Paid); expense/income transactions and logs.
 
+> **Spec 028 supersedes** the "editing a loan with payments or interest fails" criterion: such a loan can still change its interest rate and description (LOAN-12); `GET /api/loans` adds `hasMovements`.
+
 ## Out of scope
 Member loan requests, approval workflow, automatic interest generation, repayment schedules, in-app payments. (`Loan.CalculateMonthlyInterest` exists in the domain but no flow uses it - LOAN-10.)
 

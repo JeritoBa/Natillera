@@ -41,6 +41,16 @@ describe('demo client', () => {
     expect(await status(resolveDemoRequest('/api/loans?x=1', 'GET', 'Admin'))).toBe(200)
   })
 
+  it('TX-03 / AUD-04 / DEMO-02: transactions and logs answer the paginated contract and honor the query', async () => {
+    const transactions = await resolveDemoRequest<{ items: unknown[], total: number, page: number, pageSize: number, summary: object, months: unknown[] }>('/api/transactions?page=1', 'GET', 'Admin')
+    expect(transactions).toMatchObject({ total: f.transactions.filter(transaction => !transaction.isCancelled).length, page: 1, pageSize: 50 }) // UI-16
+    expect(Array.isArray(transactions.months)).toBe(true)
+    const none = await resolveDemoRequest<{ items: unknown[], total: number }>('/api/transactions?month=2000-01', 'GET', 'Member')
+    expect(none).toMatchObject({ items: [], total: 0 })
+    const logs = await resolveDemoRequest<{ items: unknown[], total: number }>('/api/logs?entity=Loan', 'GET', 'Admin')
+    expect(logs.total).toBe(f.logs.filter(log => log.entityType === 'Loan').length)
+  })
+
   it('UI-04 / MP-09: the Member gets the Member dashboard and only Paid fees', async () => {
     const summary = await resolveDemoRequest<DashboardSummary>('/api/dashboard/summary', 'GET', 'Member')
     expect(summary.role).toBe('Member')

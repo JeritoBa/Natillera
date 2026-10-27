@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { cancelActivity, createActivity, getActivities, updateActivity, type ActivityListItem } from '@/features/activities/api/activitiesApi'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -6,17 +6,25 @@ import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { defaultDateForPeriod, isDateInPeriodYear, periodDateBounds } from '@/features/settings/model/savingPeriod'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
 import { getFriendlyApiError } from '@/shared/api/apiError'
+import { activityCancelConsequences } from '@/features/activities/model/cancelConfirm'
+import { activityStartMonth, activityStatusCounts, filterActivities, matchesActivityStatus, parseActivityMonthFilter, parseActivityStatusFilter } from '@/features/activities/model/activityFilters'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
+import { ConfirmSummary } from '@/shared/ui/ConfirmSummary'
 import { Icon } from '@/shared/ui/Icon'
+import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { toMoneyInputValue } from '@/shared/lib/money'
+import { optionSource } from '@/shared/lib/listView'
+import { useClearUrlParams, useUrlParam } from '@/shared/lib/useUrlFilter'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
 import { cell, cellActions, cellAmount, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
 interface ActivityForm { name: string, description: string, quantity: string, unitCost: string, unitSalePrice: string, startDate: string }
 const emptyForm: ActivityForm = { name: '', description: '', quantity: '', unitCost: '', unitSalePrice: '', startDate: '' }
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
+const filterKeys = ['month', 'status'] as const
 
 export function ActivitiesPage() {
   const { session, isDemo } = useAuth()
@@ -32,7 +40,14 @@ export function ActivitiesPage() {
   const [form, setForm] = useState<ActivityForm>(emptyForm)
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [month, setMonth] = useState<'all' | string>('all')
+  const [submitCount, setSubmitCount] = useState(0)
+  // UI-15: the month and status filters live in the URL.
+  const [month, setMonth] = useUrlParam('month', parseActivityMonthFilter, 'all')
+  const [statusFilter, setStatusFilter] = useUrlParam('status', parseActivityStatusFilter, 'all')
+  const clearFilters = useClearUrlParams(filterKeys)
+  const [confirmTarget, setConfirmTarget] = useState<ActivityListItem | null>(null)
+  const [focusSuccess, setFocusSuccess] = useState(0)
+  const successRef = useRef<HTMLParagraphElement>(null)
 
   const load = useCallback(async () => {
     if (!session) return
@@ -40,6 +55,9 @@ export function ActivitiesPage() {
     catch (requestError) { setError(getFriendlyApiError(requestError)) }
     finally { setLoading(false) }
   }, [session])
+
+  // UI-13: after a cancellation the trigger button disappears, so the focus moves to the success banner.
+  useEffect(() => { if (focusSuccess > 0) successRef.current?.focus() }, [focusSuccess])
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
@@ -61,6 +79,7 @@ export function ActivitiesPage() {
 
   const save = async () => {
     if (saving) return
+    setSubmitCount(count => count + 1)
     setModalError(null)
     const quantity = Number(form.quantity)
     const unitCost = Number(form.unitCost)
@@ -87,22 +106,26 @@ export function ActivitiesPage() {
     finally { setSaving(false) }
   }
 
-  const cancel = async (activity: ActivityListItem) => {
+  // UI-13: errors propagate to the confirmation dialog.
+  const confirmCancel = async (activity: ActivityListItem) => {
     if (!session) return
-    setSuccess(null); setError(null)
-    try {
-      await cancelActivity(session.accessToken, activity.id)
-      setSuccess('La actividad se anuló correctamente.')
-      await load()
-    } catch (requestError) { setError(getFriendlyApiError(requestError)) }
+    await cancelActivity(session.accessToken, activity.id)
+    setConfirmTarget(null)
+    setSuccess('La actividad se anuló correctamente.')
+    setFocusSuccess(count => count + 1)
+    await load()
   }
 
-  const monthOf = (activity: ActivityListItem) => activity.startDate.slice(0, 7)
+  // UI-16: option counts exclude cancelled activities (in the "Anuladas" view they count the cancelled ones).
+  const optionActivities = optionSource(activities, activity => activity.status === 'Cancelled', statusFilter === 'Cancelled')
   const monthCounts = new Map<string, number>()
-  activities.forEach(activity => monthCounts.set(monthOf(activity), (monthCounts.get(monthOf(activity)) ?? 0) + 1))
+  optionActivities.forEach(activity => monthCounts.set(activityStartMonth(activity), (monthCounts.get(activityStartMonth(activity)) ?? 0) + 1))
   const months = [...monthCounts.keys()].sort().reverse()
   const effectiveMonth = month !== 'all' && monthCounts.has(month) ? month : 'all'
-  const filtered = effectiveMonth === 'all' ? activities : activities.filter(activity => monthOf(activity) === effectiveMonth)
+  const filtered = filterActivities(activities, effectiveMonth, statusFilter)
+  const statusCounts = activityStatusCounts(activities, effectiveMonth)
+  const statusTotal = activities.filter(activity => matchesActivityStatus(activity, statusFilter)).length // "Mostrando X de Y": the activities of the chosen status
+  const hasFilters = effectiveMonth !== 'all' || statusFilter !== 'all'
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const columns: [string, string, boolean][] = [
     ['Actividad', cellFirst, false], ['Fecha de inicio', `${cell} ${colDesktop}`, false], ['Unidades asignadas', `${cell} ${colTablet}`, true], ['Disponibles', `${cell} ${colDesktop}`, false],
@@ -116,10 +139,10 @@ export function ActivitiesPage() {
         <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Actividades</h1><p className="text-[#4e7460] text-sm">{canManage ? 'Gestiona las actividades de venta de la natillera' : 'Actividades de venta de la natillera'}{selected ? ` · Periodo ${selected.year}` : ''}</p></div>
         {canManage && <button onClick={openCreate} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Nueva actividad</button>}
       </div>
-      {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
+      {success && !isDemo && <p ref={successRef} tabIndex={-1} role="status" className="mb-4 outline-none rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
       {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
       {error && activities.length === 0 && !loading && <button onClick={() => { setLoading(true); void load() }} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3 mb-4">Reintentar</button>}
-      {!loading && !error && activities.length > 0 && <div className="rounded-xl p-4 mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3" style={cardStyle}>
+      {!loading && !error && activities.length > 0 && <div className="rounded-xl p-4 mb-4 space-y-3" style={cardStyle}>
         <div>
           <label htmlFor="activity-month-filter" className="block text-xs text-[#4e7460] mb-1">Mes de inicio</label>
           <select id="activity-month-filter" value={effectiveMonth} onChange={event => setMonth(event.target.value)} className="w-full sm:w-64 px-3 py-2.5 rounded-lg text-sm">
@@ -127,9 +150,13 @@ export function ActivitiesPage() {
             {months.map(key => <option key={key} value={key}>{`${monthText(key)} (${monthCounts.get(key)})`}</option>)}
           </select>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {activities.length} actividades</p>
-          {effectiveMonth !== 'all' && <button onClick={() => setMonth('all')} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Ver todos los meses</button>}
+        <div role="group" aria-label="Filtrar por estado" className="flex gap-1.5 flex-wrap">
+          {([['all', 'Todas'], ['Pending', 'Pendientes'], ['Finished', 'Cerradas'], ['Cancelled', 'Anuladas']] as const).map(([value, label]) =>
+            <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`px-3 min-h-10 rounded-lg text-xs font-medium transition-all ${statusFilter === value ? 'bg-[#0c5c38] text-white' : 'btn-ghost'}`}>{label} ({statusCounts[value]})</button>)}
+        </div>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {statusTotal} actividades</p>
+          {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
         </div>
       </div>}
       <div className={tableWrap} style={cardStyle}><div className={tableScroll}>
@@ -139,8 +166,8 @@ export function ActivitiesPage() {
           {loading && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando actividades…</p></td></tr>}
           {!loading && !error && activities.length === 0 && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]">{canManage ? 'Aún no hay actividades registradas. Usa «Nueva actividad» para crear la primera.' : 'Aún no hay actividades registradas.'}</td></tr>}
           {!loading && activities.length > 0 && filtered.length === 0 && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]">
-            <p>No hay actividades que empiecen en {monthText(effectiveMonth)}.</p>
-            <button onClick={() => setMonth('all')} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Ver todos los meses</button>
+            <p>{statusFilter !== 'all' ? 'No hay actividades que coincidan con los filtros.' : effectiveMonth !== 'all' ? `No hay actividades que empiecen en ${monthText(effectiveMonth)}.` : 'No hay actividades vigentes. Las anuladas se ven con el filtro «Anuladas».'}</p>
+            {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>}
           </td></tr>}
           {!loading && filtered.map(activity => <tr key={activity.id} className="table-row">
             <td className={`${cellFirst} py-3.5 ${cellMain}`}>
@@ -157,21 +184,23 @@ export function ActivitiesPage() {
             <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
               <button onClick={() => navigate(`/activities/${activity.id}`)} className={eyeButton} aria-label={`Ver detalle de ${activity.name}`}><Icon.Eye open /></button>
               {canManage && activity.status !== 'Cancelled' && <button onClick={() => openEdit(activity)} className={iconButton} aria-label={`Editar ${activity.name}`}><Icon.Edit /></button>}
-              {canManage && activity.status !== 'Cancelled' && activity.assignedQuantity === 0 && <button onClick={() => { if (window.confirm(`¿Anular la actividad "${activity.name}"? La actividad y su egreso quedarán anulados.`)) void cancel(activity) }} className={dangerButton} aria-label={`Anular ${activity.name}`}><Icon.Trash /></button>}
+              {canManage && activity.status !== 'Cancelled' && activity.assignedQuantity === 0 && <button onClick={() => { setSuccess(null); setError(null); setConfirmTarget(activity) }} className={dangerButton} aria-label={`Anular ${activity.name}`}><Icon.Trash /></button>}
             </div></td>
           </tr>)}
         </tbody></table>
       </div></div>
       {modal && <Modal title={editing ? 'Editar actividad' : 'Nueva actividad'} onClose={() => !saving && setModal(null)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4">
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Nombre</label><input type="text" maxLength={100} value={form.name} onChange={event => setField('name', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción</label><input type="text" maxLength={200} value={form.description} onChange={event => setField('description', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input type="number" min="1" step="1" value={form.quantity} onChange={event => setField('quantity', event.target.value)} placeholder="100" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
+        <div><label htmlFor="activity-name" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Nombre</label><input id="activity-name" type="text" maxLength={100} value={form.name} onChange={event => setField('name', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
+        <div><label htmlFor="activity-description" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción</label><input id="activity-description" type="text" maxLength={200} value={form.description} onChange={event => setField('description', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
+        <div><label htmlFor="activity-quantity" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input id="activity-quantity" type="number" min="1" step="1" value={form.quantity} onChange={event => setField('quantity', event.target.value)} placeholder="100" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         <div><label htmlFor="activity-unit-cost" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Costo unitario</label><MoneyInput id="activity-unit-cost" value={form.unitCost} onChange={value => setField('unitCost', value)} placeholder="5000" /></div>
         <div><label htmlFor="activity-unit-sale-price" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Precio de venta unitario</label><MoneyInput id="activity-unit-sale-price" value={form.unitSalePrice} onChange={value => setField('unitSalePrice', value)} placeholder="8000" /></div>
         <div><label htmlFor="activity-start-date" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Fecha de inicio</label><input id="activity-start-date" type="date" min={bounds?.min} max={bounds?.max} aria-describedby={periodYear ? 'activity-start-date-help' : undefined} value={form.startDate} onChange={event => setField('startDate', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" />{periodYear && <p id="activity-start-date-help" className="text-xs text-[#4e7460] mt-1.5">Debe ser una fecha de {periodYear}, el periodo seleccionado.</p>}</div>
-        {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
+        <FormError message={modalError} revision={submitCount} />
         <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
       </form></Modal>}
+      {confirmTarget && <ConfirmDialog title="Anular actividad" confirmLabel="Anular actividad" consequences={activityCancelConsequences()} onClose={() => setConfirmTarget(null)} onConfirm={() => confirmCancel(confirmTarget)}
+        summary={<ConfirmSummary title={confirmTarget.name} detail={`Inicia ${formatDateOnly(confirmTarget.startDate)}`} amount={formatCurrency(confirmTarget.totalCost)} status={confirmTarget.status.toLowerCase()} />} />}
     </div>
   )
 }

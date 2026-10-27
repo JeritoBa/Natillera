@@ -6,14 +6,20 @@ import {
   cancelInterestPayment, cancelLoanPayment, createInterestPayment, createLoanPayment, getLoanDetail, updateInterestPayment, updateLoanPayment,
   type InterestPaymentResponse, type LoanDetail, type LoanPaymentResponse, type PaymentMethod,
 } from '@/features/loans/api/loansApi'
+import { interestCancelConsequences, loanPaymentCancelConsequences } from '@/features/loans/model/cancelConfirm'
 import { longDate, methodLabel } from '@/features/loans/model/labels'
 import { getLoanSummary } from '@/features/loans/model/loanSummary'
 import { ApiError, getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
+import { ConfirmSummary } from '@/shared/ui/ConfirmSummary'
 import { Icon } from '@/shared/ui/Icon'
+import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
+import { canEditLoan } from '@/features/loans/model/loanEdit'
 import { toMoneyInputValue } from '@/shared/lib/money'
+import { CancelledToggle } from '@/shared/ui/CancelledToggle'
 import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
 import { cell, cellActions, cellAmount, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll } from '@/shared/ui/tableStyles'
@@ -49,8 +55,14 @@ export function LoanDetailPage() {
   const [method, setMethod] = useState<PaymentMethod>('Cash')
   const [description, setDescription] = useState('')
   const [interestStatus, setInterestStatus] = useState<'Pending' | 'Paid'>('Pending')
+  const [showCancelledPayments, setShowCancelledPayments] = useState(false)
+  const [showCancelledInterests, setShowCancelledInterests] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [submitCount, setSubmitCount] = useState(0)
+  const [confirmTarget, setConfirmTarget] = useState<{ kind: 'payment', payment: LoanPaymentResponse } | { kind: 'interest', interest: InterestPaymentResponse } | null>(null)
+  const [focusSuccess, setFocusSuccess] = useState(0)
+  const successRef = useRef<HTMLParagraphElement>(null)
   const requestId = useRef(0)
 
   const load = useCallback(async () => {
@@ -80,6 +92,9 @@ export function LoanDetailPage() {
     }
   }, [id, session])
 
+  // UI-13: after a cancellation the trigger button disappears, so the focus moves to the success banner.
+  useEffect(() => { if (focusSuccess > 0) successRef.current?.focus() }, [focusSuccess])
+
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
     return () => window.clearTimeout(timer)
@@ -108,11 +123,16 @@ export function LoanDetailPage() {
   const { isCancelled } = summary
   const activeCount = summary.activePayments.length
   const maxPayment = summary.outstandingPrincipal + (editingPayment?.amount ?? 0)
+  // UI-16: cancelled rows are hidden behind "Ver anulados (n)" (local state); the summary and the counts keep using every record.
+  const cancelledPaymentCount = loan.payments.filter(item => item.status === 'Cancelled').length
+  const activeInterestCount = loan.interestPayments.filter(item => item.status !== 'Cancelled').length
+  const cancelledInterestCount = loan.interestPayments.length - activeInterestCount
   const sortedPayments = [...loan.payments].sort((a, b) =>
     Number(a.status === 'Cancelled') - Number(b.status === 'Cancelled') || new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime())
   const sortedInterests = [...loan.interestPayments].sort((a, b) =>
     statusOrder[a.status] - statusOrder[b.status] || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  const activeInterestCount = loan.interestPayments.filter(item => item.status !== 'Cancelled').length
+  const visiblePayments = showCancelledPayments ? sortedPayments : sortedPayments.filter(item => item.status !== 'Cancelled')
+  const visibleInterests = showCancelledInterests ? sortedInterests : sortedInterests.filter(item => item.status !== 'Cancelled')
   const hasInterest = summary.interestGenerated > 0
 
   const openPayment = (payment: LoanPaymentResponse | null) => {
@@ -123,6 +143,7 @@ export function LoanDetailPage() {
   }
   const save = async () => {
     if (saving) return
+    setSubmitCount(count => count + 1)
     setModalError(null)
     const numericAmount = Number(amount)
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) return setModalError('Ingresa un monto válido.')
@@ -149,15 +170,15 @@ export function LoanDetailPage() {
     } catch (requestError) { setModalError(getFriendlyApiError(requestError)) }
     finally { setSaving(false) }
   }
-  const cancel = async (kind: 'payment' | 'interest', recordId: string) => {
-    if (!session) return
-    setSuccess(null); setActionError(null)
-    try {
-      if (kind === 'payment') await cancelLoanPayment(session.accessToken, loan.id, recordId)
-      else await cancelInterestPayment(session.accessToken, loan.id, recordId)
-      setSuccess(kind === 'payment' ? 'El abono se anuló correctamente.' : 'El interés se anuló correctamente.')
-      await refresh()
-    } catch (requestError) { setActionError(getFriendlyApiError(requestError)) }
+  // UI-13: errors propagate to the confirmation dialog.
+  const confirmCancel = async () => {
+    if (!session || !confirmTarget) return
+    if (confirmTarget.kind === 'payment') await cancelLoanPayment(session.accessToken, loan.id, confirmTarget.payment.id)
+    else await cancelInterestPayment(session.accessToken, loan.id, confirmTarget.interest.id)
+    setConfirmTarget(null)
+    setSuccess(confirmTarget.kind === 'payment' ? 'El abono se anuló correctamente.' : 'El interés se anuló correctamente.')
+    setFocusSuccess(count => count + 1)
+    await refresh()
   }
 
   const info: [string, ReactNode][] = [
@@ -175,13 +196,8 @@ export function LoanDetailPage() {
     ['Intereses pendientes', formatCurrency(summary.outstandingInterest), summary.pendingInterestCount > 0 ? `${summary.pendingInterestCount} intereses sin pagar` : 'Nada pendiente'],
     ['Total pagado', formatCurrency(summary.totalPaid), 'Capital + intereses pagados'],
   ]
-  // Same condition as the loans list edit button (LOAN-07).
-  const canEditDescription = canManage && loan.status === 'Active' && summary.outstandingPrincipal === loan.initialAmount
-  const paymentConfirm = (payment: LoanPaymentResponse) => `¿Anular el abono de ${formatCurrency(payment.amount)} del ${shortDate(payment.paidAt)}? El abono y su ingreso quedarán anulados y el capital pendiente aumentará.`
-  const interestConfirm = (interest: InterestPaymentResponse) => interest.status === 'Paid'
-    ? `¿Anular el interés pagado «${interest.description}»? El interés y su ingreso quedarán anulados.`
-    : `¿Anular el interés «${interest.description}»? El interés quedará anulado.`
-
+  // Same condition as the loans list edit button (LOAN-12): every non-cancelled loan.
+  const canEditDescription = canManage && canEditLoan(loan)
   return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
     {back}
     <div className="mb-7">
@@ -192,7 +208,7 @@ export function LoanDetailPage() {
       <p className="text-[#4e7460] text-sm mt-0.5">Préstamo de {formatCurrency(loan.initialAmount)} · inicia el {longDate(loan.startDate)}</p>
       {isCancelled && <p role="status" className="mt-3 rounded-lg border border-[#d6e8dc] bg-[#eef4f0] px-3 py-2.5 text-sm text-[#4e7460]">Este préstamo está anulado. Su desembolso ya no cuenta como egreso y no admite cambios.</p>}
     </div>
-    {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
+    {success && !isDemo && <p ref={successRef} tabIndex={-1} role="status" className="mb-4 outline-none rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
     {actionError && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{actionError}</p>}
 
     <div className="flex flex-col gap-4 lg:gap-5">
@@ -262,10 +278,12 @@ export function LoanDetailPage() {
             <p>Aún no hay abonos registrados.</p>
             {canManage && !isCancelled && <p>Usa «Registrar abono» para el primero.</p>}
           </div>
-          : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+          : <>{visiblePayments.length === 0
+            ? <div className="px-5 py-8 text-center text-sm text-[#4e7460]"><p>No hay abonos vigentes.</p></div>
+            : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
             {paymentHeadings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
           </tr></thead><tbody>
-            {sortedPayments.map(payment => {
+            {visiblePayments.map(payment => {
               const date = shortDate(payment.paidAt)
               const canEdit = canManage && !isCancelled && payment.status !== 'Cancelled'
               return <tr key={payment.id} className="table-row">
@@ -279,11 +297,12 @@ export function LoanDetailPage() {
                 <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
                   <button onClick={() => navigate(`/loans/${loan.id}/payments/${payment.id}`)} className={eyeButton} aria-label={`Ver abono del ${date}`}><Icon.Eye open /></button>
                   {canEdit && <button onClick={() => openPayment(payment)} className={iconButton} aria-label={`Editar abono del ${date}`}><Icon.Edit /></button>}
-                  {canEdit && <button onClick={() => { if (window.confirm(paymentConfirm(payment))) void cancel('payment', payment.id) }} className={dangerButton} aria-label={`Anular abono del ${date}`}><Icon.Trash /></button>}
+                  {canEdit && <button onClick={() => { setSuccess(null); setActionError(null); setConfirmTarget({ kind: 'payment', payment }) }} className={dangerButton} aria-label={`Anular abono del ${date}`}><Icon.Trash /></button>}
                 </div></td>
               </tr>
             })}
           </tbody></table></div>}
+          <CancelledToggle count={cancelledPaymentCount} shown={showCancelledPayments} onToggle={() => setShowCancelledPayments(value => !value)} /></>}
       </section>
 
       <section aria-labelledby="loan-interests-title" className="rounded-xl overflow-hidden" style={cardStyle}>
@@ -293,10 +312,12 @@ export function LoanDetailPage() {
         </div>
         {sortedInterests.length === 0
           ? <div className="px-5 py-10 text-center text-sm text-[#4e7460]"><p>Aún no hay intereses registrados.</p></div>
-          : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+          : <>{visibleInterests.length === 0
+            ? <div className="px-5 py-8 text-center text-sm text-[#4e7460]"><p>No hay intereses vigentes.</p></div>
+            : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
             {interestHeadings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
           </tr></thead><tbody>
-            {sortedInterests.map(interest => {
+            {visibleInterests.map(interest => {
               const cancelled = interest.status === 'Cancelled'
               const path = `/loans/${loan.id}/interest-payments/${interest.id}`
               return <tr key={interest.id} className="table-row">
@@ -312,11 +333,12 @@ export function LoanDetailPage() {
                 <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
                   <button onClick={() => navigate(path)} className={eyeButton} aria-label={`Ver interés «${interest.description}»`}><Icon.Eye open /></button>
                   {canManage && !cancelled && !isCancelled && <button onClick={() => openInterest(interest)} className={iconButton} aria-label={`Editar interés «${interest.description}»`}><Icon.Edit /></button>}
-                  {canManage && !cancelled && <button onClick={() => { if (window.confirm(interestConfirm(interest))) void cancel('interest', interest.id) }} className={dangerButton} aria-label={`Anular interés «${interest.description}»`}><Icon.Trash /></button>}
+                  {canManage && !cancelled && <button onClick={() => { setSuccess(null); setActionError(null); setConfirmTarget({ kind: 'interest', interest }) }} className={dangerButton} aria-label={`Anular interés «${interest.description}»`}><Icon.Trash /></button>}
                 </div></td>
               </tr>
             })}
           </tbody></table></div>}
+          <CancelledToggle count={cancelledInterestCount} shown={showCancelledInterests} onToggle={() => setShowCancelledInterests(value => !value)} /></>}
       </section>
 
       <section aria-labelledby="loan-info-title" className="rounded-xl overflow-hidden" style={cardStyle}>
@@ -337,8 +359,12 @@ export function LoanDetailPage() {
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción</label><input type="text" maxLength={200} value={description} onChange={event => setDescription(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         <StatusRadioGroup name="interest-status" legend="Estado" value={interestStatus} onChange={setInterestStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja', disabled: editingInterest?.status === 'Paid' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} note={editingInterest?.status === 'Paid' ? 'Un interés pagado no puede volver a pendiente.' : undefined} />
       </>}
-      {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
+      <FormError message={modalError} revision={submitCount} />
       <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
     </form></Modal>}
+    {confirmTarget?.kind === 'payment' && <ConfirmDialog title="Anular abono" confirmLabel="Anular abono" consequences={loanPaymentCancelConsequences(confirmTarget.payment.amount)} onClose={() => setConfirmTarget(null)} onConfirm={confirmCancel}
+      summary={<ConfirmSummary title={shortDate(confirmTarget.payment.paidAt)} detail={methodLabel[confirmTarget.payment.paymentMethod]} amount={formatCurrency(confirmTarget.payment.amount)} status={confirmTarget.payment.status.toLowerCase()} />} />}
+    {confirmTarget?.kind === 'interest' && <ConfirmDialog title="Anular interés" confirmLabel="Anular interés" consequences={interestCancelConsequences(confirmTarget.interest.status)} onClose={() => setConfirmTarget(null)} onConfirm={confirmCancel}
+      summary={<ConfirmSummary title={confirmTarget.interest.description} detail={`Registrado ${shortDate(confirmTarget.interest.createdAt)}`} amount={formatCurrency(confirmTarget.interest.amount)} status={confirmTarget.interest.status.toLowerCase()} />} />}
   </div>
 }

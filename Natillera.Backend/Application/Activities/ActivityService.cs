@@ -121,6 +121,7 @@ public sealed class ActivityService(
 
     public async Task<ActivityAssignmentResponse> CreateAssignmentAsync(Guid activityId, ActivityAssignmentRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
+        var status = GetAssignmentStatus(request.Status);
         var activity = await GetActivityForUpdateAsync(activityId, period, cancellationToken);
         var member = await GetActiveMemberAsync(request.UserId, cancellationToken);
         ActivityAssignment? assignment = null;
@@ -129,6 +130,18 @@ public sealed class ActivityService(
         {
             assignment = activity.AddAssignment(request.QuantityAssigned, member.Id);
             await activityRepository.AddAssignmentAsync(assignment, ct);
+            if (status == AssignmentStatus.Paid)
+            {
+                var transaction = new Transaction(
+                    SaleAmount(activity, assignment),
+                    TransactionDirection.Income,
+                    TransactionType.ActivitySale,
+                    SaleDescription(activity.Name, MemberName(member)),
+                    activity.SavingPeriodId);
+                await transactionRepository.AddAsync(transaction, ct);
+                assignment.MarkAsPaid(transaction.Id);
+            }
+
             activity.RefreshStatus();
             await logRepository.AddAsync(
                 new Log(performedByUserId, LogEntityType.ActivityAssignment, assignment.Id, LogAction.Create, activity.SavingPeriodId, null,
@@ -141,7 +154,7 @@ public sealed class ActivityService(
 
     public async Task<ActivityAssignmentResponse> UpdateAssignmentAsync(Guid activityId, Guid assignmentId, ActivityAssignmentUpdateRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
-        var status = GetAssignmentStatus(request);
+        var status = GetAssignmentStatus(request.Status);
         var activity = await GetActivityForUpdateAsync(activityId, period, cancellationToken);
         var assignment = FindAssignment(activity, assignmentId);
 
@@ -338,9 +351,9 @@ public sealed class ActivityService(
         return description.Length > 200 ? description[..200] : description;
     }
 
-    private static AssignmentStatus GetAssignmentStatus(ActivityAssignmentUpdateRequest request)
+    private static AssignmentStatus GetAssignmentStatus(AssignmentStatus? requested)
     {
-        if (request.Status is not { } status || status == AssignmentStatus.Cancelled || !Enum.IsDefined(status))
+        if (requested is not { } status || status == AssignmentStatus.Cancelled || !Enum.IsDefined(status))
             throw new DomainException("Assignment status must be Pending or Paid.");
 
         return status;

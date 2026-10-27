@@ -28,7 +28,8 @@ public sealed class LoanService(
                 loan.StartDate,
                 loan.Status,
                 Math.Max(0, loan.InitialAmount - loan.PrincipalPaid),
-                loan.Description))
+                loan.Description,
+                loan.HasMovements))
             .ToArray();
     }
 
@@ -80,8 +81,11 @@ public sealed class LoanService(
     public async Task<LoanDetailResponse> UpdateLoanAsync(Guid loanId, LoanRequest request, Guid performedByUserId, SavingPeriod period, CancellationToken cancellationToken)
     {
         var loan = await GetLoanForUpdateAsync(loanId, period, cancellationToken);
-        var member = await GetActiveMemberAsync(request.BorrowerId, cancellationToken);
-        var borrowerName = BorrowerName(member);
+        // LOAN-12 / MEM-07: only a new borrower must be active; the current one may be inactive.
+        var borrower = request.BorrowerId == loan.BorrowerId
+            ? loan.Borrower
+            : await GetActiveMemberAsync(request.BorrowerId, cancellationToken);
+        var borrowerName = BorrowerName(borrower);
 
         await unitOfWork.ExecuteInTransactionAsync(async ct =>
         {

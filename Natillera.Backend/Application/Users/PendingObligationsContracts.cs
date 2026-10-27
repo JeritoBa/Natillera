@@ -20,6 +20,9 @@ public sealed record PendingInterestItem(Guid Id, Guid LoanId, DateTime CreatedA
 public sealed record PendingActivitySaleItem(Guid Id, Guid ActivityId, string ActivityName, int Quantity,
     decimal SalePrice, decimal Amount);
 
+/// <summary>DASH-14: the raw rows of one member, with the data needed to list the member.</summary>
+public sealed record MemberPendingObligationsData(Guid UserId, string MemberName, bool IsActive, PendingObligationsData Data);
+
 /// <summary>Raw rows returned by the repository (filtered by member only); the calculator applies the MEM-10 rules.</summary>
 public sealed record PendingObligationsData(
     IReadOnlyCollection<FeeObligationRow> MonthlyPayments,

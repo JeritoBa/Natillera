@@ -33,6 +33,25 @@ export interface DashboardSummary {
   pendingObligations: PendingObligations | null
   sharedInterestPool: number | null
   paidExtraCosts: number | null
+  paidMonthlyPayments: number | null
+  membersPendingObligations: MemberPendingObligations[] | null
+}
+
+export interface PendingKindTotal {
+  count: number
+  amount: number
+}
+
+// DASH-14: one row per member with total pending > 0 in the period (Admin only).
+export interface MemberPendingObligations {
+  userId: string
+  memberName: string
+  isActive: boolean
+  total: number
+  monthlyPayments: PendingKindTotal
+  loans: PendingKindTotal
+  interests: PendingKindTotal
+  activitySales: PendingKindTotal
 }
 
 export interface TopSeller {
