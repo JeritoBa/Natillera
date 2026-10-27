@@ -231,6 +231,7 @@ Rule areas: FIN (financial integrity), AUTH, MEM, MP (monthly payments), LOAN, A
 
 ### Other open items
 
+- **Audit log search is not accent-insensitive (spec 026, AUD-04):** add the PostgreSQL `unaccent` extension in a migration (Neon supports it) and use it in the logs search.
 - Migrations and admin seeding run in Development, or elsewhere only with the opt-in flag `NATILLERA_APPLY_MIGRATIONS=true` (OPS-01). Hosting: Render + Neon (ADR-019), deployed and live.
 - **Integration tests pending** (repositories/EF against Postgres, controllers, migrations, JWT middleware, the partial unique index).
 - **Interest rounding question (LOAN-10):** `Loan.CalculateMonthlyInterest` rounds `ToEven`, the per-member interest share rounds `AwayFromZero`; owner has not confirmed it is intentional (a characterization test documents current behavior). The method is not used by any service.

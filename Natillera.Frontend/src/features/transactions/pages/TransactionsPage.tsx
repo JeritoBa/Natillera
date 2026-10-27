@@ -1,15 +1,16 @@
 import { Icon } from '@/shared/ui/Icon'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { Link, useNavigate } from 'react-router-dom'
-import { getTransactions, type RealTransaction, type TransactionType } from '@/features/transactions/api/transactionsApi'
-import { transactionTotals } from '@/features/transactions/model/transactionTotals'
-import { filterTransactions, parseTransactionMonthFilter, parseTransactionTypeFilter, transactionMonthOptions, transactionTypeOrder } from '@/features/transactions/model/transactionFilters'
+import { getTransactionsPage, type TransactionPage, type TransactionType } from '@/features/transactions/api/transactionsApi'
+import { parseTransactionMonthFilter, parseTransactionTypeFilter, transactionTypeOrder } from '@/features/transactions/model/transactionFilters'
 import { getFriendlyApiError } from '@/shared/api/apiError'
-import { useClearUrlParams, useUrlParam } from '@/shared/lib/useUrlFilter'
+import { pageRange } from '@/shared/lib/pagination'
+import { useClearUrlParams, useUrlPage, useUrlParam } from '@/shared/lib/useUrlFilter'
 import { formatCurrency, formatMonth, formatShortCurrency } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
+import { Pager } from '@/shared/ui/Pager'
 import { StatCard } from '@/shared/ui/StatCard'
 import { cell, cellActions, cellAmount, cellFirst, cellLast, colDesktop, colTablet, eyeButton, headCell, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
@@ -23,39 +24,61 @@ const typeBackground: Record<TransactionType, string> = {
   MonthlyPayment: '#dcf5e8', Activity: '#fef6dc', ActivitySale: '#ddf0ff', Loan: '#fde8e4', LoanPayment: '#dcf5e8', Performance: '#ddf0ff', ExtraCost: '#fef6dc',
 }
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
-const filterKeys = ['type', 'month'] as const
+const filterKeys = ['type', 'month', 'page'] as const
 
 export function TransactionsPage() {
   const { session } = useAuth()
   const { selected } = useSavingPeriod()
   const navigate = useNavigate()
-  const [transactions, setTransactions] = useState<RealTransaction[]>([])
-  // UI-15: the filters live in the URL.
-  const [filter, setFilter] = useUrlParam('type', parseTransactionTypeFilter, 'all')
-  const [month, setMonth] = useUrlParam('month', parseTransactionMonthFilter, 'all')
+  const [data, setData] = useState<TransactionPage | null>(null)
+  // UI-15 / UI-17: the filters and the page live in the URL; changing a filter returns to page 1 in the same update.
+  const [filter, setFilter] = useUrlParam('type', parseTransactionTypeFilter, 'all', true)
+  const [month, setMonth] = useUrlParam('month', parseTransactionMonthFilter, 'all', true)
+  const [page, setPage] = useUrlPage()
   const clearFilters = useClearUrlParams(filterKeys)
   const [loading, setLoading] = useState(true)
+  const [fetching, setFetching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const requestId = useRef(0)
+  const tableRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     if (!session) return
-    try { setTransactions(await getTransactions(session.accessToken)); setError(null) }
-    catch (requestError) { setError(getFriendlyApiError(requestError)) }
-    finally { setLoading(false) }
-  }, [session])
+    const id = ++requestId.current // a slower, older response must never overwrite a newer one
+    setFetching(true)
+    try {
+      const result = await getTransactionsPage(session.accessToken, { page, type: filter, month })
+      if (id !== requestId.current) return
+      setData(result); setError(null)
+    } catch (requestError) {
+      if (id !== requestId.current) return
+      setData(null); setError(getFriendlyApiError(requestError))
+    } finally {
+      if (id === requestId.current) { setLoading(false); setFetching(false) }
+    }
+  }, [session, page, filter, month])
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
     return () => window.clearTimeout(timer)
   }, [load])
 
-  const monthOptions = transactionMonthOptions(transactions)
-  const effectiveMonth = month !== 'all' && monthOptions.some(option => option.key === month) ? month : 'all'
-  const filtered = filterTransactions(transactions, filter, effectiveMonth)
-  const hasFilters = filter !== 'all' || effectiveMonth !== 'all'
+  const goToPage = (next: number) => {
+    setPage(next)
+    tableRef.current?.scrollIntoView?.({ block: 'start' })
+  }
+
+  const transactions = data?.items ?? []
+  const total = data?.total ?? 0
+  const pageSize = data?.pageSize ?? 50
+  // A valid month without movements is still selectable: it shows the empty list with "Limpiar filtros".
+  const monthOptions = data ? (month !== 'all' && !data.months.some(option => option.month === month) ? [...data.months, { month, count: 0 }].sort((a, b) => b.month.localeCompare(a.month)) : data.months) : []
+  const hasFilters = filter !== 'all' || month !== 'all'
+  const { from, to, totalPages } = pageRange(page, pageSize, total)
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const filterSuffix = hasFilters ? ' (filtro)' : ''
-  const { income, expense } = transactionTotals(filtered)
+  const { income, expense } = data?.summary ?? { income: 0, expense: 0 }
+  const periodIsEmpty = data !== null && data.months.length === 0 && !hasFilters
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
@@ -63,9 +86,9 @@ export function TransactionsPage() {
       <dl className="grid grid-cols-3 gap-2 sm:gap-3 mb-5">
         <StatCard label={`Ingresos totales${filterSuffix}`} value={formatShortCurrency(income)} tone="positive" />
         <StatCard label={`Egresos totales${filterSuffix}`} value={formatShortCurrency(expense)} tone="negative" />
-        <StatCard label={`Movimientos${filterSuffix}`} value={filtered.length} />
+        <StatCard label={`Movimientos${filterSuffix}`} value={total} />
       </dl>
-      {!loading && !error && transactions.length > 0 && <div className="rounded-xl p-4 mb-4 space-y-3" style={cardStyle}>
+      {!loading && (monthOptions.length > 0 || hasFilters) && <div className="rounded-xl p-4 mb-4 space-y-3" style={cardStyle}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label htmlFor="transaction-type-filter" className="block text-xs text-[#4e7460] mb-1">Tipo</label>
@@ -76,24 +99,25 @@ export function TransactionsPage() {
           </div>
           <div>
             <label htmlFor="transaction-month-filter" className="block text-xs text-[#4e7460] mb-1">Mes</label>
-            <select id="transaction-month-filter" value={effectiveMonth} onChange={event => setMonth(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm">
+            <select id="transaction-month-filter" value={month} onChange={event => setMonth(parseTransactionMonthFilter(event.target.value))} className="w-full px-3 py-2.5 rounded-lg text-sm">
               <option value="all">Todos los meses</option>
-              {monthOptions.map(option => <option key={option.key} value={option.key}>{`${monthText(option.key)} (${option.count})`}</option>)}
+              {monthOptions.map(option => <option key={option.month} value={option.month}>{`${monthText(option.month)} (${option.count})`}</option>)}
             </select>
           </div>
         </div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {transactions.length} movimientos</p>
+          <p className="text-xs text-[#4e7460]" aria-live="polite">{from === 0 ? `Mostrando 0 de ${total} movimientos` : `Mostrando ${from}–${to} de ${total} movimientos`}</p>
           {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
         </div>
       </div>}
       {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
       {error && !loading && <button onClick={() => { setLoading(true); void load() }} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-4">Reintentar</button>}
-      <div className={tableWrap} style={cardStyle}><div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>{[['Fecha', `${cellFirst} ${colTablet} text-left`], ['Descripción', `${cell} text-left`], ['Miembro', `${cell} ${colDesktop} text-left`], ['Tipo', `${cell} ${colTablet} text-left`], ['Valor', `${cell} text-right`], ['Acciones', `${cellLast} ${colTablet} text-right`]].map(([heading, cls]) => <th key={heading} className={`${headCell} ${cls}`}>{heading}</th>)}</tr></thead><tbody>
+      <div ref={tableRef} className={`${tableWrap} scroll-mt-4`} style={cardStyle} aria-busy={fetching}><div className={`${tableScroll} transition-opacity ${fetching && !loading ? 'opacity-60' : ''}`}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>{[['Fecha', `${cellFirst} ${colTablet} text-left`], ['Descripción', `${cell} text-left`], ['Miembro', `${cell} ${colDesktop} text-left`], ['Tipo', `${cell} ${colTablet} text-left`], ['Valor', `${cell} text-right`], ['Acciones', `${cellLast} ${colTablet} text-right`]].map(([heading, cls]) => <th key={heading} className={`${headCell} ${cls}`}>{heading}</th>)}</tr></thead><tbody>
         {loading && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando transacciones...</p></td></tr>}
-        {!loading && !error && transactions.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">No hay transacciones registradas</td></tr>}
-        {!loading && transactions.length > 0 && filtered.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p>No hay movimientos que coincidan con los filtros.</p><button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button></td></tr>}
-        {!loading && filtered.map(transaction => {
+        {!loading && !error && periodIsEmpty && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">No hay transacciones registradas</td></tr>}
+        {!loading && !error && total === 0 && hasFilters && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p>No hay movimientos que coincidan con los filtros.</p><button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button></td></tr>}
+        {!loading && !error && total > 0 && transactions.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p>Esta página no tiene movimientos.</p><button type="button" onClick={() => goToPage(1)} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Ir a la primera página</button></td></tr>}
+        {!loading && transactions.map(transaction => {
           const date = new Date(transaction.occurredAt).toLocaleDateString('es-CO')
           const typeChip = <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: typeBackground[transaction.type], color: typeColor[transaction.type] }}>{typeLabel[transaction.type]}</span>
           return <tr key={transaction.id} className="table-row">
@@ -109,7 +133,9 @@ export function TransactionsPage() {
             <td className={`${cellLast} py-3.5 ${cellActions} ${colTablet}`}><div className="flex justify-end gap-1"><button onClick={() => navigate(`/transactions/${transaction.id}`)} className={eyeButton} aria-label="Ver detalle"><Icon.Eye open /></button></div></td>
           </tr>
         })}
-      </tbody></table></div></div>
+      </tbody></table></div>
+      <Pager page={page} totalPages={totalPages} onChange={goToPage} />
+      </div>
     </div>
   )
 }

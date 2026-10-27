@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Natillera.Backend.Application.Common;
 using Natillera.Backend.Application.Transactions;
 using Natillera.Backend.Domain.Entities;
 
@@ -18,11 +19,43 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
     public Task<decimal> GetSharedInterestPoolAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
         SharedInterestPoolQuery.RawAsync(dbContext, savingPeriodId, cancellationToken);
 
-    public async Task<IReadOnlyCollection<TransactionListItem>> GetOrderedAsync(Guid savingPeriodId, CancellationToken cancellationToken = default)
+    public async Task<TransactionPageResponse> GetPageAsync(Guid savingPeriodId, TransactionListFilter filter, CancellationToken cancellationToken = default)
     {
-        return await dbContext.Transactions
-            .Where(transaction => transaction.SavingPeriodId == savingPeriodId)
+        var periodTransactions = dbContext.Transactions.AsNoTracking()
+            .Where(transaction => transaction.SavingPeriodId == savingPeriodId);
+
+        // Month options: every month of the period (not narrowed by the other filters), grouped by Colombia date (UI-06).
+        var occurred = await periodTransactions.Select(transaction => transaction.OccurredAt).ToListAsync(cancellationToken);
+        var months = occurred
+            .GroupBy(ColombiaTime.MonthKey)
+            .Select(group => new TransactionMonthCount(group.Key, group.Count()))
+            .OrderByDescending(item => item.Month, StringComparer.Ordinal)
+            .ToArray();
+
+        var filtered = periodTransactions;
+        if (filter.Type is { } type)
+            filtered = filtered.Where(transaction => transaction.Type == type);
+        if (filter.Month is { } month)
+        {
+            var (start, end) = ColombiaTime.MonthRangeUtc(month);
+            filtered = filtered.Where(transaction => transaction.OccurredAt >= start && transaction.OccurredAt < end);
+        }
+
+        var total = await filtered.CountAsync(cancellationToken);
+        var sums = await filtered
+            .Where(transaction => !transaction.IsCancelled) // FIN-06
+            .GroupBy(transaction => transaction.Direction)
+            .Select(group => new { Direction = group.Key, Sum = group.Sum(transaction => transaction.Amount) })
+            .ToListAsync(cancellationToken);
+        var summary = new TransactionSummary(
+            sums.Where(item => item.Direction == Domain.Enums.TransactionDirection.Income).Sum(item => item.Sum),
+            sums.Where(item => item.Direction == Domain.Enums.TransactionDirection.Expense).Sum(item => item.Sum));
+
+        var items = await filtered
             .OrderByDescending(transaction => transaction.OccurredAt)
+            .ThenByDescending(transaction => transaction.Id)
+            .Skip(PageRequest.Skip(filter.Page, filter.PageSize))
+            .Take(filter.PageSize)
             .Select(transaction => new TransactionListItem(
                 transaction.Id,
                 transaction.Amount,
@@ -52,6 +85,8 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
                     .FirstOrDefault(),
                 transaction.IsCancelled))
             .ToListAsync(cancellationToken);
+
+        return new TransactionPageResponse(items, total, filter.Page, filter.PageSize, summary, months);
     }
 
     public async Task<TransactionDetailResponse?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default)

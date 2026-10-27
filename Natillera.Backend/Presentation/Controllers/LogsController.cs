@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Natillera.Backend.Presentation.Filters;
 using Natillera.Backend.Application.Audit;
+using Natillera.Backend.Application.Common;
 using Natillera.Backend.Domain.Enums;
+using Natillera.Backend.Domain.Exceptions;
 
 namespace Natillera.Backend.Presentation.Controllers;
 
@@ -13,9 +15,16 @@ namespace Natillera.Backend.Presentation.Controllers;
 public sealed class LogsController(LogService logService) : ControllerBase
 {
     [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyCollection<LogListItem>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyCollection<LogListItem>>> Get(CancellationToken cancellationToken) =>
-        Ok(await logService.GetAllAsync(this.SavingPeriod(), cancellationToken));
+    [ProducesResponseType(typeof(PagedResult<LogListItem>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PagedResult<LogListItem>>> Get([FromQuery] LogListQuery query, CancellationToken cancellationToken)
+    {
+        LogListFilter filter;
+        try { filter = query.Parse(); }
+        catch (DomainException exception) { return BadRequest(new { message = exception.Message }); }
+
+        return Ok(await logService.GetPageAsync(this.SavingPeriod(), filter, cancellationToken));
+    }
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(LogDetailResponse), StatusCodes.Status200OK)]

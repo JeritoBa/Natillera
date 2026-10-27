@@ -1,65 +1,72 @@
 import { Icon } from '@/shared/ui/Icon'
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
-import { getLogs, type LogListItem } from '@/features/audit/api/logsApi'
+import { getLogsPage, type LogPage } from '@/features/audit/api/logsApi'
 import { actionBackground, actionColor, actionLabel, actions, entityBackground, entityColor, entityLabel, entityTypes } from '@/features/audit/model/labels'
 import { parseLogActionFilter, parseLogDateFilter, parseLogEntityFilter } from '@/features/audit/model/logFilters'
 import { getFriendlyApiError } from '@/shared/api/apiError'
-import { useClearUrlParams, useUrlParam, useUrlTextParam } from '@/shared/lib/useUrlFilter'
+import { pageRange } from '@/shared/lib/pagination'
+import { useClearUrlParams, useUrlPage, useUrlParam, useUrlTextParam } from '@/shared/lib/useUrlFilter'
 import { formatCurrency } from '@/shared/lib/formatters'
-import { normalizeSearch } from '@/shared/lib/search'
+import { Pager } from '@/shared/ui/Pager'
 import { cell, cellActions, cellFirst, cellLast, cellMain, colDesktop, colTablet, eyeButton, headCell, subMobile, subTablet, tableCardStyle, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
-const filterKeys = ['q', 'entity', 'action', 'from', 'to'] as const
+const filterKeys = ['q', 'entity', 'action', 'from', 'to', 'page'] as const
 const money = (value: number | null) => value === null ? '—' : formatCurrency(value)
 
 export function LogsPage() {
   const { session } = useAuth()
   const { selected } = useSavingPeriod()
   const navigate = useNavigate()
-  const [logs, setLogs] = useState<LogListItem[]>([])
-  // UI-15: the filters live in the URL (the search text is debounced).
-  const [search, setSearch, resetSearch] = useUrlTextParam('q')
-  const [entity, setEntity] = useUrlParam('entity', parseLogEntityFilter, 'all')
-  const [action, setAction] = useUrlParam('action', parseLogActionFilter, 'all')
-  const [from, setFrom] = useUrlParam('from', parseLogDateFilter, '')
-  const [to, setTo] = useUrlParam('to', parseLogDateFilter, '')
+  const [data, setData] = useState<LogPage | null>(null)
+  // UI-15 / UI-17: the filters and the page live in the URL (the search text is debounced); changing a filter returns to page 1 in the same update.
+  const [search, setSearch, resetSearch] = useUrlTextParam('q', 300, true)
+  const [entity, setEntity] = useUrlParam('entity', parseLogEntityFilter, 'all', true)
+  const [action, setAction] = useUrlParam('action', parseLogActionFilter, 'all', true)
+  const [from, setFrom] = useUrlParam('from', parseLogDateFilter, '', true)
+  const [to, setTo] = useUrlParam('to', parseLogDateFilter, '', true)
+  const [page, setPage] = useUrlPage()
+  const [searchParams] = useSearchParams()
+  const urlSearch = searchParams.get('q') ?? '' // the debounced text: the one the server is asked for
   const clearUrlFilters = useClearUrlParams(filterKeys)
   const [loading, setLoading] = useState(true)
+  const [fetching, setFetching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const requestId = useRef(0)
+  const tableRef = useRef<HTMLDivElement>(null)
+
+  const load = useCallback(async () => {
+    if (!session) return
+    const id = ++requestId.current // a slower, older response must never overwrite a newer one
+    setFetching(true)
+    try {
+      const result = await getLogsPage(session.accessToken, { page, q: urlSearch, entity, action, from, to })
+      if (id !== requestId.current) return
+      setData(result); setError(null)
+    } catch (requestError) {
+      if (id !== requestId.current) return
+      setData(null); setError(getFriendlyApiError(requestError))
+    } finally {
+      if (id === requestId.current) { setLoading(false); setFetching(false) }
+    }
+  }, [session, page, urlSearch, entity, action, from, to])
 
   useEffect(() => {
-    if (!session) return
-    const load = async () => {
-      try { setLogs(await getLogs(session.accessToken)) }
-      catch (requestError) { setError(getFriendlyApiError(requestError)) }
-      finally { setLoading(false) }
-    }
-    void load()
-  }, [session])
+    const timer = window.setTimeout(() => { void load() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
 
-  const filtered = useMemo(() => {
-    const fromDate = from ? new Date(`${from}T00:00:00`) : null
-    const toDate = to ? new Date(`${to}T23:59:59.999`) : null
-    const term = normalizeSearch(search.trim())
-    return logs.filter(log => {
-      if (entity !== 'all' && log.entityType !== entity) return false
-      if (action !== 'all' && log.action !== action) return false
-      const occurred = new Date(log.occurredAt)
-      if (fromDate && occurred < fromDate) return false
-      if (toDate && occurred > toDate) return false
-      if (!term) return true
-      const haystack = normalizeSearch([
-        log.userName, entityLabel[log.entityType], log.entityType, actionLabel[log.action], log.action, log.entityId,
-        log.oldValue ?? '', log.newValue ?? '', log.oldValue !== null ? money(log.oldValue) : '', log.newValue !== null ? money(log.newValue) : '',
-      ].join(' '))
-      return haystack.includes(term)
-    })
-  }, [logs, entity, action, from, to, search])
+  const goToPage = (next: number) => {
+    setPage(next)
+    tableRef.current?.scrollIntoView?.({ block: 'start' })
+  }
 
-  const hasFilters = entity !== 'all' || action !== 'all' || from !== '' || to !== '' || search !== ''
+  const logs = data?.items ?? []
+  const total = data?.total ?? 0
+  const { from: rangeFrom, to: rangeTo, totalPages } = pageRange(page, data?.pageSize ?? 50, total)
+  const hasFilters = entity !== 'all' || action !== 'all' || from !== '' || to !== '' || search !== '' || urlSearch !== ''
   const clearFilters = () => { resetSearch(); clearUrlFilters() }
   const label = 'block text-xs text-[#4e7460] mb-1'
 
@@ -74,14 +81,15 @@ export function LogsPage() {
           <div><label className={label}>Desde</label><input type="date" value={from} max={to || undefined} onChange={event => setFrom(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
           <div><label className={label}>Hasta</label><input type="date" value={to} min={from || undefined} onChange={event => setTo(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         </div>
-        <div className="flex items-center justify-between"><p className="text-xs text-[#4e7460]">{filtered.length} de {logs.length} registros</p>{hasFilters && <button onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs font-medium">Limpiar filtros</button>}</div>
+        <div className="flex items-center justify-between gap-3 flex-wrap"><p className="text-xs text-[#4e7460]" aria-live="polite">{rangeFrom === 0 ? `Mostrando 0 de ${total} registros` : `Mostrando ${rangeFrom}–${rangeTo} de ${total} registros`}</p>{hasFilters && <button onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs font-medium">Limpiar filtros</button>}</div>
       </div>
       {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
-      <div className={tableWrap} style={tableCardStyle}><div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>{[['Fecha', `${cellFirst} ${colTablet} text-left`], ['Acción', `${cell} ${colDesktop} text-left`], ['Entidad', `${cell} text-left`], ['Usuario', `${cell} ${colDesktop} text-left`], ['Valor anterior → nuevo', `${cell} ${colTablet} text-right`], ['Acciones', `${cellLast} ${colTablet} text-right`]].map(([heading, cls]) => <th key={heading} className={`${headCell} ${cls}`}>{heading}</th>)}</tr></thead><tbody>
+      <div ref={tableRef} className={`${tableWrap} scroll-mt-4`} style={tableCardStyle} aria-busy={fetching}><div className={`${tableScroll} transition-opacity ${fetching && !loading ? 'opacity-60' : ''}`}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>{[['Fecha', `${cellFirst} ${colTablet} text-left`], ['Acción', `${cell} ${colDesktop} text-left`], ['Entidad', `${cell} text-left`], ['Usuario', `${cell} ${colDesktop} text-left`], ['Valor anterior → nuevo', `${cell} ${colTablet} text-right`], ['Acciones', `${cellLast} ${colTablet} text-right`]].map(([heading, cls]) => <th key={heading} className={`${headCell} ${cls}`}>{heading}</th>)}</tr></thead><tbody>
         {loading && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">Cargando logs...</td></tr>}
-        {!loading && !error && logs.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">No hay logs registrados</td></tr>}
-        {!loading && logs.length > 0 && filtered.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">No hay resultados para los filtros aplicados</td></tr>}
-        {!loading && filtered.map(log => <tr key={log.id} className="table-row">
+        {!loading && !error && total === 0 && !hasFilters && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">No hay logs registrados</td></tr>}
+        {!loading && !error && total === 0 && hasFilters && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p>No hay resultados para los filtros aplicados</p><button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button></td></tr>}
+        {!loading && !error && total > 0 && logs.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p>Esta página no tiene registros.</p><button type="button" onClick={() => goToPage(1)} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Ir a la primera página</button></td></tr>}
+        {!loading && logs.map(log => <tr key={log.id} className="table-row">
           <td className={`${cellFirst} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap ${colTablet}`}>{new Date(log.occurredAt).toLocaleDateString('es-CO')}</td>
           <td className={`${cell} py-3.5 ${colDesktop}`}><span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold" style={{ background: actionBackground[log.action], color: actionColor[log.action] }}>{actionLabel[log.action]}</span></td>
           <td className={`${cell} py-3.5 ${cellMain} sm:pl-4`}>
@@ -94,7 +102,9 @@ export function LogsPage() {
           <td className={`${cell} py-3.5 text-right mono text-sm text-[#0c1a12] whitespace-nowrap ${colTablet}`}>{money(log.oldValue)} → {money(log.newValue)}</td>
           <td className={`${cellLast} py-3.5 ${cellActions} ${colTablet}`}><div className="flex justify-end gap-1"><button onClick={() => navigate(`/logs/${log.id}`)} className={eyeButton} aria-label="Ver detalle"><Icon.Eye open /></button></div></td>
         </tr>)}
-      </tbody></table></div></div>
+      </tbody></table></div>
+      <Pager page={page} totalPages={totalPages} onChange={goToPage} />
+      </div>
     </div>
   )
 }

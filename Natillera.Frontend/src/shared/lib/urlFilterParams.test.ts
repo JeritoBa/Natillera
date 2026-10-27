@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseIdParam, parseIsoDate, parseMonthKey, parseOneOf, syncTextDraft, withParam, withoutParams } from './urlFilterParams'
+import { parseIdParam, parseIsoDate, parseMonthKey, parseOneOf, syncTextDraft, withFilterParam, withParam, withoutParams } from './urlFilterParams'
 
 // UI-15
 describe('withParam', () => {
@@ -85,5 +85,22 @@ describe('syncTextDraft', () => {
   it('adopts the URL when it changes on its own', () => {
     expect(syncTextDraft({ text: 'ana', synced: 'ana' }, 'luis')).toEqual({ text: 'luis', synced: 'luis' })
     expect(syncTextDraft({ text: 'ana', synced: 'ana' }, '')).toEqual({ text: '', synced: '' })
+  })
+})
+
+// UI-17
+describe('withFilterParam', () => {
+  it('sets the filter and removes page in the same update', () => {
+    expect(withFilterParam(new URLSearchParams('type=Loan&page=3'), 'month', '2026-03', 'all').toString()).toBe('type=Loan&month=2026-03')
+  })
+
+  it('removes page when the filter goes back to its default', () => {
+    expect(withFilterParam(new URLSearchParams('month=2026-03&page=2'), 'month', 'all', 'all').toString()).toBe('')
+  })
+
+  it('keeps the other filters and does not mutate the current params', () => {
+    const current = new URLSearchParams('q=ana&page=2')
+    expect(withFilterParam(current, 'entity', 'Loan', 'all').toString()).toBe('q=ana&entity=Loan')
+    expect(current.toString()).toBe('q=ana&page=2')
   })
 })

@@ -14,8 +14,34 @@ export interface RealTransaction {
   isCancelled: boolean
 }
 
-export const getTransactions = (token: string) =>
-  apiRequest<RealTransaction[]>('/api/transactions', { token })
+// TX-03: one server-side page of the period transactions, with the totals of the whole filtered set.
+export interface TransactionPage {
+  items: RealTransaction[]
+  total: number
+  page: number
+  pageSize: number
+  summary: { income: number, expense: number }
+  months: { month: string, count: number }[]
+}
+
+export interface TransactionPageQuery {
+  page: number
+  type: 'all' | TransactionType
+  month: 'all' | string
+}
+
+// Default values are omitted (the server defaults: page 1, no type, no month, page size 50).
+export function buildTransactionQuery({ page, type, month }: TransactionPageQuery): string {
+  const params = new URLSearchParams()
+  if (page > 1) params.set('page', String(page))
+  if (type !== 'all') params.set('type', type)
+  if (month !== 'all') params.set('month', month)
+  const text = params.toString()
+  return text ? `?${text}` : ''
+}
+
+export const getTransactionsPage = (token: string, query: TransactionPageQuery) =>
+  apiRequest<TransactionPage>(`/api/transactions${buildTransactionQuery(query)}`, { token })
 
 export interface TransactionSourceDetail {
   entity: string

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Natillera.Backend.Presentation.Filters;
 using Natillera.Backend.Application.Transactions;
+using Natillera.Backend.Domain.Exceptions;
 
 namespace Natillera.Backend.Presentation.Controllers;
 
@@ -12,9 +13,16 @@ namespace Natillera.Backend.Presentation.Controllers;
 public sealed class TransactionsController(TransactionService transactionService) : ControllerBase
 {
     [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyCollection<TransactionListItem>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyCollection<TransactionListItem>>> Get(CancellationToken cancellationToken) =>
-        Ok(await transactionService.GetOrderedAsync(this.SavingPeriod(), cancellationToken));
+    [ProducesResponseType(typeof(TransactionPageResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<TransactionPageResponse>> Get([FromQuery] TransactionListQuery query, CancellationToken cancellationToken)
+    {
+        TransactionListFilter filter;
+        try { filter = query.Parse(); }
+        catch (DomainException exception) { return BadRequest(new { message = exception.Message }); }
+
+        return Ok(await transactionService.GetPageAsync(this.SavingPeriod(), filter, cancellationToken));
+    }
 
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(TransactionDetailResponse), StatusCodes.Status200OK)]

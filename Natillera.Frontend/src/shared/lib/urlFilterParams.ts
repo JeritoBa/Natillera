@@ -8,6 +8,12 @@ export function withParam(current: URLSearchParams, key: string, value: string, 
   return next
 }
 
+// UI-17: changing a filter returns the list to page 1 IN THE SAME URL update (two setSearchParams calls in one tick overwrite each other).
+export const PAGE_PARAM = 'page'
+export function withFilterParam(current: URLSearchParams, key: string, value: string, defaultValue: string): URLSearchParams {
+  return withoutParams(withParam(current, key, value, defaultValue), [PAGE_PARAM])
+}
+
 export function withoutParams(current: URLSearchParams, keys: readonly string[]): URLSearchParams {
   const next = new URLSearchParams(current)
   for (const key of keys) next.delete(key)
