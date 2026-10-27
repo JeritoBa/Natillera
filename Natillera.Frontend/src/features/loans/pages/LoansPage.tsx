@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
@@ -6,11 +6,14 @@ import { defaultDateForPeriod, isDateInPeriodYear, periodDateBounds } from '@/fe
 import { cancelLoan, createLoan, getLoans, updateLoan, type LoanListItem } from '@/features/loans/api/loansApi'
 import { descriptionCounterState, isLoanDescriptionValid, LOAN_DESCRIPTION_MAX_LENGTH, normalizeLoanDescription } from '@/features/loans/model/loanDescription'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
+import { loanCancelConsequences } from '@/features/loans/model/cancelConfirm'
 import { countLoansByStatus, filterLoans, loanBorrowerOptions, loanStartMonth, parseLoanStatusFilter, type LoanStatusFilter } from '@/features/loans/model/loanFilters'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
+import { ConfirmSummary } from '@/shared/ui/ConfirmSummary'
 import { Icon } from '@/shared/ui/Icon'
 import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
@@ -42,6 +45,9 @@ export function LoansPage() {
   const [submitCount, setSubmitCount] = useState(0)
   const [month, setMonth] = useState<'all' | string>('all')
   const [search, setSearch] = useState('')
+  const [confirmTarget, setConfirmTarget] = useState<LoanListItem | null>(null)
+  const [focusSuccess, setFocusSuccess] = useState(0)
+  const successRef = useRef<HTMLParagraphElement>(null)
   // Spec 021: ?borrower=<userId>&status=Active are read once on load; the URL is not written back.
   const [borrowerFilter, setBorrowerFilter] = useState<'all' | string>(() => searchParams.get('borrower') ?? 'all')
   const [statusFilter, setStatusFilter] = useState<LoanStatusFilter>(() => parseLoanStatusFilter(searchParams.get('status')))
@@ -52,6 +58,9 @@ export function LoansPage() {
     catch (requestError) { setError(getFriendlyApiError(requestError)) }
     finally { setLoading(false) }
   }, [session])
+
+  // UI-13: after a cancellation the trigger button disappears, so the focus moves to the success banner.
+  useEffect(() => { if (focusSuccess > 0) successRef.current?.focus() }, [focusSuccess])
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
@@ -93,14 +102,14 @@ export function LoansPage() {
     finally { setSaving(false) }
   }
 
-  const cancel = async (loan: LoanListItem) => {
+  // UI-13: errors propagate to the confirmation dialog.
+  const confirmCancel = async (loan: LoanListItem) => {
     if (!session) return
-    setSuccess(null); setError(null)
-    try {
-      await cancelLoan(session.accessToken, loan.id)
-      setSuccess('El préstamo se anuló correctamente.')
-      await load()
-    } catch (requestError) { setError(getFriendlyApiError(requestError)) }
+    await cancelLoan(session.accessToken, loan.id)
+    setConfirmTarget(null)
+    setSuccess('El préstamo se anuló correctamente.')
+    setFocusSuccess(count => count + 1)
+    await load()
   }
 
   const borrowers = members.filter(member => editing ? member.isActive || member.id === editing.borrowerId : member.isActive)
@@ -132,7 +141,7 @@ export function LoansPage() {
         <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Préstamos</h1><p className="text-[#4e7460] text-sm">{canManage ? 'Gestiona los créditos internos de la natillera' : 'Créditos internos de la natillera'}{selected ? ` · Periodo ${selected.year}` : ''}</p></div>
         {canManage && <button onClick={openCreate} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Nuevo préstamo</button>}
       </div>
-      {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
+      {success && !isDemo && <p ref={successRef} tabIndex={-1} role="status" className="mb-4 outline-none rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
       {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
       {error && loans.length === 0 && !loading && <button onClick={() => { setLoading(true); void load() }} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3 mb-4">Reintentar</button>}
       {!loading && !error && loans.length > 0 && <div className="rounded-xl p-4 mb-4 space-y-3" style={cardStyle}>
@@ -190,7 +199,7 @@ export function LoansPage() {
               <button onClick={() => navigate(`/loans/${loan.id}`)} className={eyeButton} aria-label={`Ver préstamo de ${loan.borrowerName}`}><Icon.Eye open /></button>
               {canManage && loan.status === 'Active' && loan.outstandingPrincipal === loan.initialAmount && <>
                 <button onClick={() => openEdit(loan)} className={iconButton} aria-label={`Editar préstamo de ${loan.borrowerName}`}><Icon.Edit /></button>
-                <button onClick={() => { if (window.confirm(`¿Anular el préstamo de ${loan.borrowerName} por ${formatCurrency(loan.initialAmount)}? El préstamo y su desembolso quedarán anulados.`)) void cancel(loan) }} className={dangerButton} aria-label={`Anular préstamo de ${loan.borrowerName}`}><Icon.Trash /></button>
+                <button onClick={() => { setSuccess(null); setError(null); setConfirmTarget(loan) }} className={dangerButton} aria-label={`Anular préstamo de ${loan.borrowerName}`}><Icon.Trash /></button>
               </>}
             </div></td>
           </tr>)}
@@ -213,6 +222,8 @@ export function LoansPage() {
         <FormError message={modalError} revision={submitCount} />
         <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
       </form></Modal>}
+      {confirmTarget && <ConfirmDialog title="Anular préstamo" confirmLabel="Anular préstamo" consequences={loanCancelConsequences()} onClose={() => setConfirmTarget(null)} onConfirm={() => confirmCancel(confirmTarget)}
+        summary={<ConfirmSummary title={confirmTarget.borrowerName} detail={`Inicia ${formatDateOnly(confirmTarget.startDate)}`} amount={formatCurrency(confirmTarget.initialAmount)} status={confirmTarget.status.toLowerCase()} />} />}
     </div>
   )
 }

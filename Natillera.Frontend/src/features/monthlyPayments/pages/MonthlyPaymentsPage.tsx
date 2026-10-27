@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { formatDateOnly } from '@/features/loans/model/labels'
@@ -6,11 +6,14 @@ import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { cancelMonthlyPayment, createMonthlyPayment, getMonthlyPayments, updateMonthlyPayment, type MonthlyPaymentResponse } from '@/features/monthlyPayments/api/monthlyPaymentsApi'
 import { getAvailableMonths, resolveSelectedMonth } from '@/features/monthlyPayments/model/availableMonths'
+import { feeCancelConsequences } from '@/features/monthlyPayments/model/cancelConfirm'
 import { countPaymentsByStatus, filterPayments, paymentMemberOptions, paymentMonthOptions, type PaymentStatusFilter } from '@/features/monthlyPayments/model/paymentFilters'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth, formatShortCurrency } from '@/shared/lib/formatters'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { Badge } from '@/shared/ui/Badge'
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
+import { ConfirmSummary } from '@/shared/ui/ConfirmSummary'
 import { Icon } from '@/shared/ui/Icon'
 import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
@@ -49,7 +52,9 @@ export function MonthlyPaymentsPage() {
   const [submitCount, setSubmitCount] = useState(0)
   const [listLoading, setListLoading] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<MonthlyPaymentRow | null>(null)
+  const [focusSuccess, setFocusSuccess] = useState(0)
+  const successRef = useRef<HTMLParagraphElement>(null)
   const [modalError, setModalError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   // Initial filters come from the URL (e.g. the pending fee links) and are read once, not written back.
@@ -83,11 +88,11 @@ export function MonthlyPaymentsPage() {
   }, [load])
 
   const openCreate = () => {
-    setEditing(null); setMemberId(activeMembers[0]?.id ?? ''); setMonth(new Date().getMonth() + 1); setAmount(''); setStatus('Paid'); setError(null); setModalError(null); setSuccess(null); setModalOpen(true)
+    setEditing(null); setMemberId(activeMembers[0]?.id ?? ''); setMonth(new Date().getMonth() + 1); setAmount(''); setStatus('Paid'); setModalError(null); setSuccess(null); setModalOpen(true)
   }
 
   const openEdit = (payment: MonthlyPaymentRow) => {
-    setEditing(payment); setMemberId(payment.userId); setMonth(payment.monthNumber); setAmount(toMoneyInputValue(payment.amount)); setStatus(payment.status === 'paid' ? 'Paid' : 'Pending'); setError(null); setModalError(null); setSuccess(null); setModalOpen(true)
+    setEditing(payment); setMemberId(payment.userId); setMonth(payment.monthNumber); setAmount(toMoneyInputValue(payment.amount)); setStatus(payment.status === 'paid' ? 'Paid' : 'Pending'); setModalError(null); setSuccess(null); setModalOpen(true)
   }
 
   const save = async () => {
@@ -110,15 +115,18 @@ export function MonthlyPaymentsPage() {
     finally { setSaving(false) }
   }
 
-  const cancel = async (payment: MonthlyPaymentRow) => {
-    if (!session || !window.confirm('¿Anular esta cuota? La cuota quedará anulada.')) return
-    setError(null); setSuccess(null)
-    try {
-      await cancelMonthlyPayment(session.accessToken, payment.backendId)
-      await load()
-      setSuccess('La cuota mensual se anuló correctamente.')
-    } catch (requestError) { setError(getFriendlyApiError(requestError)) }
+  // UI-13: errors propagate to the confirmation dialog.
+  const confirmCancel = async (payment: MonthlyPaymentRow) => {
+    if (!session) return
+    await cancelMonthlyPayment(session.accessToken, payment.backendId)
+    setConfirmTarget(null)
+    setSuccess('La cuota mensual se anuló correctamente.')
+    setFocusSuccess(count => count + 1)
+    await load()
   }
+
+  // UI-13: after a cancellation the trigger button disappears, so the focus moves to the success banner.
+  useEffect(() => { if (focusSuccess > 0) successRef.current?.focus() }, [focusSuccess])
 
   const isAdmin = session?.user.role === 'Admin'
   // MP-09: Members only receive Paid fees, so the status filter is Admin only.
@@ -144,7 +152,7 @@ export function MonthlyPaymentsPage() {
         <StatCard label={`Cuotas pagadas${filterSuffix}`} value={paid.length} />
         <StatCard label={`Cuotas vigentes${filterSuffix}`} value={actual.length} />
       </dl>
-      {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}{(listError ?? error) && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{listError ?? error}</p>}{listError && !listLoading && <button onClick={() => { setListLoading(true); void load() }} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3 mb-4">Reintentar</button>}
+      {success && !isDemo && <p ref={successRef} tabIndex={-1} role="status" className="mb-4 outline-none rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}{listError && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{listError}</p>}{listError && !listLoading && <button onClick={() => { setListLoading(true); void load() }} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3 mb-4">Reintentar</button>}
       {!listLoading && !listError && payments.length > 0 && <div className="rounded-xl p-4 mb-4 space-y-3" style={cardStyle}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -185,10 +193,12 @@ export function MonthlyPaymentsPage() {
           <td className={`${cell} px-2 sm:px-4 py-3.5 ${cellAmount} text-sm text-[#0c1a12]`}>{formatCurrency(payment.amount)}</td>
           <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{payment.paidDate ? formatDateOnly(payment.paidDate) : '—'}</td>
           <td className={`${cell} ${colTablet} py-3.5`}><Badge status={payment.status} /></td>
-          {isAdmin && <td className={`${cellLast} py-3.5 pl-1 ${cellActions}`}>{payment.status !== 'cancelled' && <div className="flex justify-end"><button onClick={() => openEdit(payment)} className={iconButton} aria-label="Editar cuota"><Icon.Edit /></button><button onClick={() => void cancel(payment)} className={dangerButton} aria-label="Anular cuota"><Icon.Trash /></button></div>}</td>}
+          {isAdmin && <td className={`${cellLast} py-3.5 pl-1 ${cellActions}`}>{payment.status !== 'cancelled' && <div className="flex justify-end"><button onClick={() => openEdit(payment)} className={iconButton} aria-label="Editar cuota"><Icon.Edit /></button><button onClick={() => { setSuccess(null); setConfirmTarget(payment) }} className={dangerButton} aria-label="Anular cuota"><Icon.Trash /></button></div>}</td>}
         </tr>)}
       </tbody></table></div></div>
       {modalOpen && <Modal title={editing ? 'Editar cuota mensual' : 'Nueva cuota mensual'} onClose={() => !saving && setModalOpen(false)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4"><div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><select value={memberId} onChange={event => setMemberId(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un miembro</option>{members.filter(member => editing ? true : member.isActive).map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div><div><label htmlFor="payment-month" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Mes</label><select id="payment-month" aria-describedby="payment-month-help" value={selectedMonth ?? ''} onChange={event => setMonth(Number(event.target.value))} disabled={!memberId || availableMonths.length === 0} className="w-full px-3 py-2.5 rounded-lg text-sm">{!memberId ? <option value="">Primero elige un miembro</option> : availableMonths.length === 0 ? <option value="">Sin meses disponibles</option> : availableMonths.map(value => <option key={value} value={value}>{formatMonth(value)}</option>)}</select><p className="text-xs text-[#4e7460] mt-1.5">Se registra en el periodo <strong>{year}</strong>.</p></div><p id="payment-month-help" aria-live="polite" className="text-xs text-[#4e7460] -mt-2">{!memberId ? '' : availableMonths.length === 0 ? `${memberName} ya tiene cuota en todos los meses de ${year}. Para otro año, cambia el periodo en Configuración.` : `Solo se muestran los meses de ${year} en que ${memberName} no tiene cuota.`}</p><div><label htmlFor="payment-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto</label><MoneyInput id="payment-amount" value={amount} onChange={setAmount} placeholder="50000" /></div><StatusRadioGroup name="payment-status" legend="Estado" value={status} onChange={setStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja', disabled: editing?.status === 'paid' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} note={editing?.status === 'paid' ? 'Una cuota pagada no puede volver a pendiente.' : undefined} /><FormError message={modalError} revision={submitCount} /><div className="flex gap-3 pt-1"><button type="button" onClick={() => setModalOpen(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : editing ? 'Actualizar cuota' : 'Guardar cuota'}</button></div></form></Modal>}
+      {confirmTarget && <ConfirmDialog title="Anular cuota" confirmLabel="Anular cuota" consequences={feeCancelConsequences()} onClose={() => setConfirmTarget(null)} onConfirm={() => confirmCancel(confirmTarget)}
+        summary={<ConfirmSummary title={confirmTarget.member} detail={confirmTarget.month} amount={formatCurrency(confirmTarget.amount)} status={confirmTarget.status} />} />}
     </div>
   )
 }

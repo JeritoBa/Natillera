@@ -5,6 +5,7 @@ import {
   cancelActivityAssignment, cancelExtraCost, createActivityAssignment, createExtraCost, getActivityDetail, updateActivityAssignment, updateExtraCost,
   type ActivityAssignmentResponse, type ActivityDetail, type ExtraCost,
 } from '@/features/activities/api/activitiesApi'
+import { assignmentCancelConsequences, extraCostCancelConsequences } from '@/features/activities/model/cancelConfirm'
 import { getActivitySummary } from '@/features/activities/model/activitySummary'
 import { EXTRA_COST_DESCRIPTION_MAX_LENGTH, extraCostCounterState, extraCostTotals, sortExtraCosts, validateExtraCostForm } from '@/features/activities/model/extraCosts'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -13,6 +14,8 @@ import { ApiError, getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { Badge } from '@/shared/ui/Badge'
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
+import { ConfirmSummary } from '@/shared/ui/ConfirmSummary'
 import { Icon } from '@/shared/ui/Icon'
 import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
@@ -54,6 +57,9 @@ export function ActivityDetailPage() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [submitCount, setSubmitCount] = useState(0)
+  const [confirmTarget, setConfirmTarget] = useState<{ kind: 'cost', cost: ExtraCost } | { kind: 'assignment', assignment: ActivityAssignmentResponse } | null>(null)
+  const [focusSuccess, setFocusSuccess] = useState(0)
+  const successRef = useRef<HTMLParagraphElement>(null)
   const [costModal, setCostModal] = useState(false)
   const [editingCost, setEditingCost] = useState<ExtraCost | null>(null)
   const [costDescription, setCostDescription] = useState('')
@@ -88,6 +94,9 @@ export function ActivityDetailPage() {
       if (current === requestId.current) setActionError(getFriendlyApiError(requestError))
     }
   }, [id, session])
+
+  // UI-13: after a cancellation the trigger button disappears, so the focus moves to the success banner.
+  useEffect(() => { if (focusSuccess > 0) successRef.current?.focus() }, [focusSuccess])
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
@@ -152,15 +161,6 @@ export function ActivityDetailPage() {
     } catch (requestError) { setModalError(getFriendlyApiError(requestError)) }
     finally { setSaving(false) }
   }
-  const cancel = async (assignment: ActivityAssignmentResponse) => {
-    if (!session) return
-    setSuccess(null); setActionError(null)
-    try {
-      await cancelActivityAssignment(session.accessToken, activity.id, assignment.id)
-      setSuccess('La asignación se anuló correctamente.')
-      await refresh()
-    } catch (requestError) { setActionError(getFriendlyApiError(requestError)) }
-  }
 
   const extraCosts = activity.extraCosts ?? []
   const sortedCosts = sortExtraCosts(extraCosts)
@@ -192,18 +192,16 @@ export function ActivityDetailPage() {
     } catch (requestError) { setCostError(getFriendlyApiError(requestError)) }
     finally { setSaving(false) }
   }
-  const cancelCost = async (cost: ExtraCost) => {
-    if (!session) return
-    setSuccess(null); setActionError(null)
-    try {
-      await cancelExtraCost(session.accessToken, activity.id, cost.id)
-      setSuccess('El costo extra se anuló correctamente.')
-      await refresh()
-    } catch (requestError) { setActionError(getFriendlyApiError(requestError)) }
+  // UI-13: errors propagate to the confirmation dialog.
+  const confirmCancel = async () => {
+    if (!session || !confirmTarget) return
+    if (confirmTarget.kind === 'cost') await cancelExtraCost(session.accessToken, activity.id, confirmTarget.cost.id)
+    else await cancelActivityAssignment(session.accessToken, activity.id, confirmTarget.assignment.id)
+    setConfirmTarget(null)
+    setSuccess(confirmTarget.kind === 'cost' ? 'El costo extra se anuló correctamente.' : 'La asignación se anuló correctamente.')
+    setFocusSuccess(count => count + 1)
+    await refresh()
   }
-  const costConfirmMessage = (cost: ExtraCost) => cost.status === 'Paid'
-    ? `¿Anular el costo extra «${cost.description}»? El costo y su egreso quedarán anulados y se devolverá a los intereses que se reparten.`
-    : `¿Anular el costo extra «${cost.description}»? Quedará anulado.`
 
   const info: [string, ReactNode][] = [
     ['Nombre', activity.name], ['Descripción', activity.description], ['Fecha de inicio', longDate(activity.startDate)], ['Estado', <Badge status={activity.status.toLowerCase()} />],
@@ -216,10 +214,6 @@ export function ActivityDetailPage() {
     ['Ganancia bruta', isCancelled ? '—' : `${summary.gross < 0 ? '−' : ''}${formatCurrency(summary.gross)}`, isCancelled ? 'No aplica: actividad anulada' : 'Margen de las unidades vendidas y pagadas'],
     ['Recaudado', formatCurrency(summary.collected), `${summary.paidCount} asignaciones pagadas`],
   ]
-  const confirmMessage = (assignment: ActivityAssignmentResponse) => assignment.status === 'Paid'
-    ? `¿Anular la asignación pagada de ${assignment.memberName}? La asignación y su ingreso quedarán anulados.`
-    : `¿Anular la asignación de ${assignment.memberName}? La asignación quedará anulada.`
-
   return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
     {back}
     <div className="mb-7">
@@ -230,7 +224,7 @@ export function ActivityDetailPage() {
       <p className="text-[#4e7460] text-sm mt-0.5">Inicia el {longDate(activity.startDate)}</p>
       {isCancelled && <p role="status" className="mt-3 rounded-lg border border-[#d6e8dc] bg-[#eef4f0] px-3 py-2.5 text-sm text-[#4e7460]">Esta actividad está anulada. Su costo ya no cuenta como egreso y no admite cambios.</p>}
     </div>
-    {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
+    {success && !isDemo && <p ref={successRef} tabIndex={-1} role="status" className="mb-4 outline-none rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
     {actionError && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{actionError}</p>}
 
     <div className="flex flex-col gap-4 lg:gap-5">
@@ -295,7 +289,7 @@ export function ActivityDetailPage() {
                 <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{shortDate(cost.paidAt ?? cost.createdAt)}</td>
                 {canManage && <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
                   {!isCancelled && !cancelledCost && <button onClick={() => openCostModal(cost)} className={iconButton} aria-label={`Editar costo extra «${cost.description}»`}><Icon.Edit /></button>}
-                  {!isCancelled && !cancelledCost && <button onClick={() => { if (window.confirm(costConfirmMessage(cost))) void cancelCost(cost) }} className={dangerButton} aria-label={`Anular costo extra «${cost.description}»`}><Icon.Trash /></button>}
+                  {!isCancelled && !cancelledCost && <button onClick={() => { setSuccess(null); setActionError(null); setConfirmTarget({ kind: 'cost', cost }) }} className={dangerButton} aria-label={`Anular costo extra «${cost.description}»`}><Icon.Trash /></button>}
                 </div></td>}
               </tr>
             })}
@@ -330,7 +324,7 @@ export function ActivityDetailPage() {
               <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
                 <button onClick={() => navigate(`/activities/${activity.id}/assignments/${assignment.id}`)} className={eyeButton} aria-label={`Ver asignación de ${assignment.memberName}`}><Icon.Eye open /></button>
                 {canManage && !isCancelled && assignment.status === 'Pending' && <button onClick={() => openModal(assignment)} className={iconButton} aria-label={`Editar asignación de ${assignment.memberName}`}><Icon.Edit /></button>}
-                {canManage && !isCancelled && assignment.status !== 'Cancelled' && <button onClick={() => { if (window.confirm(confirmMessage(assignment))) void cancel(assignment) }} className={dangerButton} aria-label={`Anular asignación de ${assignment.memberName}`}><Icon.Trash /></button>}
+                {canManage && !isCancelled && assignment.status !== 'Cancelled' && <button onClick={() => { setSuccess(null); setActionError(null); setConfirmTarget({ kind: 'assignment', assignment }) }} className={dangerButton} aria-label={`Anular asignación de ${assignment.memberName}`}><Icon.Trash /></button>}
               </div></td>
             </tr>)}
           </tbody></table></div>}
@@ -371,5 +365,9 @@ export function ActivityDetailPage() {
       <FormError message={modalError} revision={submitCount} />
       <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
     </form></Modal>}
+    {confirmTarget?.kind === 'cost' && <ConfirmDialog title="Anular costo extra" confirmLabel="Anular costo extra" consequences={extraCostCancelConsequences(confirmTarget.cost.status)} onClose={() => setConfirmTarget(null)} onConfirm={confirmCancel}
+      summary={<ConfirmSummary title={confirmTarget.cost.description} detail={shortDate(confirmTarget.cost.paidAt ?? confirmTarget.cost.createdAt)} amount={formatCurrency(confirmTarget.cost.amount)} status={confirmTarget.cost.status.toLowerCase()} />} />}
+    {confirmTarget?.kind === 'assignment' && <ConfirmDialog title="Anular asignación" confirmLabel="Anular asignación" consequences={assignmentCancelConsequences(confirmTarget.assignment.status)} onClose={() => setConfirmTarget(null)} onConfirm={confirmCancel}
+      summary={<ConfirmSummary title={confirmTarget.assignment.memberName} detail={`${confirmTarget.assignment.quantityAssigned} u.`} amount={formatCurrency(confirmTarget.assignment.saleAmount)} status={confirmTarget.assignment.status.toLowerCase()} />} />}
   </div>
 }

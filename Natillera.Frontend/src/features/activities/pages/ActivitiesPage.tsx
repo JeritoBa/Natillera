@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { cancelActivity, createActivity, getActivities, updateActivity, type ActivityListItem } from '@/features/activities/api/activitiesApi'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -6,8 +6,11 @@ import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { defaultDateForPeriod, isDateInPeriodYear, periodDateBounds } from '@/features/settings/model/savingPeriod'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
 import { getFriendlyApiError } from '@/shared/api/apiError'
+import { activityCancelConsequences } from '@/features/activities/model/cancelConfirm'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
+import { ConfirmSummary } from '@/shared/ui/ConfirmSummary'
 import { Icon } from '@/shared/ui/Icon'
 import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
@@ -35,6 +38,9 @@ export function ActivitiesPage() {
   const [saving, setSaving] = useState(false)
   const [submitCount, setSubmitCount] = useState(0)
   const [month, setMonth] = useState<'all' | string>('all')
+  const [confirmTarget, setConfirmTarget] = useState<ActivityListItem | null>(null)
+  const [focusSuccess, setFocusSuccess] = useState(0)
+  const successRef = useRef<HTMLParagraphElement>(null)
 
   const load = useCallback(async () => {
     if (!session) return
@@ -42,6 +48,9 @@ export function ActivitiesPage() {
     catch (requestError) { setError(getFriendlyApiError(requestError)) }
     finally { setLoading(false) }
   }, [session])
+
+  // UI-13: after a cancellation the trigger button disappears, so the focus moves to the success banner.
+  useEffect(() => { if (focusSuccess > 0) successRef.current?.focus() }, [focusSuccess])
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
@@ -90,14 +99,14 @@ export function ActivitiesPage() {
     finally { setSaving(false) }
   }
 
-  const cancel = async (activity: ActivityListItem) => {
+  // UI-13: errors propagate to the confirmation dialog.
+  const confirmCancel = async (activity: ActivityListItem) => {
     if (!session) return
-    setSuccess(null); setError(null)
-    try {
-      await cancelActivity(session.accessToken, activity.id)
-      setSuccess('La actividad se anuló correctamente.')
-      await load()
-    } catch (requestError) { setError(getFriendlyApiError(requestError)) }
+    await cancelActivity(session.accessToken, activity.id)
+    setConfirmTarget(null)
+    setSuccess('La actividad se anuló correctamente.')
+    setFocusSuccess(count => count + 1)
+    await load()
   }
 
   const monthOf = (activity: ActivityListItem) => activity.startDate.slice(0, 7)
@@ -119,7 +128,7 @@ export function ActivitiesPage() {
         <div><h1 className="text-xl font-bold text-[#0c1a12] mb-0.5">Actividades</h1><p className="text-[#4e7460] text-sm">{canManage ? 'Gestiona las actividades de venta de la natillera' : 'Actividades de venta de la natillera'}{selected ? ` · Periodo ${selected.year}` : ''}</p></div>
         {canManage && <button onClick={openCreate} className="btn-primary flex items-center gap-2 px-4 py-2 rounded-lg text-sm whitespace-nowrap"><Icon.Plus /> Nueva actividad</button>}
       </div>
-      {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
+      {success && !isDemo && <p ref={successRef} tabIndex={-1} role="status" className="mb-4 outline-none rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
       {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
       {error && activities.length === 0 && !loading && <button onClick={() => { setLoading(true); void load() }} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3 mb-4">Reintentar</button>}
       {!loading && !error && activities.length > 0 && <div className="rounded-xl p-4 mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3" style={cardStyle}>
@@ -160,7 +169,7 @@ export function ActivitiesPage() {
             <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
               <button onClick={() => navigate(`/activities/${activity.id}`)} className={eyeButton} aria-label={`Ver detalle de ${activity.name}`}><Icon.Eye open /></button>
               {canManage && activity.status !== 'Cancelled' && <button onClick={() => openEdit(activity)} className={iconButton} aria-label={`Editar ${activity.name}`}><Icon.Edit /></button>}
-              {canManage && activity.status !== 'Cancelled' && activity.assignedQuantity === 0 && <button onClick={() => { if (window.confirm(`¿Anular la actividad "${activity.name}"? La actividad y su egreso quedarán anulados.`)) void cancel(activity) }} className={dangerButton} aria-label={`Anular ${activity.name}`}><Icon.Trash /></button>}
+              {canManage && activity.status !== 'Cancelled' && activity.assignedQuantity === 0 && <button onClick={() => { setSuccess(null); setError(null); setConfirmTarget(activity) }} className={dangerButton} aria-label={`Anular ${activity.name}`}><Icon.Trash /></button>}
             </div></td>
           </tr>)}
         </tbody></table>
@@ -175,6 +184,8 @@ export function ActivitiesPage() {
         <FormError message={modalError} revision={submitCount} />
         <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
       </form></Modal>}
+      {confirmTarget && <ConfirmDialog title="Anular actividad" confirmLabel="Anular actividad" consequences={activityCancelConsequences()} onClose={() => setConfirmTarget(null)} onConfirm={() => confirmCancel(confirmTarget)}
+        summary={<ConfirmSummary title={confirmTarget.name} detail={`Inicia ${formatDateOnly(confirmTarget.startDate)}`} amount={formatCurrency(confirmTarget.totalCost)} status={confirmTarget.status.toLowerCase()} />} />}
     </div>
   )
 }
