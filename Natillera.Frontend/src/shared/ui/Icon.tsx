@@ -112,4 +112,9 @@ export const Icon = {
       <polyline points="20 6 9 17 4 12"/>
     </svg>
   ),
+  Clock: () => (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>
+    </svg>
+  ),
 }

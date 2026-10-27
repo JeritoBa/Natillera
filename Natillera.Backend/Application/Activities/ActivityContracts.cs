@@ -31,6 +31,9 @@ public sealed class ActivityAssignmentRequest
 
     [Range(1, int.MaxValue)]
     public int QuantityAssigned { get; init; }
+
+    [Required]
+    public AssignmentStatus? Status { get; init; }
 }
 
 public sealed class ActivityAssignmentUpdateRequest

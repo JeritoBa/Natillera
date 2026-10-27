@@ -2,6 +2,7 @@
 // Reads only select from the fixtures (and filter by role, MP-09); writes save nothing.
 import { ApiError } from '@/shared/api/apiError'
 import { buildDemoFixtures, type DemoFixtures } from '@/features/demo/model/demoFixtures'
+import { pageDemoLogs, pageDemoTransactions } from '@/features/demo/model/demoPaging'
 import { DEMO_WRITE_EVENT, type DemoRole } from '@/features/demo/model/demoSession'
 
 let cachedFixtures: DemoFixtures | null = null
@@ -17,7 +18,7 @@ const pick = <T>(record: Record<string, T>, id: string, entity: string): T => {
 interface Route {
   pattern: RegExp
   adminOnly?: boolean
-  resolve: (f: DemoFixtures, role: DemoRole, match: RegExpMatchArray) => unknown
+  resolve: (f: DemoFixtures, role: DemoRole, match: RegExpMatchArray, params: URLSearchParams) => unknown
 }
 
 const routes: Route[] = [
@@ -53,9 +54,9 @@ const routes: Route[] = [
       return assignment
     },
   },
-  { pattern: /^\/api\/transactions$/, resolve: f => f.transactions },
+  { pattern: /^\/api\/transactions$/, resolve: (f, _role, _match, params) => pageDemoTransactions(f.transactions, params) },
   { pattern: new RegExp(`^/api/transactions/${ID}$`), resolve: (f, _role, match) => pick(f.transactionDetails, match[1], 'Transaction') },
-  { pattern: /^\/api\/logs$/, adminOnly: true, resolve: f => f.logs },
+  { pattern: /^\/api\/logs$/, adminOnly: true, resolve: (f, _role, _match, params) => pageDemoLogs(f.logs, params) },
   { pattern: new RegExp(`^/api/logs/${ID}$`), adminOnly: true, resolve: (f, _role, match) => pick(f.logDetails, match[1], 'Log') },
 ]
 
@@ -66,12 +67,13 @@ export async function resolveDemoRequest<T>(path: string, method: string, role: 
     return undefined as T
   }
 
-  const route = path.split('?')[0]
+  const [route, query = ''] = path.split('?')
+  const params = new URLSearchParams(query)
   for (const candidate of routes) {
     const match = route.match(candidate.pattern)
     if (!match) continue
     if (candidate.adminOnly && role !== 'Admin') throw new ApiError(403, '')
-    return structuredClone(candidate.resolve(fixtures(), role, match)) as T
+    return structuredClone(candidate.resolve(fixtures(), role, match, params)) as T
   }
   throw new ApiError(404, 'Resource not found.')
 }

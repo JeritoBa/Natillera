@@ -5,6 +5,7 @@ import {
   cancelActivityAssignment, cancelExtraCost, createActivityAssignment, createExtraCost, getActivityDetail, updateActivityAssignment, updateExtraCost,
   type ActivityAssignmentResponse, type ActivityDetail, type ExtraCost,
 } from '@/features/activities/api/activitiesApi'
+import { assignmentCancelConsequences, extraCostCancelConsequences } from '@/features/activities/model/cancelConfirm'
 import { getActivitySummary } from '@/features/activities/model/activitySummary'
 import { EXTRA_COST_DESCRIPTION_MAX_LENGTH, extraCostCounterState, extraCostTotals, sortExtraCosts, validateExtraCostForm } from '@/features/activities/model/extraCosts'
 import { useAuth } from '@/features/auth/hooks/useAuth'
@@ -13,9 +14,13 @@ import { ApiError, getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { Badge } from '@/shared/ui/Badge'
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
+import { ConfirmSummary } from '@/shared/ui/ConfirmSummary'
 import { Icon } from '@/shared/ui/Icon'
+import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
+import { CancelledToggle } from '@/shared/ui/CancelledToggle'
 import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
 import { cell, cellActions, cellAmount, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll } from '@/shared/ui/tableStyles'
 
@@ -52,6 +57,12 @@ export function ActivityDetailPage() {
   const [status, setStatus] = useState<'Pending' | 'Paid'>('Pending')
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [submitCount, setSubmitCount] = useState(0)
+  const [showCancelledAssignments, setShowCancelledAssignments] = useState(false)
+  const [showCancelledCosts, setShowCancelledCosts] = useState(false)
+  const [confirmTarget, setConfirmTarget] = useState<{ kind: 'cost', cost: ExtraCost } | { kind: 'assignment', assignment: ActivityAssignmentResponse } | null>(null)
+  const [focusSuccess, setFocusSuccess] = useState(0)
+  const successRef = useRef<HTMLParagraphElement>(null)
   const [costModal, setCostModal] = useState(false)
   const [editingCost, setEditingCost] = useState<ExtraCost | null>(null)
   const [costDescription, setCostDescription] = useState('')
@@ -87,6 +98,9 @@ export function ActivityDetailPage() {
     }
   }, [id, session])
 
+  // UI-13: after a cancellation the trigger button disappears, so the focus moves to the success banner.
+  useEffect(() => { if (focusSuccess > 0) successRef.current?.focus() }, [focusSuccess])
+
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
     return () => window.clearTimeout(timer)
@@ -120,6 +134,8 @@ export function ActivityDetailPage() {
   const sortedAssignments = [...activity.assignments].sort((a, b) =>
     statusOrder[a.status] - statusOrder[b.status] || new Date(a.assignedAt).getTime() - new Date(b.assignedAt).getTime())
   const activeCount = activity.assignments.filter(item => item.status !== 'Cancelled').length
+  const cancelledAssignmentCount = activity.assignments.length - activeCount
+  const visibleAssignments = showCancelledAssignments ? sortedAssignments : sortedAssignments.filter(item => item.status !== 'Cancelled')
   const total = activity.quantity
   const percent = (units: number) => `${total > 0 ? Math.max(0, Math.min(100, (units / total) * 100)) : 0}%`
 
@@ -129,6 +145,7 @@ export function ActivityDetailPage() {
   }
   const save = async () => {
     if (saving) return
+    setSubmitCount(count => count + 1)
     setModalError(null)
     const numericQuantity = Number(quantity)
     if (!editing && !userId) return setModalError('Selecciona un miembro.')
@@ -141,26 +158,20 @@ export function ActivityDetailPage() {
         await updateActivityAssignment(session.accessToken, activity.id, editing.id, { quantityAssigned: numericQuantity, status })
         setSuccess(status === 'Paid' ? 'La asignación se marcó como pagada.' : 'La asignación se actualizó correctamente.')
       } else {
-        await createActivityAssignment(session.accessToken, activity.id, { userId, quantityAssigned: numericQuantity })
-        setSuccess('El miembro se asignó correctamente.')
+        await createActivityAssignment(session.accessToken, activity.id, { userId, quantityAssigned: numericQuantity, status })
+        setSuccess(status === 'Paid' ? 'El miembro se asignó y la venta quedó pagada.' : 'El miembro se asignó correctamente.')
       }
       setModal(false)
       await refresh()
     } catch (requestError) { setModalError(getFriendlyApiError(requestError)) }
     finally { setSaving(false) }
   }
-  const cancel = async (assignment: ActivityAssignmentResponse) => {
-    if (!session) return
-    setSuccess(null); setActionError(null)
-    try {
-      await cancelActivityAssignment(session.accessToken, activity.id, assignment.id)
-      setSuccess('La asignación se anuló correctamente.')
-      await refresh()
-    } catch (requestError) { setActionError(getFriendlyApiError(requestError)) }
-  }
 
   const extraCosts = activity.extraCosts ?? []
   const sortedCosts = sortExtraCosts(extraCosts)
+  // UI-16: cancelled rows are hidden behind "Ver anulados (n)" (local state); the summaries keep using every record.
+  const cancelledCostCount = extraCosts.filter(cost => cost.status === 'Cancelled').length
+  const visibleCosts = showCancelledCosts ? sortedCosts : sortedCosts.filter(cost => cost.status !== 'Cancelled')
   const costTotals = extraCostTotals(extraCosts)
 
   const openCostModal = (cost: ExtraCost | null) => {
@@ -169,6 +180,7 @@ export function ActivityDetailPage() {
   }
   const saveCost = async () => {
     if (saving) return
+    setSubmitCount(count => count + 1)
     setCostError(null)
     const validation = validateExtraCostForm(costDescription, costAmount)
     if (validation) return setCostError(validation)
@@ -188,18 +200,16 @@ export function ActivityDetailPage() {
     } catch (requestError) { setCostError(getFriendlyApiError(requestError)) }
     finally { setSaving(false) }
   }
-  const cancelCost = async (cost: ExtraCost) => {
-    if (!session) return
-    setSuccess(null); setActionError(null)
-    try {
-      await cancelExtraCost(session.accessToken, activity.id, cost.id)
-      setSuccess('El costo extra se anuló correctamente.')
-      await refresh()
-    } catch (requestError) { setActionError(getFriendlyApiError(requestError)) }
+  // UI-13: errors propagate to the confirmation dialog.
+  const confirmCancel = async () => {
+    if (!session || !confirmTarget) return
+    if (confirmTarget.kind === 'cost') await cancelExtraCost(session.accessToken, activity.id, confirmTarget.cost.id)
+    else await cancelActivityAssignment(session.accessToken, activity.id, confirmTarget.assignment.id)
+    setConfirmTarget(null)
+    setSuccess(confirmTarget.kind === 'cost' ? 'El costo extra se anuló correctamente.' : 'La asignación se anuló correctamente.')
+    setFocusSuccess(count => count + 1)
+    await refresh()
   }
-  const costConfirmMessage = (cost: ExtraCost) => cost.status === 'Paid'
-    ? `¿Anular el costo extra «${cost.description}»? El costo y su egreso quedarán anulados y se devolverá a los intereses que se reparten.`
-    : `¿Anular el costo extra «${cost.description}»? Quedará anulado.`
 
   const info: [string, ReactNode][] = [
     ['Nombre', activity.name], ['Descripción', activity.description], ['Fecha de inicio', longDate(activity.startDate)], ['Estado', <Badge status={activity.status.toLowerCase()} />],
@@ -212,10 +222,6 @@ export function ActivityDetailPage() {
     ['Ganancia bruta', isCancelled ? '—' : `${summary.gross < 0 ? '−' : ''}${formatCurrency(summary.gross)}`, isCancelled ? 'No aplica: actividad anulada' : 'Margen de las unidades vendidas y pagadas'],
     ['Recaudado', formatCurrency(summary.collected), `${summary.paidCount} asignaciones pagadas`],
   ]
-  const confirmMessage = (assignment: ActivityAssignmentResponse) => assignment.status === 'Paid'
-    ? `¿Anular la asignación pagada de ${assignment.memberName}? La asignación y su ingreso quedarán anulados.`
-    : `¿Anular la asignación de ${assignment.memberName}? La asignación quedará anulada.`
-
   return <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
     {back}
     <div className="mb-7">
@@ -226,7 +232,7 @@ export function ActivityDetailPage() {
       <p className="text-[#4e7460] text-sm mt-0.5">Inicia el {longDate(activity.startDate)}</p>
       {isCancelled && <p role="status" className="mt-3 rounded-lg border border-[#d6e8dc] bg-[#eef4f0] px-3 py-2.5 text-sm text-[#4e7460]">Esta actividad está anulada. Su costo ya no cuenta como egreso y no admite cambios.</p>}
     </div>
-    {success && !isDemo && <p role="status" className="mb-4 rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
+    {success && !isDemo && <p ref={successRef} tabIndex={-1} role="status" className="mb-4 outline-none rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
     {actionError && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{actionError}</p>}
 
     <div className="flex flex-col gap-4 lg:gap-5">
@@ -274,11 +280,13 @@ export function ActivityDetailPage() {
             <p>Esta actividad no tiene costos extra.</p>
             {canManage && !isCancelled && <p>Usa «Agregar costo extra» para registrar gastos como domicilios o transporte.</p>}
           </div>
-          : <div className={`${tableScroll} mt-3`}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+          : <>{visibleCosts.length === 0
+            ? <div className="px-5 py-8 text-center text-sm text-[#4e7460]"><p>No hay costos extra vigentes.</p></div>
+            : <div className={`${tableScroll} mt-3`}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
             {extraCostHeadings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
             {canManage && <th className={`${headCell} ${cellLast} w-px whitespace-nowrap text-right`}>Acciones</th>}
           </tr></thead><tbody>
-            {sortedCosts.map(cost => {
+            {visibleCosts.map(cost => {
               const cancelledCost = cost.status === 'Cancelled'
               return <tr key={cost.id} className="table-row">
                 <td className={`${cellFirst} py-3.5 ${cellMain}`}>
@@ -291,11 +299,12 @@ export function ActivityDetailPage() {
                 <td className={`${cell} ${colDesktop} py-3.5 text-[#4e7460] mono text-xs whitespace-nowrap`}>{shortDate(cost.paidAt ?? cost.createdAt)}</td>
                 {canManage && <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
                   {!isCancelled && !cancelledCost && <button onClick={() => openCostModal(cost)} className={iconButton} aria-label={`Editar costo extra «${cost.description}»`}><Icon.Edit /></button>}
-                  {!isCancelled && !cancelledCost && <button onClick={() => { if (window.confirm(costConfirmMessage(cost))) void cancelCost(cost) }} className={dangerButton} aria-label={`Anular costo extra «${cost.description}»`}><Icon.Trash /></button>}
+                  {!isCancelled && !cancelledCost && <button onClick={() => { setSuccess(null); setActionError(null); setConfirmTarget({ kind: 'cost', cost }) }} className={dangerButton} aria-label={`Anular costo extra «${cost.description}»`}><Icon.Trash /></button>}
                 </div></td>}
               </tr>
             })}
           </tbody></table></div>}
+          <CancelledToggle count={cancelledCostCount} shown={showCancelledCosts} onToggle={() => setShowCancelledCosts(value => !value)} /></>}
       </section>
 
       <section aria-labelledby="activity-assignments-title" className="rounded-xl overflow-hidden" style={cardStyle}>
@@ -309,10 +318,12 @@ export function ActivityDetailPage() {
             <p>Aún no hay miembros asignados a esta actividad.</p>
             {canManage && !isCancelled && <p>Usa «Asignar miembro» para repartir las unidades.</p>}
           </div>
-          : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+          : <>{visibleAssignments.length === 0
+            ? <div className="px-5 py-8 text-center text-sm text-[#4e7460]"><p>No hay asignaciones vigentes.</p></div>
+            : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
             {headings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
           </tr></thead><tbody>
-            {sortedAssignments.map(assignment => <tr key={assignment.id} className="table-row">
+            {visibleAssignments.map(assignment => <tr key={assignment.id} className="table-row">
               <td className={`${cellFirst} py-3.5 ${cellMain}`}>
                 <Link to={`/activities/${activity.id}/assignments/${assignment.id}`} title={assignment.memberName} className={mainLink}>{assignment.memberName}</Link>
                 <p className={subMobile}><span className="mono">{assignment.quantityAssigned} u.</span><Badge status={assignment.status.toLowerCase()} /></p>
@@ -326,10 +337,11 @@ export function ActivityDetailPage() {
               <td className={`${cellLast} py-3.5 ${cellActions}`}><div className="flex justify-end gap-1">
                 <button onClick={() => navigate(`/activities/${activity.id}/assignments/${assignment.id}`)} className={eyeButton} aria-label={`Ver asignación de ${assignment.memberName}`}><Icon.Eye open /></button>
                 {canManage && !isCancelled && assignment.status === 'Pending' && <button onClick={() => openModal(assignment)} className={iconButton} aria-label={`Editar asignación de ${assignment.memberName}`}><Icon.Edit /></button>}
-                {canManage && !isCancelled && assignment.status !== 'Cancelled' && <button onClick={() => { if (window.confirm(confirmMessage(assignment))) void cancel(assignment) }} className={dangerButton} aria-label={`Anular asignación de ${assignment.memberName}`}><Icon.Trash /></button>}
+                {canManage && !isCancelled && assignment.status !== 'Cancelled' && <button onClick={() => { setSuccess(null); setActionError(null); setConfirmTarget({ kind: 'assignment', assignment }) }} className={dangerButton} aria-label={`Anular asignación de ${assignment.memberName}`}><Icon.Trash /></button>}
               </div></td>
             </tr>)}
           </tbody></table></div>}
+          <CancelledToggle count={cancelledAssignmentCount} shown={showCancelledAssignments} onToggle={() => setShowCancelledAssignments(value => !value)} /></>}
       </section>
 
       <section aria-labelledby="activity-info-title" className="rounded-xl overflow-hidden" style={cardStyle}>
@@ -354,7 +366,7 @@ export function ActivityDetailPage() {
       <div><label htmlFor="extra-cost-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto</label><MoneyInput id="extra-cost-amount" value={costAmount} onChange={setCostAmount} placeholder="20000" /></div>
       <StatusRadioGroup name="extra-cost-status" legend="Estado" value={costStatus} onChange={setCostStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no sale de la caja', disabled: editingCost?.status === 'Paid' }, { value: 'Paid', badge: 'paid', hint: 'Registra el egreso en la caja' }]} note={editingCost?.status === 'Paid' ? 'Un costo pagado no puede volver a pendiente.' : undefined} />
       <p className="text-xs text-[#4e7460] rounded-lg bg-[#f8fbf8] border border-[#eef4f0] px-3 py-2">Al marcarlo como pagado, el monto se resta del dinero disponible y de los intereses de préstamos que se reparten entre los socios (rendimientos). No puede superar ninguno de los dos.</p>
-      {costError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{costError}</p>}
+      <FormError message={costError} revision={submitCount} />
       <div className="flex gap-3 pt-1"><button type="button" onClick={() => setCostModal(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
     </form></Modal>}
 
@@ -363,9 +375,13 @@ export function ActivityDetailPage() {
         ? <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><p className="text-sm text-[#0c1a12]">{editing.memberName}</p></div>
         : <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><select value={userId} onChange={event => setUserId(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un miembro</option>{selectableMembers.map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div>}
       <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input type="number" min="1" step="1" max={available} value={quantity} onChange={event => setQuantity(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /><p className="text-xs text-[#4e7460] mt-1">Unidades disponibles: {available}</p></div>
-      {editing && <StatusRadioGroup name="assignment-status" legend="Estado" value={status} onChange={setStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} />}
-      {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
+      <StatusRadioGroup name="assignment-status" legend="Estado" value={status} onChange={setStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} />
+      <FormError message={modalError} revision={submitCount} />
       <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
     </form></Modal>}
+    {confirmTarget?.kind === 'cost' && <ConfirmDialog title="Anular costo extra" confirmLabel="Anular costo extra" consequences={extraCostCancelConsequences(confirmTarget.cost.status)} onClose={() => setConfirmTarget(null)} onConfirm={confirmCancel}
+      summary={<ConfirmSummary title={confirmTarget.cost.description} detail={shortDate(confirmTarget.cost.paidAt ?? confirmTarget.cost.createdAt)} amount={formatCurrency(confirmTarget.cost.amount)} status={confirmTarget.cost.status.toLowerCase()} />} />}
+    {confirmTarget?.kind === 'assignment' && <ConfirmDialog title="Anular asignación" confirmLabel="Anular asignación" consequences={assignmentCancelConsequences(confirmTarget.assignment.status)} onClose={() => setConfirmTarget(null)} onConfirm={confirmCancel}
+      summary={<ConfirmSummary title={confirmTarget.assignment.memberName} detail={`${confirmTarget.assignment.quantityAssigned} u.`} amount={formatCurrency(confirmTarget.assignment.saleAmount)} status={confirmTarget.assignment.status.toLowerCase()} />} />}
   </div>
 }

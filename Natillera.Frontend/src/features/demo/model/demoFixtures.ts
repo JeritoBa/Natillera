@@ -4,7 +4,7 @@
 // Type-only imports keep this module free of runtime cycles with apiClient.
 import type { AuthUser } from '@/features/auth/model/authTypes'
 import type { ActivityAssignmentResponse, ActivityDetail, ActivityListItem } from '@/features/activities/api/activitiesApi'
-import type { DashboardSummary, DashboardTransaction, TopSeller } from '@/features/dashboard/api/dashboardApi'
+import type { DashboardSummary, DashboardTransaction, MemberPendingObligations, TopSeller } from '@/features/dashboard/api/dashboardApi'
 import type { InterestPaymentResponse, LoanDetail, LoanListItem, LoanPaymentResponse } from '@/features/loans/api/loansApi'
 import type { LogDetail, LogEntitySummary, LogListItem } from '@/features/audit/api/logsApi'
 import type { MemberDetail, MemberPendingPayment, PendingObligations } from '@/features/members/api/membersApi'
@@ -252,6 +252,7 @@ export function buildDemoFixtures(now: Date): DemoFixtures {
   const loans: LoanListItem[] = [loanDetails[L1], loanDetails[L2]].map(loan => ({
     id: loan.id, borrowerId: loan.borrowerId, borrowerName: loan.borrowerName, initialAmount: loan.initialAmount, interestRate: loan.interestRate,
     startDate: loan.startDate, status: loan.status, outstandingPrincipal: loan.summary.outstandingPrincipal,
+    hasMovements: loan.payments.some(payment => payment.status !== 'Cancelled') || loan.interestPayments.some(interest => interest.status !== 'Cancelled'),
   }))
   loans.sort((a, b) => b.startDate.localeCompare(a.startDate)) // startDate desc
 
@@ -385,17 +386,29 @@ export function buildDemoFixtures(now: Date): DemoFixtures {
     { userId: seedByKey.diana.id, memberName: diana, unitsSold: 12, collectedAmount: 120000, earnings: 48000 },
     { userId: seedByKey.laura.id, memberName: fullName('laura'), unitsSold: 10, collectedAmount: 100000, earnings: 40000 },
   ]
+  // DASH-14: rows derived from the member details (same amounts as the member detail "Debe"), total desc then name.
+  const membersPendingObligations: MemberPendingObligations[] = members
+    .map(member => ({ member, pending: memberDetails[member.id].pendingObligations! }))
+    .filter(({ pending }) => pending.total > 0)
+    .map(({ member, pending }) => ({
+      userId: member.id, memberName: `${member.firstName} ${member.lastName}`, isActive: member.isActive, total: pending.total,
+      monthlyPayments: { count: pending.monthlyPayments.count, amount: pending.monthlyPayments.amount },
+      loans: { count: pending.loans.count, amount: pending.loans.amount },
+      interests: { count: pending.interests.count, amount: pending.interests.amount },
+      activitySales: { count: pending.activitySales.count, amount: pending.activitySales.amount },
+    }))
+    .sort((a, b) => b.total - a.total || a.memberName.localeCompare(b.memberName, 'es'))
   const adminSummary: DashboardSummary = {
     role: 'Admin', availableMoney: 740000, totalNatilleraBalance: 988000, lentMoney: 200000, pendingActivitiesInvestment: 48000,
     mySavings: null, myEarnings: null, pendingPayments: null, recentTransactions, topSellers, myPaidMonthlyPayments: null,
-    loanInterestEarned: 10000, activityEarnings: 88000, myActivityEarnings: null, myPerformanceShare: null,
-    pendingObligations: null, sharedInterestPool: 10000, paidExtraCosts: 0,
+    loanInterestEarned: 10000, activityEarnings: -20000, myActivityEarnings: null, myPerformanceShare: null, // DASH-03: net profit = collected 220000 - total cost 240000
+    pendingObligations: null, sharedInterestPool: 10000, paidExtraCosts: 0, paidMonthlyPayments: 950000, membersPendingObligations,
   }
   const memberSummary: DashboardSummary = {
     role: 'Member', availableMoney: 740000, totalNatilleraBalance: null, lentMoney: null, pendingActivitiesInvestment: null,
     mySavings: 192000, myEarnings: 42000, pendingPayments: 1, recentTransactions, topSellers, myPaidMonthlyPayments: 150000,
     loanInterestEarned: null, activityEarnings: null, myActivityEarnings: 40000, myPerformanceShare: 2000,
-    pendingObligations: memberDetails[seedByKey[DEMO_MEMBER].id].pendingObligations, sharedInterestPool: null, paidExtraCosts: null,
+    pendingObligations: memberDetails[seedByKey[DEMO_MEMBER].id].pendingObligations, sharedInterestPool: null, paidExtraCosts: null, paidMonthlyPayments: null, membersPendingObligations: null,
   }
 
   return {

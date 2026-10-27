@@ -41,7 +41,9 @@ describe.each(scenarios)('demo fixtures (%s)', (_label, now) => {
     const lent = sum(Object.values(f.loanDetails).filter(loan => loan.status === 'Active').map(loan => loan.summary.outstandingPrincipal))
     const pendingInvestment = sum(assignments.filter(item => item.status === 'Pending').map(item => item.quantityAssigned * 6000))
     const interestEarned = sum(interestPayments.filter(item => item.status === 'Paid').map(item => item.amount))
-    const activityEarnings = sum(assignments.filter(item => item.status === 'Paid').map(item => item.saleAmount - item.quantityAssigned * 6000))
+    // DASH-03 (spec 021): net profit = collected (Paid assignments) - total cost of the non-cancelled activities.
+    const collected = sum(assignments.filter(item => item.status === 'Paid').map(item => item.saleAmount))
+    const activityEarnings = collected - sum(Object.values(f.activityDetails).map(activity => activity.totalCost))
     expect(f.adminSummary.lentMoney).toBe(lent)
     expect(f.adminSummary.pendingActivitiesInvestment).toBe(pendingInvestment)
     expect(f.adminSummary.totalNatilleraBalance).toBe(f.adminSummary.availableMoney + lent + pendingInvestment)
@@ -49,6 +51,31 @@ describe.each(scenarios)('demo fixtures (%s)', (_label, now) => {
     expect(f.adminSummary.activityEarnings).toBe(activityEarnings)
     expect(f.adminSummary.role).toBe('Admin')
     expect(f.adminSummary.mySavings).toBeNull()
+  })
+
+  it('DEMO-06 / DASH-13: paid fees equal the non-cancelled MonthlyPayment income and the interest pool is consistent', () => {
+    const feeIncome = sum(live.filter(tx => tx.type === 'MonthlyPayment').map(tx => tx.amount))
+    expect(f.adminSummary.paidMonthlyPayments).toBe(feeIncome)
+    expect(f.adminSummary.paidMonthlyPayments).toBe(sum(f.monthlyPayments.filter(payment => payment.status === 'Paid').map(payment => payment.amount)))
+    expect(f.adminSummary.sharedInterestPool).toBe(f.adminSummary.loanInterestEarned! - f.adminSummary.paidExtraCosts!)
+    expect(f.memberSummary.paidMonthlyPayments).toBeNull()
+  })
+
+  it('DEMO-06 / DASH-14: pending rows equal the member details (total > 0, total desc); member summary has none', () => {
+    const rows = f.adminSummary.membersPendingObligations!
+    const owing = f.members.filter(member => f.memberDetails[member.id].pendingObligations.total > 0)
+    expect(rows.map(row => row.userId).sort()).toEqual(owing.map(member => member.id).sort())
+    for (const row of rows) {
+      const o = f.memberDetails[row.userId].pendingObligations
+      expect(row.total).toBe(o.total)
+      expect(row.monthlyPayments).toEqual({ count: o.monthlyPayments.count, amount: o.monthlyPayments.amount })
+      expect(row.loans).toEqual({ count: o.loans.count, amount: o.loans.amount })
+      expect(row.interests).toEqual({ count: o.interests.count, amount: o.interests.amount })
+      expect(row.activitySales).toEqual({ count: o.activitySales.count, amount: o.activitySales.amount })
+    }
+    const totals = rows.map(row => row.total)
+    expect(totals).toEqual([...totals].sort((a, b) => b - a))
+    expect(f.memberSummary.membersPendingObligations).toBeNull()
   })
 
   it('DEMO-06 / DASH-09: top sellers come from Paid assignments, earnings desc', () => {

@@ -236,7 +236,7 @@ public class ActivitySavingPeriodTests
         _logs.Logs.Clear();
 
         var assignment = await _service.CreateAssignmentAsync(created.Id,
-            new ActivityAssignmentRequest { UserId = member.Id, QuantityAssigned = 2 }, Admin, TestPeriods.Y2025, default);
+            new ActivityAssignmentRequest { UserId = member.Id, QuantityAssigned = 2, Status = AssignmentStatus.Pending }, Admin, TestPeriods.Y2025, default);
         activity.Assignments.Single().Set("User", member);
         await _service.UpdateAssignmentAsync(created.Id, assignment.Id,
             new ActivityAssignmentUpdateRequest { QuantityAssigned = 2, Status = AssignmentStatus.Paid }, Admin, TestPeriods.Y2025, default);

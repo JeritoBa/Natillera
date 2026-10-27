@@ -187,16 +187,33 @@ public class DashboardServiceTests
             Task.FromResult(summary);
     }
 
-    private sealed class StubPendingRepo(PendingObligationsData data) : IPendingObligationsRepository
+    private sealed class StubPendingRepo(PendingObligationsData data, params MemberPendingObligationsData[] all) : IPendingObligationsRepository
     {
         public int Calls { get; private set; }
+        public int AllCalls { get; private set; }
 
         public Task<PendingObligationsData> GetDataAsync(Guid memberId, Guid savingPeriodId, CancellationToken cancellationToken = default)
         {
             Calls++;
             return Task.FromResult(data);
         }
+
+        public Task<IReadOnlyCollection<MemberPendingObligationsData>> GetForAllMembersAsync(Guid savingPeriodId, CancellationToken cancellationToken = default)
+        {
+            AllCalls++;
+            return Task.FromResult<IReadOnlyCollection<MemberPendingObligationsData>>(all);
+        }
     }
+
+    private static MemberPendingObligationsData MemberWith(string name, PendingObligationsData data, bool active = true) =>
+        new(Guid.NewGuid(), name, active, data);
+
+    private static PendingObligationsData Fees(params decimal[] amounts) =>
+        new(amounts.Select((a, i) => new FeeObligationRow(Guid.NewGuid(), 2026, i + 1, a, PaymentStatus.Pending, DateTime.UtcNow)).ToArray(), [], [], []);
+
+    private static Task<DashboardSummaryResponse> AdminRun(params MemberPendingObligationsData[] members) =>
+        new DashboardService(new StubDashboardRepo(Summary("Admin")), new StubPendingRepo(OneFee(), members))
+            .GetSummaryAsync(Guid.NewGuid(), "Admin", TestPeriods.Y2026, default);
 
     private static DashboardSummaryResponse Summary(string role) =>
         new(role, 0m, null, null, null, 0m, 0m, 1, [], [], null, null, null, null, null);
@@ -218,7 +235,7 @@ public class DashboardServiceTests
     }
 
     [Fact]
-    public async Task AdminSummary_IsUnchanged_PendingRepositoryNotCalled()
+    public async Task AdminSummary_DoesNotLoadSingleMemberPending_DASH11()
     {
         var pending = new StubPendingRepo(OneFee());
         var service = new DashboardService(new StubDashboardRepo(Summary("Admin")), pending);
@@ -227,5 +244,80 @@ public class DashboardServiceTests
 
         Assert.Null(result.PendingObligations);
         Assert.Equal(0, pending.Calls);
+        Assert.Equal(1, pending.AllCalls);
+    }
+
+    [Fact]
+    public async Task AdminSummary_MembersPending_OnlyTotalAboveZero_DASH14()
+    {
+        var result = await AdminRun(
+            MemberWith("Ana", Fees(30000m)),
+            MemberWith("Beto", new PendingObligationsData([], [], [], [])),
+            MemberWith("Carla", new PendingObligationsData(
+                [new FeeObligationRow(Guid.NewGuid(), 2026, 1, 30000m, PaymentStatus.Paid, DateTime.UtcNow)], [], [], [])));
+
+        Assert.Equal(["Ana"], result.MembersPendingObligations!.Select(m => m.MemberName));
+    }
+
+    [Fact]
+    public async Task AdminSummary_MembersPending_OrderedByTotalDescThenName_DASH14()
+    {
+        var result = await AdminRun(
+            MemberWith("Zoe", Fees(30000m)),
+            MemberWith("Ana", Fees(30000m)),
+            MemberWith("Max", Fees(30000m, 30000m)));
+
+        Assert.Equal(["Max", "Ana", "Zoe"], result.MembersPendingObligations!.Select(m => m.MemberName));
+    }
+
+    [Fact]
+    public async Task AdminSummary_MembersPending_TotalsEqualCalculator_DASH14_MEM10()
+    {
+        var data = new PendingObligationsData(
+            [new FeeObligationRow(Guid.NewGuid(), 2026, 1, 30000m, PaymentStatus.Pending, DateTime.UtcNow)],
+            [
+                new LoanObligationRow(Guid.NewGuid(), DateTime.UtcNow, DateTime.UtcNow, 300000m, 100000m, LoanStatus.Active),
+                new LoanObligationRow(Guid.NewGuid(), DateTime.UtcNow, DateTime.UtcNow, 100000m, 100000m, LoanStatus.Active)
+            ],
+            [new InterestObligationRow(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, 4000m, PaymentStatus.Pending)],
+            [new AssignmentObligationRow(Guid.NewGuid(), Guid.NewGuid(), "Rifa", 8, 10000m, AssignmentStatus.Pending, ActivityStatus.Pending, DateTime.UtcNow)]);
+        var expected = PendingObligationsCalculator.Calculate(data);
+
+        var item = (await AdminRun(MemberWith("Ana", data))).MembersPendingObligations!.Single();
+
+        Assert.Equal(expected.Total, item.Total);
+        Assert.Equal(new PendingKindTotal(1, 30000m), item.MonthlyPayments);
+        Assert.Equal(new PendingKindTotal(1, 200000m), item.Loans); // the loan with no principal left is not listed
+        Assert.Equal(new PendingKindTotal(1, 4000m), item.Interests);
+        Assert.Equal(new PendingKindTotal(1, 80000m), item.ActivitySales);
+        Assert.Equal(314000m, item.Total);
+    }
+
+    [Fact]
+    public async Task AdminSummary_MembersPending_IncludesInactiveMembers_DASH14()
+    {
+        var item = (await AdminRun(MemberWith("Ana", Fees(30000m), active: false))).MembersPendingObligations!.Single();
+
+        Assert.False(item.IsActive);
+    }
+
+    [Fact]
+    public async Task AdminSummary_MembersPending_EmptyWhenNobodyOwes_DASH14()
+    {
+        var result = await AdminRun(MemberWith("Ana", new PendingObligationsData([], [], [], [])));
+
+        Assert.NotNull(result.MembersPendingObligations);
+        Assert.Empty(result.MembersPendingObligations!);
+    }
+
+    [Fact]
+    public async Task MemberSummary_MembersPendingObligationsIsNull_DASH14()
+    {
+        var service = new DashboardService(new StubDashboardRepo(Summary("Member")), new StubPendingRepo(OneFee()));
+
+        var result = await service.GetSummaryAsync(Guid.NewGuid(), "Member", TestPeriods.Y2026, default);
+
+        Assert.Null(result.MembersPendingObligations);
+        Assert.Null(result.PaidMonthlyPayments);
     }
 }

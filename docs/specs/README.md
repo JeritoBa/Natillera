@@ -34,6 +34,14 @@ One spec per feature. Specs describe **what the system must do** (behavior, rule
 | 018 | [Saving periods](018-saving-periods.md) | Implemented | PER-01..08, MP-11, MP-02, MP-04, MP-10, FIN-09, FIN-13 |
 | 019 | [Loan description](019-loan-description.md) | Implemented | LOAN-11 |
 | 020 | [Activity extra costs](020-activity-extra-costs.md) | Implemented | ACT-13..15, DASH-12, FIN-14, DASH-06, FIN-08, FIN-13 |
+| 021 | [Admin dashboard: money by source and pending per member](021-admin-dashboard-sources-and-pending.md) | Implemented | DASH-13, DASH-14, DASH-03, MEM-10 |
+| 022 | [Member fee ledger](022-member-fee-ledger.md) | Implemented | MEM-11, MP-09, PER-06 |
+| 023 | [Visible form errors and confirmation dialog](023-visible-form-errors-and-confirm-dialog.md) | Implemented | UI-12, UI-13, UI-03 |
+| 024 | [List filters: counts and URL](024-list-filters-counts-and-url.md) | Implemented | UI-14, UI-15, UI-06 |
+| 025 | [Cancelled records hidden by default](025-cancelled-hidden-by-default.md) | Implemented | UI-16, UI-01, TX-01, UI-14, UI-15 |
+| 026 | [Server-side pagination](026-server-side-pagination.md) | Implemented | TX-03, AUD-04, UI-17, DEMO-02 |
+| 027 | [Assignment created as Paid](027-assignment-created-as-paid.md) | Implemented | ACT-16, ACT-08 |
+| 028 | [Loan edit: rate and description](028-loan-edit-rate-and-description.md) | Implemented | LOAN-12, LOAN-07, LOAN-11 |
 
 Not specified because not implemented: in-app payments, member loan requests/approval workflow, payment reminders beyond the dashboard notice.
 

@@ -32,7 +32,7 @@ ACT-01 .. ACT-12; FIN-05 .. FIN-08; MEM-04 (pending assignments block deactivati
 | PUT | `/api/activities/{id}` | Admin | same as POST | 200 detail; 400 (below assigned, price change with paid assignments, cancelled); 404 |
 | DELETE | `/api/activities/{id}` | Admin | - | 204 (cancel); 400 (has non-cancelled assignments); 404 |
 | GET | `/api/activities/{activityId}/assignments/{assignmentId}` | Any authenticated | - | 200 assignment; 404 |
-| POST | `/api/activities/{activityId}/assignments` | Admin | `{ userId, quantityAssigned }` | 201 assignment; 400 (duplicate member, exceeds available, inactive member); 404 |
+| POST | `/api/activities/{activityId}/assignments` | Admin | `{ userId, quantityAssigned, status: Pending or Paid }` (spec 027) | 201 assignment; 400 (invalid status, duplicate member, exceeds available, inactive member); 404 |
 | PUT | `/api/activities/{activityId}/assignments/{assignmentId}` | Admin | `{ quantityAssigned, status: Pending or Paid }` | 200 assignment; 400 (not pending, Paid -> Pending); 404 |
 | DELETE | `/api/activities/{activityId}/assignments/{assignmentId}` | Admin | - | 204; 400; 404 |
 

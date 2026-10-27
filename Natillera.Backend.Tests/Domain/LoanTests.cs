@@ -338,12 +338,87 @@ public class LoanTests
     }
 
     [Fact]
-    public void UpdateDetails_WithPayments_Throws()
+    public void UpdateDetails_WithPayments_ChangesRateAndDescription_LOAN12()
     {
         var loan = Create();
         loan.RegisterPayment(10m, PaymentMethod.Cash, Guid.NewGuid());
 
-        Assert.Throws<DomainException>(() => loan.UpdateDetails(2000m, 3m, new DateTime(2025, 6, 1), Guid.NewGuid(), TestPeriods.Y2025));
+        loan.UpdateDetails(1000m, 3m, new DateTime(2025, 1, 15), loan.BorrowerId, TestPeriods.Y2025, "Nueva");
+
+        Assert.Equal(3m, loan.InterestRate);
+        Assert.Equal("Nueva", loan.Description);
+        Assert.Equal(1000m, loan.InitialAmount);
+        Assert.NotNull(loan.UpdatedAt);
+    }
+
+    [Fact]
+    public void UpdateDetails_WithPayments_AmountChange_Throws_LOAN12()
+    {
+        var loan = Create();
+        loan.RegisterPayment(10m, PaymentMethod.Cash, Guid.NewGuid());
+
+        var ex = Assert.Throws<DomainException>(() => loan.UpdateDetails(2000m, 5m, new DateTime(2025, 1, 15), loan.BorrowerId, TestPeriods.Y2025));
+
+        Assert.Equal("The loan amount cannot be changed because the loan has payments or interest.", ex.Message);
+        Assert.Equal(1000m, loan.InitialAmount);
+    }
+
+    [Fact]
+    public void UpdateDetails_WithPayments_BorrowerChange_Throws_LOAN12()
+    {
+        var loan = Create();
+        loan.RegisterPayment(10m, PaymentMethod.Cash, Guid.NewGuid());
+
+        var ex = Assert.Throws<DomainException>(() => loan.UpdateDetails(1000m, 5m, new DateTime(2025, 1, 15), Guid.NewGuid(), TestPeriods.Y2025));
+
+        Assert.Equal("The borrower cannot be changed because the loan has payments or interest.", ex.Message);
+    }
+
+    [Fact]
+    public void UpdateDetails_WithPayments_StartDateChange_Throws_LOAN12()
+    {
+        var loan = Create();
+        loan.RegisterPayment(10m, PaymentMethod.Cash, Guid.NewGuid());
+
+        var ex = Assert.Throws<DomainException>(() => loan.UpdateDetails(1000m, 5m, new DateTime(2025, 2, 1), loan.BorrowerId, TestPeriods.Y2025));
+
+        Assert.Equal("The start date cannot be changed because the loan has payments or interest.", ex.Message);
+        Assert.Equal(new DateTime(2025, 1, 15), loan.StartDate);
+    }
+
+    [Fact]
+    public void UpdateDetails_WithPendingInterestOnly_ChangesRate_LOAN12()
+    {
+        var loan = Create();
+        loan.RegisterInterest(50m, "Interes");
+
+        loan.UpdateDetails(1000m, 2m, new DateTime(2025, 1, 15, 8, 0, 0), loan.BorrowerId, TestPeriods.Y2025);
+
+        Assert.Equal(2m, loan.InterestRate);
+        Assert.Throws<DomainException>(() => loan.UpdateDetails(900m, 2m, new DateTime(2025, 1, 15), loan.BorrowerId, TestPeriods.Y2025));
+    }
+
+    [Fact]
+    public void UpdateDetails_OnlyCancelledPayments_EveryFieldEditable_LOAN12()
+    {
+        var loan = Create();
+        loan.RegisterPayment(10m, PaymentMethod.Cash, Guid.NewGuid()).Cancel();
+        var borrower = Guid.NewGuid();
+
+        loan.UpdateDetails(2000m, 3m, new DateTime(2025, 2, 2), borrower, TestPeriods.Y2025);
+
+        Assert.Equal(2000m, loan.InitialAmount);
+        Assert.Equal(borrower, loan.BorrowerId);
+        Assert.Equal(new DateTime(2025, 2, 2), loan.StartDate);
+    }
+
+    [Fact]
+    public void UpdateDetails_Cancelled_RateChange_Throws_LOAN12()
+    {
+        var loan = Create();
+        loan.Cancel();
+
+        Assert.Throws<DomainException>(() => loan.UpdateDetails(1000m, 3m, new DateTime(2025, 1, 15), loan.BorrowerId, TestPeriods.Y2025));
     }
 
     [Fact]

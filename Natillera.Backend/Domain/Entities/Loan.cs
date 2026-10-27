@@ -83,8 +83,15 @@ public class Loan
     {
         if (Status == LoanStatus.Cancelled)
             throw new DomainException("Cancelled loans cannot be modified.");
-        if (HasActivePayments())
-            throw new DomainException("Loan cannot be modified because it has payments.");
+        if (HasActivePayments()) // LOAN-12: with movements only the rate and the description can change
+        {
+            if (initialAmount != InitialAmount)
+                throw new DomainException("The loan amount cannot be changed because the loan has payments or interest.");
+            if (borrowerId != BorrowerId)
+                throw new DomainException("The borrower cannot be changed because the loan has payments or interest.");
+            if (startDate.Date != StartDate.Date)
+                throw new DomainException("The start date cannot be changed because the loan has payments or interest.");
+        }
 
         Validate(initialAmount, interestRate);
         var normalizedDescription = NormalizeDescription(description); // LOAN-11

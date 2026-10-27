@@ -150,6 +150,9 @@ public class MemberDetailServiceTests
     {
         public Task<PendingObligationsData> GetDataAsync(Guid memberId, Guid savingPeriodId, CancellationToken cancellationToken = default) =>
             Task.FromResult(data);
+
+        public Task<IReadOnlyCollection<MemberPendingObligationsData>> GetForAllMembersAsync(Guid savingPeriodId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyCollection<MemberPendingObligationsData>>([]);
     }
 
     private static Task<MemberDetailResponse?> Run(MemberDetailData? data, PendingObligationsData? pending = null) =>

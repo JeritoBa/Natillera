@@ -52,7 +52,8 @@ public sealed record LoanListItem(
     DateTime StartDate,
     LoanStatus Status,
     decimal OutstandingPrincipal,
-    string? Description = null);
+    string? Description = null,
+    bool HasMovements = false);
 
 public sealed record LoanListData(
     Guid Id,
@@ -63,7 +64,8 @@ public sealed record LoanListData(
     DateTime StartDate,
     LoanStatus Status,
     decimal PrincipalPaid,
-    string? Description = null);
+    string? Description = null,
+    bool HasMovements = false);
 
 public sealed record LoanPaymentResponse(
     Guid Id,

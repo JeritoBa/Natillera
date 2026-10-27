@@ -18,6 +18,7 @@ public sealed class TransactionConfiguration : IEntityTypeConfiguration<Transact
         builder.Property(transaction => transaction.IsCancelled).IsRequired();
         builder.HasIndex(transaction => transaction.OccurredAt);
         builder.HasIndex(transaction => transaction.SavingPeriodId);
+        builder.HasIndex(transaction => new { transaction.SavingPeriodId, transaction.OccurredAt }); // TX-03: paginated list
         builder.HasOne(transaction => transaction.SavingPeriod).WithMany()
             .HasForeignKey(transaction => transaction.SavingPeriodId).OnDelete(DeleteBehavior.Restrict);
     }

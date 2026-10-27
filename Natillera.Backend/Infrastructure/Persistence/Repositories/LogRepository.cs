@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Natillera.Backend.Application.Audit;
+using Natillera.Backend.Application.Common;
 using Natillera.Backend.Domain.Entities;
 using Natillera.Backend.Domain.Enums;
 
@@ -10,12 +11,39 @@ public sealed class LogRepository(NatilleraDbContext dbContext) : ILogRepository
     public Task AddAsync(Log log, CancellationToken cancellationToken = default) =>
         dbContext.Logs.AddAsync(log, cancellationToken).AsTask();
 
-    public async Task<IReadOnlyCollection<LogListItem>> GetAllAsync(Guid savingPeriodId, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<LogListItem>> GetPageAsync(Guid savingPeriodId, LogListFilter filter, CancellationToken cancellationToken = default)
     {
-        return await dbContext.Logs
+        var query = dbContext.Logs
             .AsNoTracking()
-            .Where(log => log.SavingPeriodId == savingPeriodId)
+            .Where(log => log.SavingPeriodId == savingPeriodId);
+
+        if (filter.Entity is { } entity)
+            query = query.Where(log => log.EntityType == entity);
+        if (filter.Action is { } action)
+            query = query.Where(log => log.Action == action);
+
+        var (startUtc, endUtc) = ColombiaTime.DayRangeUtc(filter.From, filter.To);
+        if (startUtc is { } start)
+            query = query.Where(log => log.OccurredAt >= start);
+        if (endUtc is { } end)
+            query = query.Where(log => log.OccurredAt < end);
+
+        // AUD-04: user full name or entity id (case-insensitive), or the exact old/new amount for a numeric term.
+        if (filter.Term is { } term)
+        {
+            var amount = filter.Amount;
+            query = query.Where(log =>
+                (log.User.FirstName + " " + log.User.LastName).ToLower().Contains(term)
+                || log.EntityId.ToString().Contains(term)
+                || (amount != null && (log.OldValue == amount || log.NewValue == amount)));
+        }
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = await query
             .OrderByDescending(log => log.OccurredAt)
+            .ThenByDescending(log => log.Id)
+            .Skip(PageRequest.Skip(filter.Page, filter.PageSize))
+            .Take(filter.PageSize)
             .Select(log => new LogListItem(
                 log.Id,
                 log.EntityType,
@@ -27,6 +55,8 @@ public sealed class LogRepository(NatilleraDbContext dbContext) : ILogRepository
                 log.UserId,
                 log.User.FirstName + " " + log.User.LastName))
             .ToListAsync(cancellationToken);
+
+        return new PagedResult<LogListItem>(items, total, filter.Page, filter.PageSize);
     }
 
     public async Task<LogDetailResponse?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default)
