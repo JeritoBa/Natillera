@@ -401,7 +401,7 @@ export function buildDemoFixtures(now: Date): DemoFixtures {
   const adminSummary: DashboardSummary = {
     role: 'Admin', availableMoney: 740000, totalNatilleraBalance: 988000, lentMoney: 200000, pendingActivitiesInvestment: 48000,
     mySavings: null, myEarnings: null, pendingPayments: null, recentTransactions, topSellers, myPaidMonthlyPayments: null,
-    loanInterestEarned: 10000, activityEarnings: -20000, myActivityEarnings: null, myPerformanceShare: null, // DASH-03: net profit = collected 220000 - total cost 240000
+    loanInterestEarned: 10000, activityEarnings: 88000, myActivityEarnings: null, myPerformanceShare: null, // DASH-03: margin of Paid assignments = 22 units x (10000 - 6000)
     pendingObligations: null, sharedInterestPool: 10000, paidExtraCosts: 0, paidMonthlyPayments: 950000, membersPendingObligations,
   }
   const memberSummary: DashboardSummary = {

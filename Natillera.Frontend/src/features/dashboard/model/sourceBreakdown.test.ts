@@ -25,14 +25,14 @@ describe('source breakdown (DASH-13, DASH-03)', () => {
     expect(proportionSegments(sourceRows(summary(1, 1, 1))).map(segment => segment.percent)).toEqual([33, 33, 33])
   })
 
-  it('DASH-03: a negative or zero row has no segment and the bar uses the positive rows only', () => {
-    const rows = sourceRows(summary(300, -20000, 0))
-    expect(rows[1].amount).toBe(-20000)
+  it('DASH-13: a zero row has no segment and the bar uses the positive rows only', () => {
+    const rows = sourceRows(summary(300, 0, 0))
+    expect(rows[1].amount).toBe(0)
     expect(proportionSegments(rows).map(segment => segment.row.key)).toEqual(['fees'])
   })
 
   it('DASH-13: no positive row means no bar', () => {
-    expect(proportionSegments(sourceRows(summary(0, -5, 0)))).toEqual([])
+    expect(proportionSegments(sourceRows(summary(0, 0, 0)))).toEqual([])
   })
 
   it('DASH-13: accessible label lists the positive rows', () => {

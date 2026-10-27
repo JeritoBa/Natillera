@@ -47,9 +47,14 @@
 
 > **This is not an open-source project.** The source code is private property of its owner and is shared here only to describe what the application is, how it works and how it is built. No license is granted to use, copy, modify or distribute it. All rights reserved.
 
-## Latest version: v1.1.1
+## Latest version: v1.1.2
 
-- **Admin dashboard:** the total money of the natillera now shows where it comes from (paid fees, net activity earnings and loan returns) with a proportion bar, and a new **"Pendientes por cobrar"** table lists what each member owes, filterable by kind (fees, loan principal, interest, activity sales) with links to the matching lists.
+- **Admin dashboard fix:** "Ganancias de actividades" now shows what has been earned so far: the margin (sale price - unit cost) of every paid unit. It is never negative and nothing is subtracted from it; extra costs are still taken only from the loan returns.
+
+<details>
+<summary>v1.1.1</summary>
+
+- **Admin dashboard:** the total money of the natillera now shows where it comes from (paid fees, activity earnings and loan returns) with a proportion bar, and a new **"Pendientes por cobrar"** table lists what each member owes, filterable by kind (fees, loan principal, interest, activity sales) with links to the matching lists.
 - **Fee ledger:** the member detail and the member dashboard show the 12 months of the period at a glance (paid, pending, no fee, upcoming), each paid month linked to its fee.
 - **Clearer forms and confirmations:** form errors always scroll into view, and every "Anular" action opens the app's own confirmation dialog with its consequences; if the server rejects it, the reason is shown right there.
 - **Filters:** every list keeps its filters in the URL (they survive a reload and can be shared), status counts follow the other filters, and cancelled records (and inactive members) are hidden unless you choose the "Anulados" (or "Inactivos") filter. Loan and activity details hide cancelled rows behind "Ver anulados".
@@ -57,6 +62,8 @@
 - **Activities:** an assignment can be created already paid, registering the sale income in one step.
 - **Loans:** the interest rate and description can be corrected at any time; once a loan has payments or interest, its amount, borrower and start date stay locked.
 - **Fixes:** the dashboard no longer scrolls into an empty white area, and the loans list has a borrower filter.
+
+</details>
 
 <details>
 <summary>v1.1.0</summary>

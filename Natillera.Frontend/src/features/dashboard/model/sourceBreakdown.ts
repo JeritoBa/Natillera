@@ -16,7 +16,7 @@ export const sourceRows = (summary: Pick<DashboardSummary, 'paidMonthlyPayments'
   const extraCosts = summary.paidExtraCosts ?? 0
   return [
     { key: 'fees', label: 'Cuotas pagadas', detail: 'Aportes de los miembros', amount: summary.paidMonthlyPayments ?? 0, color: '#0c5c38', shortLabel: 'cuotas' },
-    { key: 'activities', label: 'Ganancias de actividades', detail: 'Ganancia neta de las actividades', amount: summary.activityEarnings ?? 0, color: '#3f9b6b', shortLabel: 'actividades' },
+    { key: 'activities', label: 'Ganancias de actividades', detail: 'Margen de las ventas pagadas', amount: summary.activityEarnings ?? 0, color: '#3f9b6b', shortLabel: 'actividades' },
     {
       key: 'interest', label: 'Rendimientos de préstamos',
       detail: extraCosts > 0
