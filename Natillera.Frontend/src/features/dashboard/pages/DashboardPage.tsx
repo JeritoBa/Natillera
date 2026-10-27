@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
@@ -7,6 +7,9 @@ import { MembersPendingSection } from '@/features/dashboard/components/MembersPe
 import { proportionLabel, proportionSegments, sourceRows } from '@/features/dashboard/model/sourceBreakdown'
 import { PendingObligationsCard } from '@/features/members/components/PendingObligationsCard'
 import { hasPendingObligations } from '@/features/members/model/pendingObligations'
+import { getMonthlyPayments, type MonthlyPaymentResponse } from '@/features/monthlyPayments/api/monthlyPaymentsApi'
+import { FeeLedger } from '@/features/monthlyPayments/components/FeeLedger'
+import { memberLedgerFees } from '@/features/monthlyPayments/model/feeLedger'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
 import { cell, cellAmount, cellFirst, cellLast, tableScroll } from '@/shared/ui/tableStyles'
@@ -20,6 +23,9 @@ export function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [fees, setFees] = useState<MonthlyPaymentResponse[] | null>(null)
+  const [feesLoading, setFeesLoading] = useState(true)
+  const [feesError, setFeesError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!session) return
@@ -30,6 +36,22 @@ export function DashboardPage() {
     }
     void load()
   }, [session])
+
+  // MEM-11: Members see their own fee ledger; the fees load in parallel with the summary and fail on their own.
+  const isMember = session?.user.role === 'Member'
+  const loadFees = useCallback(async () => {
+    if (!session) return
+    setFeesLoading(true); setFeesError(null)
+    try { setFees(await getMonthlyPayments(session.accessToken)) }
+    catch (requestError) { setFees(null); setFeesError(getFriendlyApiError(requestError)) }
+    finally { setFeesLoading(false) }
+  }, [session])
+
+  useEffect(() => {
+    if (!isMember) return
+    const timer = window.setTimeout(() => { void loadFees() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [isMember, loadFees])
 
   const isAdmin = session?.user.role === 'Admin'
   const available = summary?.availableMoney ?? 0
@@ -102,6 +124,9 @@ export function DashboardPage() {
           </>}
         </section>
       </div>
+
+      {isMember && session && <FeeLedger year={selected?.year ?? new Date().getFullYear()} audience="member" memberId={session.user.id} titleId="dashboard-fees-title" loading={loading || feesLoading} error={feesError} onRetry={() => void loadFees()}
+        fees={fees === null ? null : memberLedgerFees(fees, summary?.pendingObligations?.monthlyPayments.items ?? [], session.user.id, selected?.year ?? new Date().getFullYear())} />}
 
       <section aria-labelledby="ranking-title" aria-busy={loading} className="rounded-xl overflow-hidden" style={cardStyle}>
         <div className="px-5 py-3.5 border-b" style={{ borderColor: '#eef4f0' }}>
