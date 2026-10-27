@@ -9,6 +9,7 @@ import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
+import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
@@ -32,6 +33,7 @@ export function ActivitiesPage() {
   const [form, setForm] = useState<ActivityForm>(emptyForm)
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [submitCount, setSubmitCount] = useState(0)
   const [month, setMonth] = useState<'all' | string>('all')
 
   const load = useCallback(async () => {
@@ -61,6 +63,7 @@ export function ActivitiesPage() {
 
   const save = async () => {
     if (saving) return
+    setSubmitCount(count => count + 1)
     setModalError(null)
     const quantity = Number(form.quantity)
     const unitCost = Number(form.unitCost)
@@ -163,13 +166,13 @@ export function ActivitiesPage() {
         </tbody></table>
       </div></div>
       {modal && <Modal title={editing ? 'Editar actividad' : 'Nueva actividad'} onClose={() => !saving && setModal(null)}><form noValidate onSubmit={event => { event.preventDefault(); void save() }} className="space-y-4">
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Nombre</label><input type="text" maxLength={100} value={form.name} onChange={event => setField('name', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción</label><input type="text" maxLength={200} value={form.description} onChange={event => setField('description', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
-        <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input type="number" min="1" step="1" value={form.quantity} onChange={event => setField('quantity', event.target.value)} placeholder="100" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
+        <div><label htmlFor="activity-name" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Nombre</label><input id="activity-name" type="text" maxLength={100} value={form.name} onChange={event => setField('name', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
+        <div><label htmlFor="activity-description" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción</label><input id="activity-description" type="text" maxLength={200} value={form.description} onChange={event => setField('description', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
+        <div><label htmlFor="activity-quantity" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input id="activity-quantity" type="number" min="1" step="1" value={form.quantity} onChange={event => setField('quantity', event.target.value)} placeholder="100" className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         <div><label htmlFor="activity-unit-cost" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Costo unitario</label><MoneyInput id="activity-unit-cost" value={form.unitCost} onChange={value => setField('unitCost', value)} placeholder="5000" /></div>
         <div><label htmlFor="activity-unit-sale-price" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Precio de venta unitario</label><MoneyInput id="activity-unit-sale-price" value={form.unitSalePrice} onChange={value => setField('unitSalePrice', value)} placeholder="8000" /></div>
         <div><label htmlFor="activity-start-date" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Fecha de inicio</label><input id="activity-start-date" type="date" min={bounds?.min} max={bounds?.max} aria-describedby={periodYear ? 'activity-start-date-help' : undefined} value={form.startDate} onChange={event => setField('startDate', event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" />{periodYear && <p id="activity-start-date-help" className="text-xs text-[#4e7460] mt-1.5">Debe ser una fecha de {periodYear}, el periodo seleccionado.</p>}</div>
-        {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
+        <FormError message={modalError} revision={submitCount} />
         <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
       </form></Modal>}
     </div>

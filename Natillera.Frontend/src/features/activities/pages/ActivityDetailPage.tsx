@@ -14,6 +14,7 @@ import { formatCurrency } from '@/shared/lib/formatters'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
+import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
 import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
@@ -52,6 +53,7 @@ export function ActivityDetailPage() {
   const [status, setStatus] = useState<'Pending' | 'Paid'>('Pending')
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [submitCount, setSubmitCount] = useState(0)
   const [costModal, setCostModal] = useState(false)
   const [editingCost, setEditingCost] = useState<ExtraCost | null>(null)
   const [costDescription, setCostDescription] = useState('')
@@ -129,6 +131,7 @@ export function ActivityDetailPage() {
   }
   const save = async () => {
     if (saving) return
+    setSubmitCount(count => count + 1)
     setModalError(null)
     const numericQuantity = Number(quantity)
     if (!editing && !userId) return setModalError('Selecciona un miembro.')
@@ -169,6 +172,7 @@ export function ActivityDetailPage() {
   }
   const saveCost = async () => {
     if (saving) return
+    setSubmitCount(count => count + 1)
     setCostError(null)
     const validation = validateExtraCostForm(costDescription, costAmount)
     if (validation) return setCostError(validation)
@@ -354,7 +358,7 @@ export function ActivityDetailPage() {
       <div><label htmlFor="extra-cost-amount" className="block text-sm font-medium text-[#0c1a12] mb-1.5">Monto</label><MoneyInput id="extra-cost-amount" value={costAmount} onChange={setCostAmount} placeholder="20000" /></div>
       <StatusRadioGroup name="extra-cost-status" legend="Estado" value={costStatus} onChange={setCostStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no sale de la caja', disabled: editingCost?.status === 'Paid' }, { value: 'Paid', badge: 'paid', hint: 'Registra el egreso en la caja' }]} note={editingCost?.status === 'Paid' ? 'Un costo pagado no puede volver a pendiente.' : undefined} />
       <p className="text-xs text-[#4e7460] rounded-lg bg-[#f8fbf8] border border-[#eef4f0] px-3 py-2">Al marcarlo como pagado, el monto se resta del dinero disponible y de los intereses de préstamos que se reparten entre los socios (rendimientos). No puede superar ninguno de los dos.</p>
-      {costError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{costError}</p>}
+      <FormError message={costError} revision={submitCount} />
       <div className="flex gap-3 pt-1"><button type="button" onClick={() => setCostModal(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
     </form></Modal>}
 
@@ -364,7 +368,7 @@ export function ActivityDetailPage() {
         : <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><select value={userId} onChange={event => setUserId(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un miembro</option>{selectableMembers.map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div>}
       <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input type="number" min="1" step="1" max={available} value={quantity} onChange={event => setQuantity(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /><p className="text-xs text-[#4e7460] mt-1">Unidades disponibles: {available}</p></div>
       {editing && <StatusRadioGroup name="assignment-status" legend="Estado" value={status} onChange={setStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} />}
-      {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
+      <FormError message={modalError} revision={submitCount} />
       <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
     </form></Modal>}
   </div>

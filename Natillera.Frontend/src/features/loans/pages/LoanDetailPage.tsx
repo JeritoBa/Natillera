@@ -12,6 +12,7 @@ import { ApiError, getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
+import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
@@ -51,6 +52,7 @@ export function LoanDetailPage() {
   const [interestStatus, setInterestStatus] = useState<'Pending' | 'Paid'>('Pending')
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [submitCount, setSubmitCount] = useState(0)
   const requestId = useRef(0)
 
   const load = useCallback(async () => {
@@ -123,6 +125,7 @@ export function LoanDetailPage() {
   }
   const save = async () => {
     if (saving) return
+    setSubmitCount(count => count + 1)
     setModalError(null)
     const numericAmount = Number(amount)
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) return setModalError('Ingresa un monto válido.')
@@ -337,7 +340,7 @@ export function LoanDetailPage() {
         <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Descripción</label><input type="text" maxLength={200} value={description} onChange={event => setDescription(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         <StatusRadioGroup name="interest-status" legend="Estado" value={interestStatus} onChange={setInterestStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja', disabled: editingInterest?.status === 'Paid' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} note={editingInterest?.status === 'Paid' ? 'Un interés pagado no puede volver a pendiente.' : undefined} />
       </>}
-      {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
+      <FormError message={modalError} revision={submitCount} />
       <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
     </form></Modal>}
   </div>

@@ -12,6 +12,7 @@ import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
+import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
@@ -38,6 +39,7 @@ export function LoansPage() {
   const [form, setForm] = useState<LoanForm>(emptyForm)
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [submitCount, setSubmitCount] = useState(0)
   const [month, setMonth] = useState<'all' | string>('all')
   const [search, setSearch] = useState('')
   // Spec 021: ?borrower=<userId>&status=Active are read once on load; the URL is not written back.
@@ -68,6 +70,7 @@ export function LoansPage() {
 
   const save = async () => {
     if (saving) return
+    setSubmitCount(count => count + 1)
     setModalError(null)
     const initialAmount = Number(form.initialAmount)
     const interestRate = Number(form.interestRate)
@@ -207,7 +210,7 @@ export function LoansPage() {
           </div>
           {form.description.length >= 450 && <span aria-live="polite" className="sr-only">Te quedan {LOAN_DESCRIPTION_MAX_LENGTH - form.description.length} caracteres</span>}
         </div>
-        {modalError && <p role="alert" className="rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{modalError}</p>}
+        <FormError message={modalError} revision={submitCount} />
         <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(null)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
       </form></Modal>}
     </div>
