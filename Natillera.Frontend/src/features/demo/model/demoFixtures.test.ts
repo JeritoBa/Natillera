@@ -41,9 +41,8 @@ describe.each(scenarios)('demo fixtures (%s)', (_label, now) => {
     const lent = sum(Object.values(f.loanDetails).filter(loan => loan.status === 'Active').map(loan => loan.summary.outstandingPrincipal))
     const pendingInvestment = sum(assignments.filter(item => item.status === 'Pending').map(item => item.quantityAssigned * 6000))
     const interestEarned = sum(interestPayments.filter(item => item.status === 'Paid').map(item => item.amount))
-    // DASH-03 (spec 021): net profit = collected (Paid assignments) - total cost of the non-cancelled activities.
-    const collected = sum(assignments.filter(item => item.status === 'Paid').map(item => item.saleAmount))
-    const activityEarnings = collected - sum(Object.values(f.activityDetails).map(activity => activity.totalCost))
+    // DASH-03 (spec 029): earned so far = margin of the Paid assignments, never negative.
+    const activityEarnings = sum(assignments.filter(item => item.status === 'Paid').map(item => item.quantityAssigned * (10000 - 6000)))
     expect(f.adminSummary.lentMoney).toBe(lent)
     expect(f.adminSummary.pendingActivitiesInvestment).toBe(pendingInvestment)
     expect(f.adminSummary.totalNatilleraBalance).toBe(f.adminSummary.availableMoney + lent + pendingInvestment)

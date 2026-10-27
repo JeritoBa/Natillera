@@ -95,13 +95,12 @@ export function DashboardPage() {
               <dl className="mt-2 space-y-2 text-sm">
                 {sources.map(row => {
                   const hasSegment = segments.some(segment => segment.row.key === row.key)
-                  const negative = row.amount < 0
                   return <div key={row.key} className={`${rowClass} gap-3`}>
                     <dt className="min-w-0 flex gap-2">
                       <span aria-hidden="true" className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: hasSegment ? row.color : 'transparent' }} />
                       <span className="min-w-0"><span className="text-[#0c1a12]">{row.label}</span><span className="block text-xs text-[#4e7460]">{row.detail}</span></span>
                     </dt>
-                    <dd className="mono whitespace-nowrap text-right" style={{ color: row.key === 'activities' && negative ? '#0c1a12' : '#0a6635' }}>{negative ? `−${formatCurrency(row.amount)}` : formatCurrency(row.amount)}</dd>
+                    <dd className="mono whitespace-nowrap text-right text-[#0a6635]">{formatCurrency(row.amount)}</dd>
                   </div>
                 })}
               </dl>
