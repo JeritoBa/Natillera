@@ -32,7 +32,7 @@ The Admin sees the total money of the natillera but not where it comes from: the
 5. New Admin-only section **"Pendientes por cobrar"**, placed between "Top 10 de ventas" and "Movimientos recientes".
 6. One row per member with total pending > 0 in the selected period: MEM-10 applied to each member (fees, loan principal, interest, activity sales), using the **same calculator** as the member detail, so each row total equals the member detail "Debe $ X". Inactive members with pending items are included.
 7. Default order: total descending, then member name A-Z.
-8. **Filter by kind:** "Todos", "Cuotas", "Préstamos (capital)", "Intereses", "Ventas de actividades". With a kind selected, only members with an amount > 0 in that kind are shown, ordered by that amount descending, then name. Each filter shows the number of members it would show; filters with 0 are disabled.
+8. **Filter by kind:** "Todos", "Cuotas", "Capital Préstamos", "Intereses", "Ventas de actividades". With a kind selected, only members with an amount > 0 in that kind are shown, ordered by that amount descending, then name. Each filter shows the number of members it would show; filters with 0 are disabled.
 9. **Filter in the URL:** the selected kind is written to the query string (`/dashboard?pending=monthlyPayments|loans|interests|activitySales`, absent = "Todos") with history replace, and read on load. An unknown value means "Todos". Changing the saving period keeps the filter.
 10. **Totals row** "Total por cobrar": the sum of the visible rows per column.
 11. **Amounts link to the list that explains them** (see "Links" in UI).
@@ -89,9 +89,9 @@ Route `/dashboard`, Admin only for the changes below; the Member dashboard does 
 
 ### Section "Pendientes por cobrar"
 - `section` with `aria-labelledby`, `aria-busy` while loading; card style as the ranking. Header: `h2` "Pendientes por cobrar", `p` "Lo que cada miembro le debe a la natillera en este periodo".
-- **Filters:** `role="group" aria-label="Filtrar por tipo de pendiente"`, single-choice buttons with `aria-pressed`, same style as the loans status filter: "Todos ({n})", "Cuotas ({n})", "Préstamos (capital) ({n})", "Intereses ({n})", "Ventas de actividades ({n})"; `n` = members shown by that filter; `disabled` when 0. Labels come from one exported map in `pendingObligations.ts` (no duplicated strings). Below: `p aria-live="polite"` "Mostrando {x} de {y} miembros con pendientes".
+- **Filters:** `role="group" aria-label="Filtrar por tipo de pendiente"`, single-choice buttons with `aria-pressed`, same style as the loans status filter: "Todos ({n})", "Cuotas ({n})", "Capital Préstamos ({n})", "Intereses ({n})", "Ventas de actividades ({n})"; `n` = members shown by that filter; `disabled` when 0. Labels come from one exported map in `pendingObligations.ts` (no duplicated strings). Below: `p aria-live="polite"` "Mostrando {x} de {y} miembros con pendientes".
 - **Table** (`tableScroll`, shared `tableStyles`), `caption` (sr-only) "Pendientes por cobrar por miembro, ordenados de mayor a menor":
-  - Columns: "Miembro" | "Cuotas" | "Préstamos (capital)" | "Intereses" | "Ventas de actividades" | "Total". The column that orders the rows has `aria-sort="descending"`; with a kind selected that column is also highlighted (`font-semibold`, background `#f8fbf8`).
+  - Columns: "Miembro" | "Cuotas" | "Capital Préstamos" | "Intereses" | "Ventas de actividades" | "Total". The column that orders the rows has `aria-sort="descending"`; with a kind selected that column is also highlighted (`font-semibold`, background `#f8fbf8`).
   - Member cell: link to `/members/{userId}` (`mainLink`), `aria-label` "Ver detalle de {nombre}, debe {monto principal}"; "Inactivo" badge in the secondary line for inactive members.
   - Zero cells: "—" (`aria-hidden`) + sr-only "Sin pendientes".
   - Footer row "Total por cobrar" with the sum of the visible rows per visible column.
@@ -100,7 +100,7 @@ Route `/dashboard`, Admin only for the changes below; the Member dashboard does 
   | Amount | Goes to |
   |---|---|
   | Cuotas | `/payments?member={userId}&status=pending` (existing filters, spec 017) |
-  | Préstamos (capital) | `/loans?borrower={userId}&status=Active` (new borrower filter, scope 3) |
+  | Capital Préstamos | `/loans?borrower={userId}&status=Active` (new borrower filter, scope 3) |
   | Intereses | `/members/{userId}#pendientes` (member detail, pending obligations section, which already lists each interest with its link) |
   | Ventas de actividades | `/members/{userId}#pendientes` (same, lists each assignment with its link) |
   | Total | `/members/{userId}#pendientes` |

@@ -4,7 +4,7 @@ export type PendingKindKey = 'monthlyPayments' | 'loans' | 'interests' | 'activi
 
 export const pendingKindLabels: Record<PendingKindKey, string> = {
   monthlyPayments: 'Cuotas',
-  loans: 'Préstamos (capital)',
+  loans: 'Capital Préstamos',
   interests: 'Intereses',
   activitySales: 'Ventas de actividades',
 }

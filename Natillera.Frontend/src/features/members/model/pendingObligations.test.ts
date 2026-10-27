@@ -32,7 +32,7 @@ describe('pending obligations model (MEM-10, DASH-11)', () => {
   it('lists the four kinds in order', () => {
     const group = { count: 1, amount: 1, items: [] }
     const o: PendingObligations = { total: 4, monthlyPayments: group, loans: group, interests: group, activitySales: group }
-    expect(pendingKinds(o).map(kind => kind.label)).toEqual(['Cuotas', 'Préstamos (capital)', 'Intereses', 'Ventas de actividades'])
+    expect(pendingKinds(o).map(kind => kind.label)).toEqual(['Cuotas', 'Capital Préstamos', 'Intereses', 'Ventas de actividades'])
   })
 
   it('words the sum of pending payments with singular and plural', () => {
