@@ -38,6 +38,7 @@ One spec per feature. Specs describe **what the system must do** (behavior, rule
 | 022 | [Member fee ledger](022-member-fee-ledger.md) | Implemented | MEM-11, MP-09, PER-06 |
 | 023 | [Visible form errors and confirmation dialog](023-visible-form-errors-and-confirm-dialog.md) | Implemented | UI-12, UI-13, UI-03 |
 | 024 | [List filters: counts and URL](024-list-filters-counts-and-url.md) | Implemented | UI-14, UI-15, UI-06 |
+| 027 | [Assignment created as Paid](027-assignment-created-as-paid.md) | Implemented | ACT-16, ACT-08 |
 
 Not specified because not implemented: in-app payments, member loan requests/approval workflow, payment reminders beyond the dashboard notice.
 

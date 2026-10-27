@@ -153,8 +153,8 @@ export function ActivityDetailPage() {
         await updateActivityAssignment(session.accessToken, activity.id, editing.id, { quantityAssigned: numericQuantity, status })
         setSuccess(status === 'Paid' ? 'La asignación se marcó como pagada.' : 'La asignación se actualizó correctamente.')
       } else {
-        await createActivityAssignment(session.accessToken, activity.id, { userId, quantityAssigned: numericQuantity })
-        setSuccess('El miembro se asignó correctamente.')
+        await createActivityAssignment(session.accessToken, activity.id, { userId, quantityAssigned: numericQuantity, status })
+        setSuccess(status === 'Paid' ? 'El miembro se asignó y la venta quedó pagada.' : 'El miembro se asignó correctamente.')
       }
       setModal(false)
       await refresh()
@@ -361,7 +361,7 @@ export function ActivityDetailPage() {
         ? <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><p className="text-sm text-[#0c1a12]">{editing.memberName}</p></div>
         : <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Miembro</label><select value={userId} onChange={event => setUserId(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="">Selecciona un miembro</option>{selectableMembers.map(member => <option key={member.id} value={member.id}>{member.firstName} {member.lastName}</option>)}</select></div>}
       <div><label className="block text-sm font-medium text-[#0c1a12] mb-1.5">Cantidad</label><input type="number" min="1" step="1" max={available} value={quantity} onChange={event => setQuantity(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /><p className="text-xs text-[#4e7460] mt-1">Unidades disponibles: {available}</p></div>
-      {editing && <StatusRadioGroup name="assignment-status" legend="Estado" value={status} onChange={setStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} />}
+      <StatusRadioGroup name="assignment-status" legend="Estado" value={status} onChange={setStatus} options={[{ value: 'Pending', badge: 'pending', hint: 'Aún no entra a la caja' }, { value: 'Paid', badge: 'paid', hint: 'Registra el ingreso en la caja' }]} />
       <FormError message={modalError} revision={submitCount} />
       <div className="flex gap-3 pt-1"><button type="button" onClick={() => setModal(false)} disabled={saving} className="btn-ghost flex-1 py-2.5 rounded-lg text-sm">Cancelar</button><button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 rounded-lg text-sm">{saving ? 'Guardando...' : 'Guardar'}</button></div>
     </form></Modal>}
