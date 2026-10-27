@@ -34,6 +34,7 @@ One spec per feature. Specs describe **what the system must do** (behavior, rule
 | 018 | [Saving periods](018-saving-periods.md) | Implemented | PER-01..08, MP-11, MP-02, MP-04, MP-10, FIN-09, FIN-13 |
 | 019 | [Loan description](019-loan-description.md) | Implemented | LOAN-11 |
 | 020 | [Activity extra costs](020-activity-extra-costs.md) | Implemented | ACT-13..15, DASH-12, FIN-14, DASH-06, FIN-08, FIN-13 |
+| 021 | [Admin dashboard: money by source and pending per member](021-admin-dashboard-sources-and-pending.md) | Implemented | DASH-13, DASH-14, DASH-03, MEM-10 |
 
 Not specified because not implemented: in-app payments, member loan requests/approval workflow, payment reminders beyond the dashboard notice.
 

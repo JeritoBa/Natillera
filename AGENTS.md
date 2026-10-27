@@ -2,7 +2,7 @@
 
 Single entry point for any AI coding agent (Claude Code, Copilot, Cursor, etc.). Read this first, then the documents it links. The owner talks to agents in **Spanish**; all repository documentation and code are in **English**.
 
-Last verified against the code: backend 423 tests and frontend 217 tests passing.
+Last verified against the code: backend 429 tests and frontend 240 tests passing.
 
 ---
 
@@ -122,8 +122,8 @@ Rebuild after code changes: `docker compose up -d --build backend web`. In `Deve
 **Test.**
 
 ```bash
-dotnet test Natillera.sln          # backend, ~423 tests, no DB/Docker needed
-cd Natillera.Frontend && npm test  # Vitest, ~217 tests, pure logic
+dotnet test Natillera.sln          # backend, ~429 tests, no DB/Docker needed
+cd Natillera.Frontend && npm test  # Vitest, ~240 tests, pure logic
 cd Natillera.Frontend && npm run lint && npm run build
 ```
 
