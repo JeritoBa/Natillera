@@ -43,3 +43,7 @@ export function loanBorrowerOptions(loans: LoanListItem[]): LoanBorrowerOption[]
 // Reads the status from the URL once (spec 021); an unknown value means "Todos".
 export const parseLoanStatusFilter = (value: string | null | undefined): LoanStatusFilter =>
   value === 'Active' || value === 'Paid' || value === 'Cancelled' ? value : 'all'
+
+// UI-14: the status buttons count the loans left by the other filters (search, month, borrower), not the status itself.
+export const loanStatusCounts = (loans: LoanListItem[], term: string, month: 'all' | string, borrowerId: 'all' | string): Record<LoanStatusFilter, number> =>
+  countLoansByStatus(filterLoans(loans, term, month, 'all', borrowerId))

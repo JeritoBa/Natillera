@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countMembersByStatus, filterMembers } from '@/features/members/model/memberFilters'
+import { countMembersByStatus, filterMembers, memberStatusCounts } from '@/features/members/model/memberFilters'
 import type { Member } from '@/features/members/model/memberTypes'
 
 const m = (id: string, firstName: string, lastName: string, email: string, phone: string, isActive = true): Member =>
@@ -61,5 +61,17 @@ describe('countMembersByStatus', () => {
   it('counts the whole list', () => {
     expect(countMembersByStatus(members)).toEqual({ all: 3, active: 2, inactive: 1 })
     expect(countMembersByStatus([])).toEqual({ all: 0, active: 0, inactive: 0 })
+  })
+})
+
+// UI-14
+describe('memberStatusCounts', () => {
+  it('equals the totals without a search', () => {
+    expect(memberStatusCounts(members, '')).toEqual({ all: 3, active: 2, inactive: 1 })
+  })
+
+  it('counts only the members that match the search', () => {
+    expect(memberStatusCounts(members, 'mail.com')).toEqual({ all: 2, active: 2, inactive: 0 })
+    expect(memberStatusCounts(members, 'galvez')).toEqual({ all: 1, active: 0, inactive: 1 })
   })
 })

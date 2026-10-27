@@ -17,3 +17,7 @@ export function countMembersByStatus(members: Member[]) {
   const active = members.filter(member => member.isActive).length
   return { all: members.length, active, inactive: members.length - active }
 }
+
+// UI-14: the status buttons count the members left by the search, not the status itself.
+export const memberStatusCounts = (members: Member[], term: string) =>
+  countMembersByStatus(filterMembers(members, term, 'all'))

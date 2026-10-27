@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LoanListItem } from '@/features/loans/api/loansApi'
-import { countLoansByStatus, filterLoans, loanBorrowerOptions, loanStartMonth, parseLoanStatusFilter } from '@/features/loans/model/loanFilters'
+import { countLoansByStatus, filterLoans, loanBorrowerOptions, loanStartMonth, loanStatusCounts, parseLoanStatusFilter } from '@/features/loans/model/loanFilters'
 
 const loan = (id: string, borrowerName: string, startDate: string, status: LoanListItem['status'] = 'Active'): LoanListItem => ({
   id, borrowerId: `u-${id}`, borrowerName, initialAmount: 1000, interestRate: 2, startDate, status, outstandingPrincipal: 1000,
@@ -101,5 +101,29 @@ describe('borrower filter (spec 021)', () => {
     expect(parseLoanStatusFilter('Paid')).toBe('Paid')
     expect(parseLoanStatusFilter('xyz')).toBe('all')
     expect(parseLoanStatusFilter(null)).toBe('all')
+  })
+})
+
+// UI-14
+describe('loanStatusCounts', () => {
+  const mixed = [
+    loan('1', 'Ana Gallego', '2026-10-03T00:00:00'),
+    loan('2', 'Luis Gálvez', '2026-10-20T00:00:00', 'Paid'),
+    loan('3', 'Ana Peña', '2026-09-01T00:00:00'),
+    loan('4', 'Ana Gallego', '2026-09-15T00:00:00', 'Cancelled'),
+  ]
+
+  it('equals the period totals when no filter is applied', () => {
+    expect(loanStatusCounts(mixed, '', 'all', 'all')).toEqual(countLoansByStatus(mixed))
+  })
+
+  it('follows the search, month and borrower filters', () => {
+    expect(loanStatusCounts(mixed, 'ana', 'all', 'all')).toEqual({ all: 3, Active: 2, Paid: 0, Cancelled: 1 })
+    expect(loanStatusCounts(mixed, '', '2026-10', 'all')).toEqual({ all: 2, Active: 1, Paid: 1, Cancelled: 0 })
+    expect(loanStatusCounts(mixed, '', 'all', 'u-1')).toEqual({ all: 1, Active: 1, Paid: 0, Cancelled: 0 })
+  })
+
+  it('does not depend on the status filter itself', () => {
+    expect(loanStatusCounts(mixed, '', '2026-09', 'all')).toEqual({ all: 2, Active: 1, Paid: 0, Cancelled: 1 })
   })
 })

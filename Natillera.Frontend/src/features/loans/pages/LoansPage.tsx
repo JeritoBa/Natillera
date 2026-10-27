@@ -7,7 +7,7 @@ import { cancelLoan, createLoan, getLoans, updateLoan, type LoanListItem } from 
 import { descriptionCounterState, isLoanDescriptionValid, LOAN_DESCRIPTION_MAX_LENGTH, normalizeLoanDescription } from '@/features/loans/model/loanDescription'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
 import { loanCancelConsequences } from '@/features/loans/model/cancelConfirm'
-import { countLoansByStatus, filterLoans, loanBorrowerOptions, loanStartMonth, parseLoanStatusFilter, type LoanStatusFilter } from '@/features/loans/model/loanFilters'
+import { filterLoans, loanBorrowerOptions, loanStartMonth, loanStatusCounts, parseLoanStatusFilter, type LoanStatusFilter } from '@/features/loans/model/loanFilters'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
@@ -120,7 +120,7 @@ export function LoansPage() {
   const borrowerOptions = loanBorrowerOptions(loans)
   const effectiveBorrower = borrowerFilter !== 'all' && borrowerOptions.some(option => option.id === borrowerFilter) ? borrowerFilter : 'all'
   const filtered = filterLoans(loans, search, effectiveMonth, statusFilter, effectiveBorrower)
-  const statusCounts = countLoansByStatus(loans)
+  const statusCounts = loanStatusCounts(loans, search, effectiveMonth, effectiveBorrower)
   const hasFilters = effectiveMonth !== 'all' || search.trim() !== '' || statusFilter !== 'all' || effectiveBorrower !== 'all'
   const clearFilters = () => { setMonth('all'); setSearch(''); setStatusFilter('all'); setBorrowerFilter('all') }
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`

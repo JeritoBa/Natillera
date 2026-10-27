@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { countMembersByStatus, filterMembers, type MemberStatusFilter } from '@/features/members/model/memberFilters'
+import { filterMembers, memberStatusCounts, type MemberStatusFilter } from '@/features/members/model/memberFilters'
 import type { Member, MemberFormValues } from '@/features/members/model/memberTypes'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { Badge } from '@/shared/ui/Badge'
@@ -31,7 +31,7 @@ export function MembersPage() {
   const [statusTarget, setStatusTarget] = useState<Member | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const activeCount = members.filter(member => member.isActive).length
-  const counts = countMembersByStatus(members)
+  const counts = memberStatusCounts(members, search)
   const filtered = filterMembers(members, search, statusFilter)
   const hasFilters = search.trim() !== '' || statusFilter !== 'all'
   const clearFilters = () => { setSearch(''); setStatusFilter('all') }
