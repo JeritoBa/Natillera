@@ -7,10 +7,14 @@ export const loanStartMonth = (loan: Pick<LoanListItem, 'startDate'>) => loan.st
 
 export type LoanStatusFilter = 'all' | LoanStatus
 
-export function filterLoans(loans: LoanListItem[], term: string, month: 'all' | string, status: LoanStatusFilter = 'all', borrowerId: 'all' | string = 'all'): LoanListItem[] {
+// UI-16: "all" means every status except Cancelled; cancelled loans only appear with the "Cancelled" status.
+export const matchesLoanStatus = (loan: Pick<LoanListItem, 'status'>, status: LoanStatusFilter) =>
+  status === 'all' ? loan.status !== 'Cancelled' : loan.status === status
+
+// Everything but the status: search, month and borrower.
+function filterLoansExceptStatus(loans: LoanListItem[], term: string, month: 'all' | string, borrowerId: 'all' | string): LoanListItem[] {
   const query = normalizeSearch(term.trim())
   return loans.filter(loan => {
-    if (status !== 'all' && loan.status !== status) return false
     if (borrowerId !== 'all' && loan.borrowerId !== borrowerId) return false
     if (month !== 'all' && loanStartMonth(loan) !== month) return false
     if (!query) return true
@@ -18,9 +22,15 @@ export function filterLoans(loans: LoanListItem[], term: string, month: 'all' | 
   })
 }
 
+export const filterLoans = (loans: LoanListItem[], term: string, month: 'all' | string, status: LoanStatusFilter = 'all', borrowerId: 'all' | string = 'all'): LoanListItem[] =>
+  filterLoansExceptStatus(loans, term, month, borrowerId).filter(loan => matchesLoanStatus(loan, status))
+
 export function countLoansByStatus(loans: LoanListItem[]): Record<LoanStatusFilter, number> {
-  const counts: Record<LoanStatusFilter, number> = { all: loans.length, Active: 0, Paid: 0, Cancelled: 0 }
-  for (const loan of loans) counts[loan.status] += 1
+  const counts: Record<LoanStatusFilter, number> = { all: 0, Active: 0, Paid: 0, Cancelled: 0 }
+  for (const loan of loans) {
+    counts[loan.status] += 1
+    if (loan.status !== 'Cancelled') counts.all += 1
+  }
   return counts
 }
 
@@ -47,7 +57,7 @@ export const parseLoanStatusFilter = (value: string | null | undefined): LoanSta
 
 // UI-14: the status buttons count the loans left by the other filters (search, month, borrower), not the status itself.
 export const loanStatusCounts = (loans: LoanListItem[], term: string, month: 'all' | string, borrowerId: 'all' | string): Record<LoanStatusFilter, number> =>
-  countLoansByStatus(filterLoans(loans, term, month, 'all', borrowerId))
+  countLoansByStatus(filterLoansExceptStatus(loans, term, month, borrowerId))
 
 export const parseLoanBorrowerFilter = parseIdParam
 export const parseLoanMonthFilter = parseMonthKey

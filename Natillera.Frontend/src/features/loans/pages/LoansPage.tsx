@@ -8,7 +8,7 @@ import { canEditLoan, LOAN_EDIT_LOCK_NOTE, loanEditLocks } from '@/features/loan
 import { descriptionCounterState, isLoanDescriptionValid, LOAN_DESCRIPTION_MAX_LENGTH, normalizeLoanDescription } from '@/features/loans/model/loanDescription'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
 import { loanCancelConsequences } from '@/features/loans/model/cancelConfirm'
-import { filterLoans, loanBorrowerOptions, loanStartMonth, loanStatusCounts, parseLoanBorrowerFilter, parseLoanMonthFilter, parseLoanStatusFilter } from '@/features/loans/model/loanFilters'
+import { filterLoans, loanBorrowerOptions, loanStartMonth, loanStatusCounts, matchesLoanStatus, parseLoanBorrowerFilter, parseLoanMonthFilter, parseLoanStatusFilter } from '@/features/loans/model/loanFilters'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
@@ -19,6 +19,7 @@ import { Icon } from '@/shared/ui/Icon'
 import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { toMoneyInputValue } from '@/shared/lib/money'
+import { optionSource } from '@/shared/lib/listView'
 import { useClearUrlParams, useUrlParam, useUrlTextParam } from '@/shared/lib/useUrlFilter'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
 import { cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
@@ -117,14 +118,17 @@ export function LoansPage() {
   }
 
   const borrowers = members.filter(member => editing ? member.isActive || member.id === editing.borrowerId : member.isActive)
+  // UI-16: option counts exclude cancelled loans (in the "Anulados" view they count the cancelled ones).
+  const optionLoans = optionSource(loans, loan => loan.status === 'Cancelled', statusFilter === 'Cancelled')
   const monthCounts = new Map<string, number>()
-  loans.forEach(loan => monthCounts.set(loanStartMonth(loan), (monthCounts.get(loanStartMonth(loan)) ?? 0) + 1))
+  optionLoans.forEach(loan => monthCounts.set(loanStartMonth(loan), (monthCounts.get(loanStartMonth(loan)) ?? 0) + 1))
   const months = [...monthCounts.keys()].sort().reverse()
   const effectiveMonth = month !== 'all' && monthCounts.has(month) ? month : 'all'
-  const borrowerOptions = loanBorrowerOptions(loans)
+  const borrowerOptions = loanBorrowerOptions(optionLoans)
   const effectiveBorrower = borrowerFilter !== 'all' && borrowerOptions.some(option => option.id === borrowerFilter) ? borrowerFilter : 'all'
   const filtered = filterLoans(loans, search, effectiveMonth, statusFilter, effectiveBorrower)
   const statusCounts = loanStatusCounts(loans, search, effectiveMonth, effectiveBorrower)
+  const statusTotal = loans.filter(loan => matchesLoanStatus(loan, statusFilter)).length // "Mostrando X de Y": the loans of the chosen status
   const hasFilters = effectiveMonth !== 'all' || search.trim() !== '' || statusFilter !== 'all' || effectiveBorrower !== 'all'
   const clearFilters = () => { resetSearch(); clearUrlFilters() }
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
@@ -174,7 +178,7 @@ export function LoansPage() {
             <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`px-3 min-h-10 rounded-lg text-xs font-medium transition-all ${statusFilter === value ? 'bg-[#0c5c38] text-white' : 'btn-ghost'}`}>{label} ({statusCounts[value]})</button>)}
         </div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {loans.length} préstamos</p>
+          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {statusTotal} préstamos</p>
           {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
         </div>
       </div>}
@@ -185,8 +189,8 @@ export function LoansPage() {
           {loading && <tr><td colSpan={7} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando préstamos…</p></td></tr>}
           {!loading && !error && loans.length === 0 && <tr><td colSpan={7} className="px-5 py-12 text-center text-[#4e7460]">{canManage ? 'Aún no hay préstamos registrados. Usa «Nuevo préstamo» para crear el primero.' : 'Aún no hay préstamos registrados.'}</td></tr>}
           {!loading && loans.length > 0 && filtered.length === 0 && <tr><td colSpan={7} className="px-5 py-12 text-center text-[#4e7460]">
-            <p>{search.trim() || statusFilter !== 'all' || effectiveBorrower !== 'all' ? 'No hay préstamos que coincidan con los filtros.' : `No hay préstamos que inicien en ${monthText(effectiveMonth)}.`}</p>
-            <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>
+            <p>{search.trim() || statusFilter !== 'all' || effectiveBorrower !== 'all' ? 'No hay préstamos que coincidan con los filtros.' : effectiveMonth !== 'all' ? `No hay préstamos que inicien en ${monthText(effectiveMonth)}.` : 'No hay préstamos vigentes. Los anulados se ven con el filtro «Anulados».'}</p>
+            {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>}
           </td></tr>}
           {!loading && filtered.map(loan => <tr key={loan.id} className="table-row">
             <td className={`${col('borrower')} py-3.5 ${cellMain}`}>

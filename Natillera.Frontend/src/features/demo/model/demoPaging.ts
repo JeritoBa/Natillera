@@ -3,7 +3,7 @@
 import type { LogListItem, LogPage } from '@/features/audit/api/logsApi'
 import { filterLogs, parseLogActionFilter, parseLogDateFilter, parseLogEntityFilter } from '@/features/audit/model/logFilters'
 import type { RealTransaction, TransactionPage } from '@/features/transactions/api/transactionsApi'
-import { filterTransactions, parseTransactionMonthFilter, parseTransactionTypeFilter, transactionMonthOptions } from '@/features/transactions/model/transactionFilters'
+import { filterTransactions, parseTransactionMonthFilter, parseTransactionStatusFilter, parseTransactionTypeFilter, transactionMonthOptions } from '@/features/transactions/model/transactionFilters'
 import { transactionTotals } from '@/features/transactions/model/transactionTotals'
 import { parsePageParam } from '@/shared/lib/pagination'
 
@@ -13,14 +13,20 @@ const slice = <T>(items: T[], page: number) => items.slice((page - 1) * DEMO_PAG
 
 export function pageDemoTransactions(transactions: RealTransaction[], params: URLSearchParams): TransactionPage {
   const page = parsePageParam(params.get('page'))
-  const filtered = filterTransactions(transactions, parseTransactionTypeFilter(params.get('type')), parseTransactionMonthFilter(params.get('month')))
+  const type = parseTransactionTypeFilter(params.get('type'))
+  const month = parseTransactionMonthFilter(params.get('month'))
+  const status = parseTransactionStatusFilter(params.get('status'))
+  const filtered = filterTransactions(transactions, type, month, status)
+  // UI-16: months count the records of the chosen status view; the status buttons count type and month but not the status.
+  const byTypeAndMonth = transactions.filter(transaction => filterTransactions([transaction], type, month, transaction.isCancelled ? 'cancelled' : 'all').length > 0)
   return {
     items: slice(filtered, page),
     total: filtered.length,
     page,
     pageSize: DEMO_PAGE_SIZE,
     summary: transactionTotals(filtered),
-    months: transactionMonthOptions(transactions).map(option => ({ month: option.key, count: option.count })),
+    months: transactionMonthOptions(transactions.filter(transaction => transaction.isCancelled === (status === 'cancelled'))).map(option => ({ month: option.key, count: option.count })),
+    statusCounts: { active: byTypeAndMonth.filter(transaction => !transaction.isCancelled).length, cancelled: byTypeAndMonth.filter(transaction => transaction.isCancelled).length },
   }
 }
 

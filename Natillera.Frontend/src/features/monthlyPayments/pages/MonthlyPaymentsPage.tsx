@@ -6,9 +6,10 @@ import { useMembers } from '@/features/members/hooks/useMembers'
 import { cancelMonthlyPayment, createMonthlyPayment, getMonthlyPayments, updateMonthlyPayment, type MonthlyPaymentResponse } from '@/features/monthlyPayments/api/monthlyPaymentsApi'
 import { getAvailableMonths, resolveSelectedMonth } from '@/features/monthlyPayments/model/availableMonths'
 import { feeCancelConsequences } from '@/features/monthlyPayments/model/cancelConfirm'
-import { countPaymentsByStatus, filterPayments, paymentMemberOptions, paymentMonthOptions, parsePaymentMemberFilter, parsePaymentMonthFilter, parsePaymentStatusFilter } from '@/features/monthlyPayments/model/paymentFilters'
+import { filterPayments, matchesPaymentStatus, paymentMemberOptions, paymentStatusCounts, paymentMonthOptions, parsePaymentMemberFilter, parsePaymentMonthFilter, parsePaymentStatusFilter } from '@/features/monthlyPayments/model/paymentFilters'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth, formatShortCurrency } from '@/shared/lib/formatters'
+import { optionSource } from '@/shared/lib/listView'
 import { toMoneyInputValue } from '@/shared/lib/money'
 import { useClearUrlParams, useUrlParam } from '@/shared/lib/useUrlFilter'
 import { Badge } from '@/shared/ui/Badge'
@@ -127,14 +128,17 @@ export function MonthlyPaymentsPage() {
 
   const isAdmin = session?.user.role === 'Admin'
   // MP-09: Members only receive Paid fees, so the status filter is Admin only.
-  const memberOptions = paymentMemberOptions(payments)
-  const monthOptions = paymentMonthOptions(payments)
+  const effectiveStatus = isAdmin ? filterStatus : 'all'
+  // UI-16: option counts exclude cancelled fees (in the "Anuladas" view they count the cancelled ones).
+  const optionPayments = optionSource(payments, payment => payment.status === 'cancelled', effectiveStatus === 'cancelled')
+  const memberOptions = paymentMemberOptions(optionPayments)
+  const monthOptions = paymentMonthOptions(optionPayments)
   const effectiveMember = filterMember !== 'all' && memberOptions.some(option => option.id === filterMember) ? filterMember : 'all'
   const effectiveMonth = filterMonth !== 'all' && monthOptions.some(option => option.key === filterMonth) ? filterMonth : 'all'
-  const effectiveStatus = isAdmin ? filterStatus : 'all'
+  const statusTotal = payments.filter(payment => matchesPaymentStatus(payment, effectiveStatus)).length // "Mostrando X de Y": the fees of the chosen status
   const filtered = filterPayments(payments, effectiveMember, effectiveMonth, effectiveStatus)
   // The status buttons count the fees left by the member and month filters.
-  const statusCounts = countPaymentsByStatus(filterPayments(payments, effectiveMember, effectiveMonth))
+  const statusCounts = paymentStatusCounts(payments, effectiveMember, effectiveMonth)
   const hasFilters = effectiveMember !== 'all' || effectiveMonth !== 'all' || effectiveStatus !== 'all'
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const paid = filtered.filter(payment => payment.status === 'paid')
@@ -171,14 +175,14 @@ export function MonthlyPaymentsPage() {
             <button key={value} type="button" aria-pressed={filterStatus === value} onClick={() => setFilterStatus(value)} className={`px-3 min-h-10 rounded-lg text-xs font-medium transition-all ${filterStatus === value ? 'bg-[#0c5c38] text-white' : 'btn-ghost'}`}>{label} ({statusCounts[value]})</button>)}
         </div>}
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {payments.length} cuotas</p>
+          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {statusTotal} cuotas</p>
           {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
         </div>
       </div>}
       <div className={tableWrap} style={cardStyle}><div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>{[['Miembro', `${cellFirst} text-left`], ['Mes', `${cell} ${colTablet} text-left`], ['Monto', `${cell} text-right`], ['Fecha pago', `${cell} ${colDesktop} text-left`], ['Estado', `${cell} ${colTablet} text-left`], ...(isAdmin ? [['Acciones', `${cellLast} text-right w-px whitespace-nowrap`]] : [])].map(([heading, cls]) => <th key={heading} className={`${headCell} ${cls}`}>{heading}</th>)}</tr></thead><tbody>
         {listLoading && <tr><td colSpan={isAdmin ? 6 : 5} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando cuotas…</p></td></tr>}
         {!listLoading && !listError && payments.length === 0 && <tr><td colSpan={isAdmin ? 6 : 5} className="px-5 py-12 text-center text-[#4e7460]">Aún no hay cuotas registradas.</td></tr>}
-        {!listLoading && payments.length > 0 && filtered.length === 0 && <tr><td colSpan={isAdmin ? 6 : 5} className="px-5 py-12 text-center text-[#4e7460]"><p>No hay cuotas que coincidan con los filtros.</p><button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button></td></tr>}
+        {!listLoading && payments.length > 0 && filtered.length === 0 && <tr><td colSpan={isAdmin ? 6 : 5} className="px-5 py-12 text-center text-[#4e7460]"><p>{hasFilters ? 'No hay cuotas que coincidan con los filtros.' : 'No hay cuotas vigentes. Las anuladas se ven con el filtro «Anuladas».'}</p>{hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>}</td></tr>}
         {filtered.map(payment => <tr key={payment.backendId} className="table-row">
           <td className={`${cellFirst} py-3.5 ${cellMain}`}>
             <span className="block line-clamp-2 break-words sm:line-clamp-none font-medium text-[#0c1a12]" title={payment.member}>{payment.member}</span>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TransactionType } from '@/features/transactions/api/transactionsApi'
-import { filterTransactions, parseTransactionMonthFilter, parseTransactionTypeFilter, transactionMonthKey, transactionMonthOptions } from '@/features/transactions/model/transactionFilters'
+import { filterTransactions, parseTransactionMonthFilter, parseTransactionStatusFilter, parseTransactionTypeFilter, transactionMonthKey, transactionMonthOptions } from '@/features/transactions/model/transactionFilters'
 
 // Colombia is UTC-5 all year, so these instants do not depend on the machine time zone.
 const tx = (type: TransactionType, occurredAt: string) => ({ type, occurredAt })
@@ -45,5 +45,26 @@ describe('transaction filters from the URL', () => {
     expect(parseTransactionMonthFilter('2026-03')).toBe('2026-03')
     expect(parseTransactionMonthFilter('2026-00')).toBe('all')
     expect(parseTransactionMonthFilter(null)).toBe('all')
+  })
+})
+
+// UI-16
+describe('transaction status filter', () => {
+  const list = [
+    { type: 'Loan' as TransactionType, occurredAt: '2026-10-05T17:00:00Z', isCancelled: false },
+    { type: 'Loan' as TransactionType, occurredAt: '2026-10-06T17:00:00Z', isCancelled: true },
+    { type: 'Activity' as TransactionType, occurredAt: '2026-09-06T17:00:00Z', isCancelled: true },
+  ]
+
+  it('hides cancelled transactions for "all" and shows only them for "cancelled"', () => {
+    expect(filterTransactions(list, 'all', 'all')).toEqual([list[0]])
+    expect(filterTransactions(list, 'all', 'all', 'cancelled')).toEqual([list[1], list[2]])
+    expect(filterTransactions(list, 'Loan', '2026-10', 'cancelled')).toEqual([list[1]])
+  })
+
+  it('parses the status from the URL; only "cancelled" is recognized', () => {
+    expect(parseTransactionStatusFilter('cancelled')).toBe('cancelled')
+    expect(parseTransactionStatusFilter('active')).toBe('all')
+    expect(parseTransactionStatusFilter(null)).toBe('all')
   })
 })

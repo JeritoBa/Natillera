@@ -20,6 +20,7 @@ import { Icon } from '@/shared/ui/Icon'
 import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
+import { CancelledToggle } from '@/shared/ui/CancelledToggle'
 import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
 import { cell, cellActions, cellAmount, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll } from '@/shared/ui/tableStyles'
 
@@ -57,6 +58,8 @@ export function ActivityDetailPage() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [submitCount, setSubmitCount] = useState(0)
+  const [showCancelledAssignments, setShowCancelledAssignments] = useState(false)
+  const [showCancelledCosts, setShowCancelledCosts] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState<{ kind: 'cost', cost: ExtraCost } | { kind: 'assignment', assignment: ActivityAssignmentResponse } | null>(null)
   const [focusSuccess, setFocusSuccess] = useState(0)
   const successRef = useRef<HTMLParagraphElement>(null)
@@ -131,6 +134,8 @@ export function ActivityDetailPage() {
   const sortedAssignments = [...activity.assignments].sort((a, b) =>
     statusOrder[a.status] - statusOrder[b.status] || new Date(a.assignedAt).getTime() - new Date(b.assignedAt).getTime())
   const activeCount = activity.assignments.filter(item => item.status !== 'Cancelled').length
+  const cancelledAssignmentCount = activity.assignments.length - activeCount
+  const visibleAssignments = showCancelledAssignments ? sortedAssignments : sortedAssignments.filter(item => item.status !== 'Cancelled')
   const total = activity.quantity
   const percent = (units: number) => `${total > 0 ? Math.max(0, Math.min(100, (units / total) * 100)) : 0}%`
 
@@ -164,6 +169,9 @@ export function ActivityDetailPage() {
 
   const extraCosts = activity.extraCosts ?? []
   const sortedCosts = sortExtraCosts(extraCosts)
+  // UI-16: cancelled rows are hidden behind "Ver anulados (n)" (local state); the summaries keep using every record.
+  const cancelledCostCount = extraCosts.filter(cost => cost.status === 'Cancelled').length
+  const visibleCosts = showCancelledCosts ? sortedCosts : sortedCosts.filter(cost => cost.status !== 'Cancelled')
   const costTotals = extraCostTotals(extraCosts)
 
   const openCostModal = (cost: ExtraCost | null) => {
@@ -272,11 +280,13 @@ export function ActivityDetailPage() {
             <p>Esta actividad no tiene costos extra.</p>
             {canManage && !isCancelled && <p>Usa «Agregar costo extra» para registrar gastos como domicilios o transporte.</p>}
           </div>
-          : <div className={`${tableScroll} mt-3`}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+          : <>{visibleCosts.length === 0
+            ? <div className="px-5 py-8 text-center text-sm text-[#4e7460]"><p>No hay costos extra vigentes.</p></div>
+            : <div className={`${tableScroll} mt-3`}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
             {extraCostHeadings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
             {canManage && <th className={`${headCell} ${cellLast} w-px whitespace-nowrap text-right`}>Acciones</th>}
           </tr></thead><tbody>
-            {sortedCosts.map(cost => {
+            {visibleCosts.map(cost => {
               const cancelledCost = cost.status === 'Cancelled'
               return <tr key={cost.id} className="table-row">
                 <td className={`${cellFirst} py-3.5 ${cellMain}`}>
@@ -294,6 +304,7 @@ export function ActivityDetailPage() {
               </tr>
             })}
           </tbody></table></div>}
+          <CancelledToggle count={cancelledCostCount} shown={showCancelledCosts} onToggle={() => setShowCancelledCosts(value => !value)} /></>}
       </section>
 
       <section aria-labelledby="activity-assignments-title" className="rounded-xl overflow-hidden" style={cardStyle}>
@@ -307,10 +318,12 @@ export function ActivityDetailPage() {
             <p>Aún no hay miembros asignados a esta actividad.</p>
             {canManage && !isCancelled && <p>Usa «Asignar miembro» para repartir las unidades.</p>}
           </div>
-          : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+          : <>{visibleAssignments.length === 0
+            ? <div className="px-5 py-8 text-center text-sm text-[#4e7460]"><p>No hay asignaciones vigentes.</p></div>
+            : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
             {headings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
           </tr></thead><tbody>
-            {sortedAssignments.map(assignment => <tr key={assignment.id} className="table-row">
+            {visibleAssignments.map(assignment => <tr key={assignment.id} className="table-row">
               <td className={`${cellFirst} py-3.5 ${cellMain}`}>
                 <Link to={`/activities/${activity.id}/assignments/${assignment.id}`} title={assignment.memberName} className={mainLink}>{assignment.memberName}</Link>
                 <p className={subMobile}><span className="mono">{assignment.quantityAssigned} u.</span><Badge status={assignment.status.toLowerCase()} /></p>
@@ -328,6 +341,7 @@ export function ActivityDetailPage() {
               </div></td>
             </tr>)}
           </tbody></table></div>}
+          <CancelledToggle count={cancelledAssignmentCount} shown={showCancelledAssignments} onToggle={() => setShowCancelledAssignments(value => !value)} /></>}
       </section>
 
       <section aria-labelledby="activity-info-title" className="rounded-xl overflow-hidden" style={cardStyle}>

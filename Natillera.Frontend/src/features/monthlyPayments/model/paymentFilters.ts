@@ -15,18 +15,31 @@ export interface FilterablePayment {
 export const feeMonthKey = (payment: Pick<FilterablePayment, 'year' | 'monthNumber'>) =>
   `${payment.year}-${String(payment.monthNumber).padStart(2, '0')}`
 
+// UI-16: "all" means every status except cancelled; cancelled fees only appear with the "cancelled" status.
+export const matchesPaymentStatus = (payment: Pick<FilterablePayment, 'status'>, status: PaymentStatusFilter) =>
+  status === 'all' ? payment.status !== 'cancelled' : payment.status === status
+
 export function filterPayments<T extends FilterablePayment>(payments: T[], memberId: 'all' | string, month: 'all' | string, status: PaymentStatusFilter = 'all'): T[] {
   return payments.filter(payment =>
     (memberId === 'all' || payment.userId === memberId)
     && (month === 'all' || feeMonthKey(payment) === month)
-    && (status === 'all' || payment.status === status))
+    && matchesPaymentStatus(payment, status))
 }
 
+// "all" counts the non-cancelled fees.
 export function countPaymentsByStatus(payments: FilterablePayment[]): Record<PaymentStatusFilter, number> {
-  const counts: Record<PaymentStatusFilter, number> = { all: payments.length, pending: 0, paid: 0, cancelled: 0 }
-  for (const payment of payments) counts[payment.status] += 1
+  const counts: Record<PaymentStatusFilter, number> = { all: 0, pending: 0, paid: 0, cancelled: 0 }
+  for (const payment of payments) {
+    counts[payment.status] += 1
+    if (payment.status !== 'cancelled') counts.all += 1
+  }
   return counts
 }
+
+// UI-14 / UI-16: the status buttons count the fees left by the member and month filters, not the status itself ("all" excludes cancelled).
+export const paymentStatusCounts = (payments: FilterablePayment[], memberId: 'all' | string, month: 'all' | string): Record<PaymentStatusFilter, number> =>
+  countPaymentsByStatus(payments.filter(payment =>
+    (memberId === 'all' || payment.userId === memberId) && (month === 'all' || feeMonthKey(payment) === month)))
 
 // Members found in the payments (inactive ones included), A-Z, with their number of fees.
 export function paymentMemberOptions(payments: FilterablePayment[]): { id: string, name: string, count: number }[] {

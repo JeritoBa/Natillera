@@ -81,4 +81,28 @@ public class TransactionListQueryTests
         Assert.Null(filter.Type);
         Assert.Null(filter.Month);
     }
+
+    // UI-16
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("", false)]
+    [InlineData("active", false)]
+    [InlineData("Active", false)]
+    [InlineData("cancelled", true)]
+    [InlineData("CANCELLED", true)]
+    public void Parse_Status_DefaultsToActive_UI16(string? status, bool cancelled)
+    {
+        Assert.Equal(cancelled, new TransactionListQuery { Status = status }.Parse().Cancelled);
+    }
+
+    [Theory]
+    [InlineData("all")]
+    [InlineData("paid")]
+    [InlineData("1")]
+    public void Parse_UnknownStatus_Throws_UI16(string status)
+    {
+        var ex = Assert.Throws<DomainException>(() => new TransactionListQuery { Status = status }.Parse());
+
+        Assert.Equal("Unknown status.", ex.Message);
+    }
 }

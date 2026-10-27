@@ -19,6 +19,7 @@ import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { canEditLoan } from '@/features/loans/model/loanEdit'
 import { toMoneyInputValue } from '@/shared/lib/money'
+import { CancelledToggle } from '@/shared/ui/CancelledToggle'
 import { StatusRadioGroup } from '@/shared/ui/StatusRadioGroup'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
 import { cell, cellActions, cellAmount, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll } from '@/shared/ui/tableStyles'
@@ -54,6 +55,8 @@ export function LoanDetailPage() {
   const [method, setMethod] = useState<PaymentMethod>('Cash')
   const [description, setDescription] = useState('')
   const [interestStatus, setInterestStatus] = useState<'Pending' | 'Paid'>('Pending')
+  const [showCancelledPayments, setShowCancelledPayments] = useState(false)
+  const [showCancelledInterests, setShowCancelledInterests] = useState(false)
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [submitCount, setSubmitCount] = useState(0)
@@ -120,11 +123,16 @@ export function LoanDetailPage() {
   const { isCancelled } = summary
   const activeCount = summary.activePayments.length
   const maxPayment = summary.outstandingPrincipal + (editingPayment?.amount ?? 0)
+  // UI-16: cancelled rows are hidden behind "Ver anulados (n)" (local state); the summary and the counts keep using every record.
+  const cancelledPaymentCount = loan.payments.filter(item => item.status === 'Cancelled').length
+  const activeInterestCount = loan.interestPayments.filter(item => item.status !== 'Cancelled').length
+  const cancelledInterestCount = loan.interestPayments.length - activeInterestCount
   const sortedPayments = [...loan.payments].sort((a, b) =>
     Number(a.status === 'Cancelled') - Number(b.status === 'Cancelled') || new Date(a.paidAt).getTime() - new Date(b.paidAt).getTime())
   const sortedInterests = [...loan.interestPayments].sort((a, b) =>
     statusOrder[a.status] - statusOrder[b.status] || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  const activeInterestCount = loan.interestPayments.filter(item => item.status !== 'Cancelled').length
+  const visiblePayments = showCancelledPayments ? sortedPayments : sortedPayments.filter(item => item.status !== 'Cancelled')
+  const visibleInterests = showCancelledInterests ? sortedInterests : sortedInterests.filter(item => item.status !== 'Cancelled')
   const hasInterest = summary.interestGenerated > 0
 
   const openPayment = (payment: LoanPaymentResponse | null) => {
@@ -270,10 +278,12 @@ export function LoanDetailPage() {
             <p>Aún no hay abonos registrados.</p>
             {canManage && !isCancelled && <p>Usa «Registrar abono» para el primero.</p>}
           </div>
-          : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+          : <>{visiblePayments.length === 0
+            ? <div className="px-5 py-8 text-center text-sm text-[#4e7460]"><p>No hay abonos vigentes.</p></div>
+            : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
             {paymentHeadings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
           </tr></thead><tbody>
-            {sortedPayments.map(payment => {
+            {visiblePayments.map(payment => {
               const date = shortDate(payment.paidAt)
               const canEdit = canManage && !isCancelled && payment.status !== 'Cancelled'
               return <tr key={payment.id} className="table-row">
@@ -292,6 +302,7 @@ export function LoanDetailPage() {
               </tr>
             })}
           </tbody></table></div>}
+          <CancelledToggle count={cancelledPaymentCount} shown={showCancelledPayments} onToggle={() => setShowCancelledPayments(value => !value)} /></>}
       </section>
 
       <section aria-labelledby="loan-interests-title" className="rounded-xl overflow-hidden" style={cardStyle}>
@@ -301,10 +312,12 @@ export function LoanDetailPage() {
         </div>
         {sortedInterests.length === 0
           ? <div className="px-5 py-10 text-center text-sm text-[#4e7460]"><p>Aún no hay intereses registrados.</p></div>
-          : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
+          : <>{visibleInterests.length === 0
+            ? <div className="px-5 py-8 text-center text-sm text-[#4e7460]"><p>No hay intereses vigentes.</p></div>
+            : <div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>
             {interestHeadings.map(([heading, visibility, right]) => <th key={heading} className={`${headCell} ${visibility} ${right ? 'text-right' : 'text-left'}`}>{heading}</th>)}
           </tr></thead><tbody>
-            {sortedInterests.map(interest => {
+            {visibleInterests.map(interest => {
               const cancelled = interest.status === 'Cancelled'
               const path = `/loans/${loan.id}/interest-payments/${interest.id}`
               return <tr key={interest.id} className="table-row">
@@ -325,6 +338,7 @@ export function LoanDetailPage() {
               </tr>
             })}
           </tbody></table></div>}
+          <CancelledToggle count={cancelledInterestCount} shown={showCancelledInterests} onToggle={() => setShowCancelledInterests(value => !value)} /></>}
       </section>
 
       <section aria-labelledby="loan-info-title" className="rounded-xl overflow-hidden" style={cardStyle}>

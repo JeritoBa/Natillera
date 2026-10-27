@@ -24,8 +24,12 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
         var periodTransactions = dbContext.Transactions.AsNoTracking()
             .Where(transaction => transaction.SavingPeriodId == savingPeriodId);
 
-        // Month options: every month of the period (not narrowed by the other filters), grouped by Colombia date (UI-06).
-        var occurred = await periodTransactions.Select(transaction => transaction.OccurredAt).ToListAsync(cancellationToken);
+        // Month options: every month of the period with the chosen status (UI-16: live records by default, cancelled ones in the "Anulados" view),
+        // not narrowed by the other filters, grouped by Colombia date (UI-06).
+        var occurred = await periodTransactions
+            .Where(transaction => transaction.IsCancelled == filter.Cancelled)
+            .Select(transaction => transaction.OccurredAt)
+            .ToListAsync(cancellationToken);
         var months = occurred
             .GroupBy(ColombiaTime.MonthKey)
             .Select(group => new TransactionMonthCount(group.Key, group.Count()))
@@ -41,7 +45,17 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
             filtered = filtered.Where(transaction => transaction.OccurredAt >= start && transaction.OccurredAt < end);
         }
 
-        var total = await filtered.CountAsync(cancellationToken);
+        // UI-16: the status buttons count type and month but not the status itself.
+        var statusGroups = await filtered
+            .GroupBy(transaction => transaction.IsCancelled)
+            .Select(group => new { IsCancelled = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+        var statusCounts = new TransactionStatusCounts(
+            statusGroups.Where(item => !item.IsCancelled).Sum(item => item.Count),
+            statusGroups.Where(item => item.IsCancelled).Sum(item => item.Count));
+
+        filtered = filtered.Where(transaction => transaction.IsCancelled == filter.Cancelled);
+        var total = filter.Cancelled ? statusCounts.Cancelled : statusCounts.Active;
         var sums = await filtered
             .Where(transaction => !transaction.IsCancelled) // FIN-06
             .GroupBy(transaction => transaction.Direction)
@@ -86,7 +100,7 @@ public sealed class TransactionRepository(NatilleraDbContext dbContext) : ITrans
                 transaction.IsCancelled))
             .ToListAsync(cancellationToken);
 
-        return new TransactionPageResponse(items, total, filter.Page, filter.PageSize, summary, months);
+        return new TransactionPageResponse(items, total, filter.Page, filter.PageSize, summary, months, statusCounts);
     }
 
     public async Task<TransactionDetailResponse?> GetDetailAsync(Guid id, Guid savingPeriodId, CancellationToken cancellationToken = default)

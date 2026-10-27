@@ -7,7 +7,7 @@ import { defaultDateForPeriod, isDateInPeriodYear, periodDateBounds } from '@/fe
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { activityCancelConsequences } from '@/features/activities/model/cancelConfirm'
-import { parseActivityMonthFilter } from '@/features/activities/model/activityFilters'
+import { activityStartMonth, activityStatusCounts, filterActivities, matchesActivityStatus, parseActivityMonthFilter, parseActivityStatusFilter } from '@/features/activities/model/activityFilters'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
@@ -16,13 +16,15 @@ import { Icon } from '@/shared/ui/Icon'
 import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { toMoneyInputValue } from '@/shared/lib/money'
-import { useUrlParam } from '@/shared/lib/useUrlFilter'
+import { optionSource } from '@/shared/lib/listView'
+import { useClearUrlParams, useUrlParam } from '@/shared/lib/useUrlFilter'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
 import { cell, cellActions, cellAmount, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
 interface ActivityForm { name: string, description: string, quantity: string, unitCost: string, unitSalePrice: string, startDate: string }
 const emptyForm: ActivityForm = { name: '', description: '', quantity: '', unitCost: '', unitSalePrice: '', startDate: '' }
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
+const filterKeys = ['month', 'status'] as const
 
 export function ActivitiesPage() {
   const { session, isDemo } = useAuth()
@@ -39,8 +41,10 @@ export function ActivitiesPage() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [submitCount, setSubmitCount] = useState(0)
-  // UI-15: the month filter lives in the URL.
+  // UI-15: the month and status filters live in the URL.
   const [month, setMonth] = useUrlParam('month', parseActivityMonthFilter, 'all')
+  const [statusFilter, setStatusFilter] = useUrlParam('status', parseActivityStatusFilter, 'all')
+  const clearFilters = useClearUrlParams(filterKeys)
   const [confirmTarget, setConfirmTarget] = useState<ActivityListItem | null>(null)
   const [focusSuccess, setFocusSuccess] = useState(0)
   const successRef = useRef<HTMLParagraphElement>(null)
@@ -112,12 +116,16 @@ export function ActivitiesPage() {
     await load()
   }
 
-  const monthOf = (activity: ActivityListItem) => activity.startDate.slice(0, 7)
+  // UI-16: option counts exclude cancelled activities (in the "Anuladas" view they count the cancelled ones).
+  const optionActivities = optionSource(activities, activity => activity.status === 'Cancelled', statusFilter === 'Cancelled')
   const monthCounts = new Map<string, number>()
-  activities.forEach(activity => monthCounts.set(monthOf(activity), (monthCounts.get(monthOf(activity)) ?? 0) + 1))
+  optionActivities.forEach(activity => monthCounts.set(activityStartMonth(activity), (monthCounts.get(activityStartMonth(activity)) ?? 0) + 1))
   const months = [...monthCounts.keys()].sort().reverse()
   const effectiveMonth = month !== 'all' && monthCounts.has(month) ? month : 'all'
-  const filtered = effectiveMonth === 'all' ? activities : activities.filter(activity => monthOf(activity) === effectiveMonth)
+  const filtered = filterActivities(activities, effectiveMonth, statusFilter)
+  const statusCounts = activityStatusCounts(activities, effectiveMonth)
+  const statusTotal = activities.filter(activity => matchesActivityStatus(activity, statusFilter)).length // "Mostrando X de Y": the activities of the chosen status
+  const hasFilters = effectiveMonth !== 'all' || statusFilter !== 'all'
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const columns: [string, string, boolean][] = [
     ['Actividad', cellFirst, false], ['Fecha de inicio', `${cell} ${colDesktop}`, false], ['Unidades asignadas', `${cell} ${colTablet}`, true], ['Disponibles', `${cell} ${colDesktop}`, false],
@@ -134,7 +142,7 @@ export function ActivitiesPage() {
       {success && !isDemo && <p ref={successRef} tabIndex={-1} role="status" className="mb-4 outline-none rounded-lg border border-[#b8e2c8] bg-[#eef9f1] px-3 py-2.5 text-sm text-[#0a6635]">{success}</p>}
       {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
       {error && activities.length === 0 && !loading && <button onClick={() => { setLoading(true); void load() }} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3 mb-4">Reintentar</button>}
-      {!loading && !error && activities.length > 0 && <div className="rounded-xl p-4 mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3" style={cardStyle}>
+      {!loading && !error && activities.length > 0 && <div className="rounded-xl p-4 mb-4 space-y-3" style={cardStyle}>
         <div>
           <label htmlFor="activity-month-filter" className="block text-xs text-[#4e7460] mb-1">Mes de inicio</label>
           <select id="activity-month-filter" value={effectiveMonth} onChange={event => setMonth(event.target.value)} className="w-full sm:w-64 px-3 py-2.5 rounded-lg text-sm">
@@ -142,9 +150,13 @@ export function ActivitiesPage() {
             {months.map(key => <option key={key} value={key}>{`${monthText(key)} (${monthCounts.get(key)})`}</option>)}
           </select>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {activities.length} actividades</p>
-          {effectiveMonth !== 'all' && <button onClick={() => setMonth('all')} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Ver todos los meses</button>}
+        <div role="group" aria-label="Filtrar por estado" className="flex gap-1.5 flex-wrap">
+          {([['all', 'Todas'], ['Pending', 'Pendientes'], ['Finished', 'Cerradas'], ['Cancelled', 'Anuladas']] as const).map(([value, label]) =>
+            <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`px-3 min-h-10 rounded-lg text-xs font-medium transition-all ${statusFilter === value ? 'bg-[#0c5c38] text-white' : 'btn-ghost'}`}>{label} ({statusCounts[value]})</button>)}
+        </div>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {statusTotal} actividades</p>
+          {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
         </div>
       </div>}
       <div className={tableWrap} style={cardStyle}><div className={tableScroll}>
@@ -154,8 +166,8 @@ export function ActivitiesPage() {
           {loading && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando actividades…</p></td></tr>}
           {!loading && !error && activities.length === 0 && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]">{canManage ? 'Aún no hay actividades registradas. Usa «Nueva actividad» para crear la primera.' : 'Aún no hay actividades registradas.'}</td></tr>}
           {!loading && activities.length > 0 && filtered.length === 0 && <tr><td colSpan={8} className="px-5 py-12 text-center text-[#4e7460]">
-            <p>No hay actividades que empiecen en {monthText(effectiveMonth)}.</p>
-            <button onClick={() => setMonth('all')} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Ver todos los meses</button>
+            <p>{statusFilter !== 'all' ? 'No hay actividades que coincidan con los filtros.' : effectiveMonth !== 'all' ? `No hay actividades que empiecen en ${monthText(effectiveMonth)}.` : 'No hay actividades vigentes. Las anuladas se ven con el filtro «Anuladas».'}</p>
+            {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>}
           </td></tr>}
           {!loading && filtered.map(activity => <tr key={activity.id} className="table-row">
             <td className={`${cellFirst} py-3.5 ${cellMain}`}>

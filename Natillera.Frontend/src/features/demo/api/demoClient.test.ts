@@ -43,7 +43,7 @@ describe('demo client', () => {
 
   it('TX-03 / AUD-04 / DEMO-02: transactions and logs answer the paginated contract and honor the query', async () => {
     const transactions = await resolveDemoRequest<{ items: unknown[], total: number, page: number, pageSize: number, summary: object, months: unknown[] }>('/api/transactions?page=1', 'GET', 'Admin')
-    expect(transactions).toMatchObject({ total: f.transactions.length, page: 1, pageSize: 50 })
+    expect(transactions).toMatchObject({ total: f.transactions.filter(transaction => !transaction.isCancelled).length, page: 1, pageSize: 50 }) // UI-16
     expect(Array.isArray(transactions.months)).toBe(true)
     const none = await resolveDemoRequest<{ items: unknown[], total: number }>('/api/transactions?month=2000-01', 'GET', 'Member')
     expect(none).toMatchObject({ items: [], total: 0 })

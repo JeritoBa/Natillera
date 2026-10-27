@@ -4,7 +4,7 @@ import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { Link, useNavigate } from 'react-router-dom'
 import { getTransactionsPage, type TransactionPage, type TransactionType } from '@/features/transactions/api/transactionsApi'
-import { parseTransactionMonthFilter, parseTransactionTypeFilter, transactionTypeOrder } from '@/features/transactions/model/transactionFilters'
+import { parseTransactionMonthFilter, parseTransactionStatusFilter, parseTransactionTypeFilter, transactionTypeOrder } from '@/features/transactions/model/transactionFilters'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { pageRange } from '@/shared/lib/pagination'
 import { useClearUrlParams, useUrlPage, useUrlParam } from '@/shared/lib/useUrlFilter'
@@ -24,7 +24,7 @@ const typeBackground: Record<TransactionType, string> = {
   MonthlyPayment: '#dcf5e8', Activity: '#fef6dc', ActivitySale: '#ddf0ff', Loan: '#fde8e4', LoanPayment: '#dcf5e8', Performance: '#ddf0ff', ExtraCost: '#fef6dc',
 }
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
-const filterKeys = ['type', 'month', 'page'] as const
+const filterKeys = ['type', 'month', 'status', 'page'] as const
 
 export function TransactionsPage() {
   const { session } = useAuth()
@@ -34,6 +34,7 @@ export function TransactionsPage() {
   // UI-15 / UI-17: the filters and the page live in the URL; changing a filter returns to page 1 in the same update.
   const [filter, setFilter] = useUrlParam('type', parseTransactionTypeFilter, 'all', true)
   const [month, setMonth] = useUrlParam('month', parseTransactionMonthFilter, 'all', true)
+  const [status, setStatus] = useUrlParam('status', parseTransactionStatusFilter, 'all', true)
   const [page, setPage] = useUrlPage()
   const clearFilters = useClearUrlParams(filterKeys)
   const [loading, setLoading] = useState(true)
@@ -47,7 +48,7 @@ export function TransactionsPage() {
     const id = ++requestId.current // a slower, older response must never overwrite a newer one
     setFetching(true)
     try {
-      const result = await getTransactionsPage(session.accessToken, { page, type: filter, month })
+      const result = await getTransactionsPage(session.accessToken, { page, type: filter, month, status })
       if (id !== requestId.current) return
       setData(result); setError(null)
     } catch (requestError) {
@@ -56,7 +57,7 @@ export function TransactionsPage() {
     } finally {
       if (id === requestId.current) { setLoading(false); setFetching(false) }
     }
-  }, [session, page, filter, month])
+  }, [session, page, filter, month, status])
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load() }, 0)
@@ -73,12 +74,14 @@ export function TransactionsPage() {
   const pageSize = data?.pageSize ?? 50
   // A valid month without movements is still selectable: it shows the empty list with "Limpiar filtros".
   const monthOptions = data ? (month !== 'all' && !data.months.some(option => option.month === month) ? [...data.months, { month, count: 0 }].sort((a, b) => b.month.localeCompare(a.month)) : data.months) : []
-  const hasFilters = filter !== 'all' || month !== 'all'
+  const hasFilters = filter !== 'all' || month !== 'all' || status !== 'all'
+  const statusCounts = data?.statusCounts ?? { active: 0, cancelled: 0 }
   const { from, to, totalPages } = pageRange(page, pageSize, total)
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const filterSuffix = hasFilters ? ' (filtro)' : ''
   const { income, expense } = data?.summary ?? { income: 0, expense: 0 }
-  const periodIsEmpty = data !== null && data.months.length === 0 && !hasFilters
+  // The period has no transactions at all (live or cancelled).
+  const periodIsEmpty = data !== null && statusCounts.active === 0 && statusCounts.cancelled === 0 && !hasFilters
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-5xl">
@@ -88,7 +91,7 @@ export function TransactionsPage() {
         <StatCard label={`Egresos totales${filterSuffix}`} value={formatShortCurrency(expense)} tone="negative" />
         <StatCard label={`Movimientos${filterSuffix}`} value={total} />
       </dl>
-      {!loading && (monthOptions.length > 0 || hasFilters) && <div className="rounded-xl p-4 mb-4 space-y-3" style={cardStyle}>
+      {!loading && (monthOptions.length > 0 || statusCounts.cancelled > 0 || hasFilters) && <div className="rounded-xl p-4 mb-4 space-y-3" style={cardStyle}>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label htmlFor="transaction-type-filter" className="block text-xs text-[#4e7460] mb-1">Tipo</label>
@@ -105,6 +108,10 @@ export function TransactionsPage() {
             </select>
           </div>
         </div>
+        <div role="group" aria-label="Filtrar por estado" className="flex gap-1.5 flex-wrap">
+          {([['all', 'Todos', statusCounts.active], ['cancelled', 'Anulados', statusCounts.cancelled]] as const).map(([value, label, count]) =>
+            <button key={value} type="button" aria-pressed={status === value} onClick={() => setStatus(value)} className={`px-3 min-h-10 rounded-lg text-xs font-medium transition-all ${status === value ? 'bg-[#0c5c38] text-white' : 'btn-ghost'}`}>{label} ({count})</button>)}
+        </div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <p className="text-xs text-[#4e7460]" aria-live="polite">{from === 0 ? `Mostrando 0 de ${total} movimientos` : `Mostrando ${from}–${to} de ${total} movimientos`}</p>
           {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
@@ -115,7 +122,7 @@ export function TransactionsPage() {
       <div ref={tableRef} className={`${tableWrap} scroll-mt-4`} style={cardStyle} aria-busy={fetching}><div className={`${tableScroll} transition-opacity ${fetching && !loading ? 'opacity-60' : ''}`}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>{[['Fecha', `${cellFirst} ${colTablet} text-left`], ['Descripción', `${cell} text-left`], ['Miembro', `${cell} ${colDesktop} text-left`], ['Tipo', `${cell} ${colTablet} text-left`], ['Valor', `${cell} text-right`], ['Acciones', `${cellLast} ${colTablet} text-right`]].map(([heading, cls]) => <th key={heading} className={`${headCell} ${cls}`}>{heading}</th>)}</tr></thead><tbody>
         {loading && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando transacciones...</p></td></tr>}
         {!loading && !error && periodIsEmpty && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]">No hay transacciones registradas</td></tr>}
-        {!loading && !error && total === 0 && hasFilters && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p>No hay movimientos que coincidan con los filtros.</p><button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button></td></tr>}
+        {!loading && !error && total === 0 && !periodIsEmpty && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p>{status === 'all' && filter === 'all' && month === 'all' ? 'No hay movimientos vigentes. Los anulados se ven con el filtro «Anulados».' : 'No hay movimientos que coincidan con los filtros.'}</p>{hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>}</td></tr>}
         {!loading && !error && total > 0 && transactions.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-[#4e7460]"><p>Esta página no tiene movimientos.</p><button type="button" onClick={() => goToPage(1)} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Ir a la primera página</button></td></tr>}
         {!loading && transactions.map(transaction => {
           const date = new Date(transaction.occurredAt).toLocaleDateString('es-CO')

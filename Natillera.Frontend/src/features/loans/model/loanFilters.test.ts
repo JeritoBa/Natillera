@@ -55,8 +55,9 @@ describe('filterLoans by status', () => {
     loan('4', 'Ana Ríos', '2026-10-05T00:00:00', 'Paid'),
   ]
 
-  it('keeps every status for "all"', () => {
-    expect(filterLoans(mixed, '', 'all', 'all')).toHaveLength(4)
+  // UI-16: "all" hides the cancelled loans; they only appear with the "Cancelled" status.
+  it('keeps every status except Cancelled for "all"', () => {
+    expect(ids(filterLoans(mixed, '', 'all', 'all'))).toEqual(['1', '2', '4'])
   })
 
   it('filters by a single status', () => {
@@ -69,8 +70,8 @@ describe('filterLoans by status', () => {
     expect(filterLoans(mixed, 'ana', '2026-09', 'Paid')).toEqual([])
   })
 
-  it('counts loans per status over the whole list', () => {
-    expect(countLoansByStatus(mixed)).toEqual({ all: 4, Active: 1, Paid: 2, Cancelled: 1 })
+  it('counts loans per status over the whole list ("all" excludes the cancelled)', () => {
+    expect(countLoansByStatus(mixed)).toEqual({ all: 3, Active: 1, Paid: 2, Cancelled: 1 })
   })
 })
 
@@ -115,16 +116,17 @@ describe('loanStatusCounts', () => {
 
   it('equals the period totals when no filter is applied', () => {
     expect(loanStatusCounts(mixed, '', 'all', 'all')).toEqual(countLoansByStatus(mixed))
+    expect(loanStatusCounts(mixed, '', 'all', 'all')).toEqual({ all: 3, Active: 2, Paid: 1, Cancelled: 1 })
   })
 
   it('follows the search, month and borrower filters', () => {
-    expect(loanStatusCounts(mixed, 'ana', 'all', 'all')).toEqual({ all: 3, Active: 2, Paid: 0, Cancelled: 1 })
+    expect(loanStatusCounts(mixed, 'ana', 'all', 'all')).toEqual({ all: 2, Active: 2, Paid: 0, Cancelled: 1 })
     expect(loanStatusCounts(mixed, '', '2026-10', 'all')).toEqual({ all: 2, Active: 1, Paid: 1, Cancelled: 0 })
     expect(loanStatusCounts(mixed, '', 'all', 'u-1')).toEqual({ all: 1, Active: 1, Paid: 0, Cancelled: 0 })
   })
 
   it('does not depend on the status filter itself', () => {
-    expect(loanStatusCounts(mixed, '', '2026-09', 'all')).toEqual({ all: 2, Active: 1, Paid: 0, Cancelled: 1 })
+    expect(loanStatusCounts(mixed, '', '2026-09', 'all')).toEqual({ all: 1, Active: 1, Paid: 0, Cancelled: 1 })
   })
 })
 

@@ -31,14 +31,15 @@ export function MembersPage() {
   const [submitCount, setSubmitCount] = useState(0)
   // UI-15: the filters live in the URL (the search text is debounced).
   const [search, setSearch, resetSearch] = useUrlTextParam('q')
-  const [statusFilter, setStatusFilter] = useUrlParam('status', parseMemberStatusFilter, 'all')
+  const [statusFilter, setStatusFilter] = useUrlParam('status', parseMemberStatusFilter, 'active')
   const clearUrlFilters = useClearUrlParams(filterKeys)
   const [statusTarget, setStatusTarget] = useState<Member | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const activeCount = members.filter(member => member.isActive).length
   const counts = memberStatusCounts(members, search)
   const filtered = filterMembers(members, search, statusFilter)
-  const hasFilters = search.trim() !== '' || statusFilter !== 'all'
+  const hasFilters = search.trim() !== '' || statusFilter !== 'active'
+  const statusTotal = members.filter(member => member.isActive === (statusFilter === 'active')).length
   const clearFilters = () => { resetSearch(); clearUrlFilters() }
 
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModalError(null); setSuccess(null); setModal('create') }
@@ -94,12 +95,12 @@ export function MembersPage() {
             <input id="member-search" type="search" autoComplete="off" value={search} onChange={event => setSearch(event.target.value)} placeholder="Nombre, correo o teléfono" className="w-full px-3 py-2.5 rounded-lg text-sm" />
           </div>
           <div role="group" aria-label="Filtrar por estado" className="flex gap-1.5 flex-wrap">
-            {([['all', 'Todos', counts.all], ['active', 'Activos', counts.active], ['inactive', 'Inactivos', counts.inactive]] as const).map(([value, label, count]) =>
+            {([['active', 'Activos', counts.active], ['inactive', 'Inactivos', counts.inactive]] as const).map(([value, label, count]) =>
               <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`px-3 min-h-10 rounded-lg text-xs font-medium transition-all ${statusFilter === value ? 'bg-[#0c5c38] text-white' : 'btn-ghost'}`}>{label} ({count})</button>)}
           </div>
         </div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {members.length} miembros</p>
+          <p className="text-xs text-[#4e7460]" aria-live="polite">Mostrando {filtered.length} de {statusTotal} miembros</p>
           {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs">Limpiar filtros</button>}
         </div>
       </div>}
@@ -110,8 +111,8 @@ export function MembersPage() {
           {loading && <tr><td colSpan={canManage ? 5 : 4} className="px-5 py-12 text-center text-[#4e7460]">Cargando miembros...</td></tr>}
           {!loading && members.length === 0 && <tr><td colSpan={canManage ? 5 : 4} className="px-5 py-12 text-center text-[#4e7460]">No hay miembros registrados</td></tr>}
           {!loading && members.length > 0 && filtered.length === 0 && <tr><td colSpan={canManage ? 5 : 4} className="px-5 py-12 text-center text-[#4e7460]">
-            <p>No hay miembros que coincidan con la búsqueda.</p>
-            <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>
+            <p>{search.trim() !== '' ? 'No hay miembros que coincidan con la búsqueda.' : statusFilter === 'active' ? 'No hay miembros activos. Los inactivos se ven con el filtro «Inactivos».' : 'No hay miembros inactivos.'}</p>
+            {hasFilters && <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>}
           </td></tr>}
           {!loading && filtered.map(member => <tr key={member.id} className="table-row">
             <td className={`${cellFirst} py-3.5 ${cellMain}`}>
