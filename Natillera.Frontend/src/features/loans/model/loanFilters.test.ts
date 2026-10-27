@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LoanListItem } from '@/features/loans/api/loansApi'
-import { countLoansByStatus, filterLoans, loanStartMonth } from '@/features/loans/model/loanFilters'
+import { countLoansByStatus, filterLoans, loanBorrowerOptions, loanStartMonth, parseLoanStatusFilter } from '@/features/loans/model/loanFilters'
 
 const loan = (id: string, borrowerName: string, startDate: string, status: LoanListItem['status'] = 'Active'): LoanListItem => ({
   id, borrowerId: `u-${id}`, borrowerName, initialAmount: 1000, interestRate: 2, startDate, status, outstandingPrincipal: 1000,
@@ -71,5 +71,35 @@ describe('filterLoans by status', () => {
 
   it('counts loans per status over the whole list', () => {
     expect(countLoansByStatus(mixed)).toEqual({ all: 4, Active: 1, Paid: 2, Cancelled: 1 })
+  })
+})
+
+describe('borrower filter (spec 021)', () => {
+  const two = [
+    { ...loan('1', 'Luis Gálvez', '2026-10-03T00:00:00'), borrowerId: 'luis' },
+    { ...loan('2', 'Ana Peña', '2026-09-01T00:00:00', 'Paid'), borrowerId: 'ana' },
+    { ...loan('3', 'Ana Peña', '2026-10-05T00:00:00'), borrowerId: 'ana' },
+  ]
+
+  it('filters by borrower id and combines with the other filters (AND)', () => {
+    expect(ids(filterLoans(two, '', 'all', 'all', 'ana'))).toEqual(['2', '3'])
+    expect(ids(filterLoans(two, '', 'all', 'Active', 'ana'))).toEqual(['3'])
+    expect(ids(filterLoans(two, '', '2026-09', 'all', 'ana'))).toEqual(['2'])
+    expect(filterLoans(two, 'luis', 'all', 'all', 'ana')).toEqual([])
+    expect(filterLoans(two, '', 'all', 'all', 'all')).toHaveLength(3)
+  })
+
+  it('lists unique borrowers A-Z with their loan counts', () => {
+    expect(loanBorrowerOptions(two)).toEqual([
+      { id: 'ana', name: 'Ana Peña', count: 2 },
+      { id: 'luis', name: 'Luis Gálvez', count: 1 },
+    ])
+  })
+
+  it('parses the status of the URL, unknown means all', () => {
+    expect(parseLoanStatusFilter('Active')).toBe('Active')
+    expect(parseLoanStatusFilter('Paid')).toBe('Paid')
+    expect(parseLoanStatusFilter('xyz')).toBe('all')
+    expect(parseLoanStatusFilter(null)).toBe('all')
   })
 })

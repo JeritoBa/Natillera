@@ -6,10 +6,11 @@ export const loanStartMonth = (loan: Pick<LoanListItem, 'startDate'>) => loan.st
 
 export type LoanStatusFilter = 'all' | LoanStatus
 
-export function filterLoans(loans: LoanListItem[], term: string, month: 'all' | string, status: LoanStatusFilter = 'all'): LoanListItem[] {
+export function filterLoans(loans: LoanListItem[], term: string, month: 'all' | string, status: LoanStatusFilter = 'all', borrowerId: 'all' | string = 'all'): LoanListItem[] {
   const query = normalizeSearch(term.trim())
   return loans.filter(loan => {
     if (status !== 'all' && loan.status !== status) return false
+    if (borrowerId !== 'all' && loan.borrowerId !== borrowerId) return false
     if (month !== 'all' && loanStartMonth(loan) !== month) return false
     if (!query) return true
     return normalizeSearch(loan.borrowerName).includes(query)
@@ -21,3 +22,24 @@ export function countLoansByStatus(loans: LoanListItem[]): Record<LoanStatusFilt
   for (const loan of loans) counts[loan.status] += 1
   return counts
 }
+
+export interface LoanBorrowerOption {
+  id: string
+  name: string
+  count: number
+}
+
+// Unique borrowers of the period, A-Z, with their number of loans.
+export function loanBorrowerOptions(loans: LoanListItem[]): LoanBorrowerOption[] {
+  const byId = new Map<string, LoanBorrowerOption>()
+  for (const loan of loans) {
+    const option = byId.get(loan.borrowerId)
+    if (option) option.count += 1
+    else byId.set(loan.borrowerId, { id: loan.borrowerId, name: loan.borrowerName, count: 1 })
+  }
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'))
+}
+
+// Reads the status from the URL once (spec 021); an unknown value means "Todos".
+export const parseLoanStatusFilter = (value: string | null | undefined): LoanStatusFilter =>
+  value === 'Active' || value === 'Paid' || value === 'Cancelled' ? value : 'all'

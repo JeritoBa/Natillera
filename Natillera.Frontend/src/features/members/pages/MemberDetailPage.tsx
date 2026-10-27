@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { appName } from '@/app/useDocumentTitle'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
@@ -22,6 +22,7 @@ const collapsedCount = 5
 export function MemberDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { hash } = useLocation()
   const { session } = useAuth()
   const { selected } = useSavingPeriod()
   const [detail, setDetail] = useState<MemberDetail | null>(null)
@@ -55,6 +56,11 @@ export function MemberDetailPage() {
   useEffect(() => {
     if (detail) document.title = `${detail.member.firstName} ${detail.member.lastName} · ${appName}`
   }, [detail])
+
+  // Spec 021: the dashboard links to /members/{id}#pendientes; scroll once the detail has rendered.
+  useEffect(() => {
+    if (detail && hash === '#pendientes') document.getElementById('pendientes')?.scrollIntoView()
+  }, [detail, hash])
 
   const back = <button onClick={() => navigate('/members')} className="btn-ghost px-4 py-2 rounded-lg text-sm mb-5">← Volver a miembros</button>
 
@@ -111,7 +117,7 @@ export function MemberDetailPage() {
           {balance.total === 0 && <p className="mt-3 text-xs text-[#4e7460]">Aún no tiene cuotas pagadas.</p>}
         </section>
 
-        <section aria-labelledby="member-pending-title" className="rounded-xl p-5" style={cardStyle}>
+        <section id="pendientes" aria-labelledby="member-pending-title" className="rounded-xl p-5 scroll-mt-4" style={cardStyle}>
           <PendingObligationsCard obligations={pendingObligations} audience="admin" titleId="member-pending-title" memberId={member.id} />
         </section>
       </div>

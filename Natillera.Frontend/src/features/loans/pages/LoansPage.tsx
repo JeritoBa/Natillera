@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { defaultDateForPeriod, isDateInPeriodYear, periodDateBounds } from '@/features/settings/model/savingPeriod'
 import { cancelLoan, createLoan, getLoans, updateLoan, type LoanListItem } from '@/features/loans/api/loansApi'
 import { descriptionCounterState, isLoanDescriptionValid, LOAN_DESCRIPTION_MAX_LENGTH, normalizeLoanDescription } from '@/features/loans/model/loanDescription'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
-import { countLoansByStatus, filterLoans, loanStartMonth, type LoanStatusFilter } from '@/features/loans/model/loanFilters'
+import { countLoansByStatus, filterLoans, loanBorrowerOptions, loanStartMonth, parseLoanStatusFilter, type LoanStatusFilter } from '@/features/loans/model/loanFilters'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
@@ -27,6 +27,7 @@ export function LoansPage() {
   const { selected } = useSavingPeriod()
   const { members } = useMembers()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const canManage = session?.user.role === 'Admin'
   const [loans, setLoans] = useState<LoanListItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,7 +40,9 @@ export function LoansPage() {
   const [saving, setSaving] = useState(false)
   const [month, setMonth] = useState<'all' | string>('all')
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<LoanStatusFilter>('all')
+  // Spec 021: ?borrower=<userId>&status=Active are read once on load; the URL is not written back.
+  const [borrowerFilter, setBorrowerFilter] = useState<'all' | string>(() => searchParams.get('borrower') ?? 'all')
+  const [statusFilter, setStatusFilter] = useState<LoanStatusFilter>(() => parseLoanStatusFilter(searchParams.get('status')))
 
   const load = useCallback(async () => {
     if (!session) return
@@ -102,10 +105,12 @@ export function LoansPage() {
   loans.forEach(loan => monthCounts.set(loanStartMonth(loan), (monthCounts.get(loanStartMonth(loan)) ?? 0) + 1))
   const months = [...monthCounts.keys()].sort().reverse()
   const effectiveMonth = month !== 'all' && monthCounts.has(month) ? month : 'all'
-  const filtered = filterLoans(loans, search, effectiveMonth, statusFilter)
+  const borrowerOptions = loanBorrowerOptions(loans)
+  const effectiveBorrower = borrowerFilter !== 'all' && borrowerOptions.some(option => option.id === borrowerFilter) ? borrowerFilter : 'all'
+  const filtered = filterLoans(loans, search, effectiveMonth, statusFilter, effectiveBorrower)
   const statusCounts = countLoansByStatus(loans)
-  const hasFilters = effectiveMonth !== 'all' || search.trim() !== '' || statusFilter !== 'all'
-  const clearFilters = () => { setMonth('all'); setSearch(''); setStatusFilter('all') }
+  const hasFilters = effectiveMonth !== 'all' || search.trim() !== '' || statusFilter !== 'all' || effectiveBorrower !== 'all'
+  const clearFilters = () => { setMonth('all'); setSearch(''); setStatusFilter('all'); setBorrowerFilter('all') }
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const columns: { heading: ReactNode, key: string, cls: string, right: boolean }[] = [
     { key: 'borrower', heading: 'Deudor', cls: 'px-3 sm:px-5', right: false },
@@ -128,10 +133,17 @@ export function LoansPage() {
       {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
       {error && loans.length === 0 && !loading && <button onClick={() => { setLoading(true); void load() }} className="btn-ghost px-4 py-2 rounded-lg text-sm mt-3 mb-4">Reintentar</button>}
       {!loading && !error && loans.length > 0 && <div className="rounded-xl p-4 mb-4 space-y-3" style={cardStyle}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div>
             <label htmlFor="loan-search" className="block text-xs text-[#4e7460] mb-1">Buscar deudor</label>
             <input id="loan-search" type="search" autoComplete="off" value={search} onChange={event => setSearch(event.target.value)} placeholder="Nombre del deudor" className="w-full px-3 py-2.5 rounded-lg text-sm" />
+          </div>
+          <div>
+            <label htmlFor="loan-borrower-filter" className="block text-xs text-[#4e7460] mb-1">Deudor</label>
+            <select id="loan-borrower-filter" value={effectiveBorrower} onChange={event => setBorrowerFilter(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm">
+              <option value="all">Todos los deudores</option>
+              {borrowerOptions.map(option => <option key={option.id} value={option.id}>{`${option.name} (${option.count})`}</option>)}
+            </select>
           </div>
           <div>
             <label htmlFor="loan-month-filter" className="block text-xs text-[#4e7460] mb-1">Mes de inicio</label>
@@ -157,7 +169,7 @@ export function LoansPage() {
           {loading && <tr><td colSpan={7} className="px-5 py-12 text-center text-[#4e7460]"><p role="status">Cargando préstamos…</p></td></tr>}
           {!loading && !error && loans.length === 0 && <tr><td colSpan={7} className="px-5 py-12 text-center text-[#4e7460]">{canManage ? 'Aún no hay préstamos registrados. Usa «Nuevo préstamo» para crear el primero.' : 'Aún no hay préstamos registrados.'}</td></tr>}
           {!loading && loans.length > 0 && filtered.length === 0 && <tr><td colSpan={7} className="px-5 py-12 text-center text-[#4e7460]">
-            <p>{search.trim() || statusFilter !== 'all' ? 'No hay préstamos que coincidan con los filtros.' : `No hay préstamos que inicien en ${monthText(effectiveMonth)}.`}</p>
+            <p>{search.trim() || statusFilter !== 'all' || effectiveBorrower !== 'all' ? 'No hay préstamos que coincidan con los filtros.' : `No hay préstamos que inicien en ${monthText(effectiveMonth)}.`}</p>
             <button type="button" onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs mt-2">Limpiar filtros</button>
           </td></tr>}
           {!loading && filtered.map(loan => <tr key={loan.id} className="table-row">
