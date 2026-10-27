@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countPaymentsByStatus, feeMonthKey, filterPayments, paymentMemberOptions, paymentMonthOptions, type FilterablePayment } from '@/features/monthlyPayments/model/paymentFilters'
+import { countPaymentsByStatus, feeMonthKey, filterPayments, parsePaymentMemberFilter, parsePaymentMonthFilter, parsePaymentStatusFilter, paymentMemberOptions, paymentMonthOptions, type FilterablePayment } from '@/features/monthlyPayments/model/paymentFilters'
 
 const payment = (userId: string, member: string, year: number, monthNumber: number, status: FilterablePayment['status']): FilterablePayment =>
   ({ userId, member, year, monthNumber, status })
@@ -38,5 +38,24 @@ describe('payment filters (MP-09, UI-06)', () => {
   it('lists members A-Z and months newest first, with counts', () => {
     expect(paymentMemberOptions(payments)).toEqual([{ id: 'u2', name: 'Ana Gallego', count: 2 }, { id: 'u1', name: 'Luis Gálvez', count: 2 }])
     expect(paymentMonthOptions(payments)).toEqual([{ key: '2026-10', count: 2 }, { key: '2026-09', count: 1 }, { key: '2025-12', count: 1 }])
+  })
+})
+
+// UI-15
+describe('payment filters from the URL', () => {
+  it('parses the status', () => {
+    expect(parsePaymentStatusFilter('pending')).toBe('pending')
+    expect(parsePaymentStatusFilter('cancelled')).toBe('cancelled')
+    expect(parsePaymentStatusFilter('xyz')).toBe('all')
+    expect(parsePaymentStatusFilter('Pending')).toBe('all')
+    expect(parsePaymentStatusFilter(null)).toBe('all')
+  })
+
+  it('parses the member and the month', () => {
+    expect(parsePaymentMemberFilter('u-1')).toBe('u-1')
+    expect(parsePaymentMemberFilter(null)).toBe('all')
+    expect(parsePaymentMonthFilter('2026-03')).toBe('2026-03')
+    expect(parsePaymentMonthFilter('2019-13')).toBe('all')
+    expect(parsePaymentMonthFilter(null)).toBe('all')
   })
 })

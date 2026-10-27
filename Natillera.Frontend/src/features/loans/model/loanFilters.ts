@@ -1,5 +1,6 @@
 import type { LoanListItem, LoanStatus } from '@/features/loans/api/loansApi'
 import { normalizeSearch } from '@/shared/lib/search'
+import { parseIdParam, parseMonthKey } from '@/shared/lib/urlFilterParams'
 
 // UI-06: month filters use startDate.slice(0, 7).
 export const loanStartMonth = (loan: Pick<LoanListItem, 'startDate'>) => loan.startDate.slice(0, 7)
@@ -40,10 +41,13 @@ export function loanBorrowerOptions(loans: LoanListItem[]): LoanBorrowerOption[]
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'es'))
 }
 
-// Reads the status from the URL once (spec 021); an unknown value means "Todos".
+// UI-15: filters come from the URL; unknown values mean "Todos" (the page checks the borrower and the month against the data).
 export const parseLoanStatusFilter = (value: string | null | undefined): LoanStatusFilter =>
   value === 'Active' || value === 'Paid' || value === 'Cancelled' ? value : 'all'
 
 // UI-14: the status buttons count the loans left by the other filters (search, month, borrower), not the status itself.
 export const loanStatusCounts = (loans: LoanListItem[], term: string, month: 'all' | string, borrowerId: 'all' | string): Record<LoanStatusFilter, number> =>
   countLoansByStatus(filterLoans(loans, term, month, 'all', borrowerId))
+
+export const parseLoanBorrowerFilter = parseIdParam
+export const parseLoanMonthFilter = parseMonthKey

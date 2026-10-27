@@ -1,3 +1,5 @@
+import { parseIdParam, parseMonthKey, parseOneOf } from '@/shared/lib/urlFilterParams'
+
 export type PaymentStatus = 'pending' | 'paid' | 'cancelled'
 export type PaymentStatusFilter = 'all' | PaymentStatus
 
@@ -43,3 +45,8 @@ export function paymentMonthOptions(payments: FilterablePayment[]): { key: strin
   for (const payment of payments) counts.set(feeMonthKey(payment), (counts.get(feeMonthKey(payment)) ?? 0) + 1)
   return [...counts.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.key.localeCompare(a.key))
 }
+
+// UI-15: filters come from the URL; unknown values mean "Todos". Whether a member/month exists in the data is decided by the page.
+export const parsePaymentStatusFilter = parseOneOf<PaymentStatus>(['pending', 'paid', 'cancelled'])
+export const parsePaymentMemberFilter = parseIdParam
+export const parsePaymentMonthFilter = parseMonthKey

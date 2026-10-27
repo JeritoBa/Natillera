@@ -1,5 +1,6 @@
 import type { Member } from '@/features/members/model/memberTypes'
 import { normalizeSearch } from '@/shared/lib/search'
+import { parseOneOf } from '@/shared/lib/urlFilterParams'
 
 export type MemberStatusFilter = 'all' | 'active' | 'inactive'
 
@@ -21,3 +22,6 @@ export function countMembersByStatus(members: Member[]) {
 // UI-14: the status buttons count the members left by the search, not the status itself.
 export const memberStatusCounts = (members: Member[], term: string) =>
   countMembersByStatus(filterMembers(members, term, 'all'))
+
+// UI-15: the status comes from the URL; unknown values mean "Todos".
+export const parseMemberStatusFilter = parseOneOf<'active' | 'inactive'>(['active', 'inactive'])

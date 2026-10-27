@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { formatDateOnly } from '@/features/loans/model/labels'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
@@ -7,10 +6,11 @@ import { useMembers } from '@/features/members/hooks/useMembers'
 import { cancelMonthlyPayment, createMonthlyPayment, getMonthlyPayments, updateMonthlyPayment, type MonthlyPaymentResponse } from '@/features/monthlyPayments/api/monthlyPaymentsApi'
 import { getAvailableMonths, resolveSelectedMonth } from '@/features/monthlyPayments/model/availableMonths'
 import { feeCancelConsequences } from '@/features/monthlyPayments/model/cancelConfirm'
-import { countPaymentsByStatus, filterPayments, paymentMemberOptions, paymentMonthOptions, type PaymentStatusFilter } from '@/features/monthlyPayments/model/paymentFilters'
+import { countPaymentsByStatus, filterPayments, paymentMemberOptions, paymentMonthOptions, parsePaymentMemberFilter, parsePaymentMonthFilter, parsePaymentStatusFilter } from '@/features/monthlyPayments/model/paymentFilters'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth, formatShortCurrency } from '@/shared/lib/formatters'
 import { toMoneyInputValue } from '@/shared/lib/money'
+import { useClearUrlParams, useUrlParam } from '@/shared/lib/useUrlFilter'
 import { Badge } from '@/shared/ui/Badge'
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
 import { ConfirmSummary } from '@/shared/ui/ConfirmSummary'
@@ -28,7 +28,8 @@ type MonthlyPaymentRow = {
 }
 
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
-const statusFilters = ['pending', 'paid', 'cancelled']
+// UI-15: the filters live in the URL.
+const filterKeys = ['member', 'month', 'status'] as const
 
 const toRow = (payment: MonthlyPaymentResponse): MonthlyPaymentRow => ({
   backendId: payment.id, userId: payment.userId, member: payment.memberName, year: payment.year, monthNumber: payment.month,
@@ -40,7 +41,6 @@ export function MonthlyPaymentsPage() {
   const { session, isDemo } = useAuth()
   const { members, loading: membersLoading } = useMembers()
   const { selected } = useSavingPeriod()
-  const [searchParams] = useSearchParams()
   const [payments, setPayments] = useState<MonthlyPaymentRow[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<MonthlyPaymentRow | null>(null)
@@ -57,13 +57,10 @@ export function MonthlyPaymentsPage() {
   const successRef = useRef<HTMLParagraphElement>(null)
   const [modalError, setModalError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  // Initial filters come from the URL (e.g. the pending fee links) and are read once, not written back.
-  const [filterMember, setFilterMember] = useState(() => searchParams.get('member') ?? 'all')
-  const [filterMonth, setFilterMonth] = useState(() => searchParams.get('month') ?? 'all')
-  const [filterStatus, setFilterStatus] = useState<PaymentStatusFilter>(() => {
-    const value = searchParams.get('status')
-    return value && statusFilters.includes(value) ? value as PaymentStatusFilter : 'all'
-  })
+  const [filterMember, setFilterMember] = useUrlParam('member', parsePaymentMemberFilter, 'all')
+  const [filterMonth, setFilterMonth] = useUrlParam('month', parsePaymentMonthFilter, 'all')
+  const [filterStatus, setFilterStatus] = useUrlParam('status', parsePaymentStatusFilter, 'all')
+  const clearFilters = useClearUrlParams(filterKeys)
   const activeMembers = members.filter(member => member.isActive)
 
   const load = useCallback(async () => {
@@ -139,7 +136,6 @@ export function MonthlyPaymentsPage() {
   // The status buttons count the fees left by the member and month filters.
   const statusCounts = countPaymentsByStatus(filterPayments(payments, effectiveMember, effectiveMonth))
   const hasFilters = effectiveMember !== 'all' || effectiveMonth !== 'all' || effectiveStatus !== 'all'
-  const clearFilters = () => { setFilterMember('all'); setFilterMonth('all'); setFilterStatus('all') }
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const paid = filtered.filter(payment => payment.status === 'paid')
   const actual = filtered.filter(payment => payment.status !== 'cancelled')

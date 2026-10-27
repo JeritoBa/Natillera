@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LoanListItem } from '@/features/loans/api/loansApi'
-import { countLoansByStatus, filterLoans, loanBorrowerOptions, loanStartMonth, loanStatusCounts, parseLoanStatusFilter } from '@/features/loans/model/loanFilters'
+import { countLoansByStatus, filterLoans, loanBorrowerOptions, loanStartMonth, loanStatusCounts, parseLoanBorrowerFilter, parseLoanMonthFilter, parseLoanStatusFilter } from '@/features/loans/model/loanFilters'
 
 const loan = (id: string, borrowerName: string, startDate: string, status: LoanListItem['status'] = 'Active'): LoanListItem => ({
   id, borrowerId: `u-${id}`, borrowerName, initialAmount: 1000, interestRate: 2, startDate, status, outstandingPrincipal: 1000,
@@ -125,5 +125,23 @@ describe('loanStatusCounts', () => {
 
   it('does not depend on the status filter itself', () => {
     expect(loanStatusCounts(mixed, '', '2026-09', 'all')).toEqual({ all: 2, Active: 1, Paid: 0, Cancelled: 1 })
+  })
+})
+
+// UI-15
+describe('loan filters from the URL', () => {
+  it('parses the status (PascalCase)', () => {
+    expect(parseLoanStatusFilter('Active')).toBe('Active')
+    expect(parseLoanStatusFilter('active')).toBe('all')
+    expect(parseLoanStatusFilter('xyz')).toBe('all')
+    expect(parseLoanStatusFilter(null)).toBe('all')
+  })
+
+  it('parses the borrower and the month', () => {
+    expect(parseLoanBorrowerFilter('u-1')).toBe('u-1')
+    expect(parseLoanBorrowerFilter('')).toBe('all')
+    expect(parseLoanMonthFilter('2026-03')).toBe('2026-03')
+    expect(parseLoanMonthFilter('xyz')).toBe('all')
+    expect(parseLoanMonthFilter(null)).toBe('all')
   })
 })

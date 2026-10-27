@@ -1,4 +1,5 @@
 import type { TransactionType } from '@/features/transactions/api/transactionsApi'
+import { parseMonthKey, parseOneOf } from '@/shared/lib/urlFilterParams'
 
 // UI-06: the month is the Colombia (America/Bogota) date of occurredAt (the API sends a UTC timestamp), regardless of the browser time zone.
 const bogotaMonth = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit' })
@@ -25,3 +26,10 @@ export function transactionMonthOptions(transactions: FilterableTransaction[]): 
   }
   return [...counts.entries()].map(([key, count]) => ({ key, count })).sort((a, b) => b.key.localeCompare(a.key))
 }
+
+// Order of the type options in the filter.
+export const transactionTypeOrder: TransactionType[] = ['MonthlyPayment', 'Loan', 'LoanPayment', 'Performance', 'Activity', 'ActivitySale', 'ExtraCost']
+
+// UI-15: filters come from the URL; unknown values mean "Todos".
+export const parseTransactionTypeFilter = parseOneOf(transactionTypeOrder)
+export const parseTransactionMonthFilter = parseMonthKey

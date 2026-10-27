@@ -3,13 +3,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
-import { getLogs, type LogAction, type LogEntityType, type LogListItem } from '@/features/audit/api/logsApi'
+import { getLogs, type LogListItem } from '@/features/audit/api/logsApi'
 import { actionBackground, actionColor, actionLabel, actions, entityBackground, entityColor, entityLabel, entityTypes } from '@/features/audit/model/labels'
+import { parseLogActionFilter, parseLogDateFilter, parseLogEntityFilter } from '@/features/audit/model/logFilters'
 import { getFriendlyApiError } from '@/shared/api/apiError'
+import { useClearUrlParams, useUrlParam, useUrlTextParam } from '@/shared/lib/useUrlFilter'
 import { formatCurrency } from '@/shared/lib/formatters'
 import { normalizeSearch } from '@/shared/lib/search'
 import { cell, cellActions, cellFirst, cellLast, cellMain, colDesktop, colTablet, eyeButton, headCell, subMobile, subTablet, tableCardStyle, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
+const filterKeys = ['q', 'entity', 'action', 'from', 'to'] as const
 const money = (value: number | null) => value === null ? '—' : formatCurrency(value)
 
 export function LogsPage() {
@@ -17,11 +20,13 @@ export function LogsPage() {
   const { selected } = useSavingPeriod()
   const navigate = useNavigate()
   const [logs, setLogs] = useState<LogListItem[]>([])
-  const [entity, setEntity] = useState<LogEntityType | 'all'>('all')
-  const [action, setAction] = useState<LogAction | 'all'>('all')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
-  const [search, setSearch] = useState('')
+  // UI-15: the filters live in the URL (the search text is debounced).
+  const [search, setSearch, resetSearch] = useUrlTextParam('q')
+  const [entity, setEntity] = useUrlParam('entity', parseLogEntityFilter, 'all')
+  const [action, setAction] = useUrlParam('action', parseLogActionFilter, 'all')
+  const [from, setFrom] = useUrlParam('from', parseLogDateFilter, '')
+  const [to, setTo] = useUrlParam('to', parseLogDateFilter, '')
+  const clearUrlFilters = useClearUrlParams(filterKeys)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,7 +60,7 @@ export function LogsPage() {
   }, [logs, entity, action, from, to, search])
 
   const hasFilters = entity !== 'all' || action !== 'all' || from !== '' || to !== '' || search !== ''
-  const clearFilters = () => { setEntity('all'); setAction('all'); setFrom(''); setTo(''); setSearch('') }
+  const clearFilters = () => { resetSearch(); clearUrlFilters() }
   const label = 'block text-xs text-[#4e7460] mb-1'
 
   return (
@@ -64,12 +69,12 @@ export function LogsPage() {
       <div className="rounded-xl p-4 mb-4 space-y-3" style={{ background: '#fff', border: '1px solid #d6e8dc' }}>
         <input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar por usuario, entidad, acción, id o monto" className="w-full px-3 py-2.5 rounded-lg text-sm" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div><label className={label}>Entidad</label><select value={entity} onChange={event => setEntity(event.target.value as LogEntityType | 'all')} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="all">Todas</option>{entityTypes.map(value => <option key={value} value={value}>{entityLabel[value]}</option>)}</select></div>
-          <div><label className={label}>Acción</label><select value={action} onChange={event => setAction(event.target.value as LogAction | 'all')} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="all">Todas</option>{actions.map(value => <option key={value} value={value}>{actionLabel[value]}</option>)}</select></div>
+          <div><label className={label}>Entidad</label><select value={entity} onChange={event => setEntity(parseLogEntityFilter(event.target.value))} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="all">Todas</option>{entityTypes.map(value => <option key={value} value={value}>{entityLabel[value]}</option>)}</select></div>
+          <div><label className={label}>Acción</label><select value={action} onChange={event => setAction(parseLogActionFilter(event.target.value))} className="w-full px-3 py-2.5 rounded-lg text-sm"><option value="all">Todas</option>{actions.map(value => <option key={value} value={value}>{actionLabel[value]}</option>)}</select></div>
           <div><label className={label}>Desde</label><input type="date" value={from} max={to || undefined} onChange={event => setFrom(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
           <div><label className={label}>Hasta</label><input type="date" value={to} min={from || undefined} onChange={event => setTo(event.target.value)} className="w-full px-3 py-2.5 rounded-lg text-sm" /></div>
         </div>
-        <div className="flex items-center justify-between"><p className="text-xs text-[#4e7460]">{filtered.length} de {logs.length} registros</p>{hasFilters && <button onClick={clearFilters} className="btn-ghost px-3 py-1.5 rounded-lg text-xs font-medium">Limpiar filtros</button>}</div>
+        <div className="flex items-center justify-between"><p className="text-xs text-[#4e7460]">{filtered.length} de {logs.length} registros</p>{hasFilters && <button onClick={clearFilters} className="btn-ghost px-3 min-h-10 rounded-lg text-xs font-medium">Limpiar filtros</button>}</div>
       </div>
       {error && <p role="alert" className="mb-4 rounded-lg border border-[#f0c0bc] bg-[#fdf0ee] px-3 py-2.5 text-sm text-[#c0392b]">{error}</p>}
       <div className={tableWrap} style={tableCardStyle}><div className={tableScroll}><table className="w-full text-sm"><thead><tr style={tableHeadStyle}>{[['Fecha', `${cellFirst} ${colTablet} text-left`], ['Acción', `${cell} ${colDesktop} text-left`], ['Entidad', `${cell} text-left`], ['Usuario', `${cell} ${colDesktop} text-left`], ['Valor anterior → nuevo', `${cell} ${colTablet} text-right`], ['Acciones', `${cellLast} ${colTablet} text-right`]].map(([heading, cls]) => <th key={heading} className={`${headCell} ${cls}`}>{heading}</th>)}</tr></thead><tbody>

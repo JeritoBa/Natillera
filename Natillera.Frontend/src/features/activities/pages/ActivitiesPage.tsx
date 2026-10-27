@@ -7,6 +7,7 @@ import { defaultDateForPeriod, isDateInPeriodYear, periodDateBounds } from '@/fe
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { activityCancelConsequences } from '@/features/activities/model/cancelConfirm'
+import { parseActivityMonthFilter } from '@/features/activities/model/activityFilters'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog'
@@ -15,6 +16,7 @@ import { Icon } from '@/shared/ui/Icon'
 import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { toMoneyInputValue } from '@/shared/lib/money'
+import { useUrlParam } from '@/shared/lib/useUrlFilter'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
 import { cell, cellActions, cellAmount, cellFirst, cellLast, cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
@@ -37,7 +39,8 @@ export function ActivitiesPage() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [submitCount, setSubmitCount] = useState(0)
-  const [month, setMonth] = useState<'all' | string>('all')
+  // UI-15: the month filter lives in the URL.
+  const [month, setMonth] = useUrlParam('month', parseActivityMonthFilter, 'all')
   const [confirmTarget, setConfirmTarget] = useState<ActivityListItem | null>(null)
   const [focusSuccess, setFocusSuccess] = useState(0)
   const successRef = useRef<HTMLParagraphElement>(null)

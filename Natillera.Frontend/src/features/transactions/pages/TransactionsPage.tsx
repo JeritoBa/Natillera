@@ -5,8 +5,9 @@ import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { Link, useNavigate } from 'react-router-dom'
 import { getTransactions, type RealTransaction, type TransactionType } from '@/features/transactions/api/transactionsApi'
 import { transactionTotals } from '@/features/transactions/model/transactionTotals'
-import { filterTransactions, transactionMonthOptions } from '@/features/transactions/model/transactionFilters'
+import { filterTransactions, parseTransactionMonthFilter, parseTransactionTypeFilter, transactionMonthOptions, transactionTypeOrder } from '@/features/transactions/model/transactionFilters'
 import { getFriendlyApiError } from '@/shared/api/apiError'
+import { useClearUrlParams, useUrlParam } from '@/shared/lib/useUrlFilter'
 import { formatCurrency, formatMonth, formatShortCurrency } from '@/shared/lib/formatters'
 import { Badge } from '@/shared/ui/Badge'
 import { StatCard } from '@/shared/ui/StatCard'
@@ -22,15 +23,17 @@ const typeBackground: Record<TransactionType, string> = {
   MonthlyPayment: '#dcf5e8', Activity: '#fef6dc', ActivitySale: '#ddf0ff', Loan: '#fde8e4', LoanPayment: '#dcf5e8', Performance: '#ddf0ff', ExtraCost: '#fef6dc',
 }
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
-const typeOrder: TransactionType[] = ['MonthlyPayment', 'Loan', 'LoanPayment', 'Performance', 'Activity', 'ActivitySale', 'ExtraCost']
+const filterKeys = ['type', 'month'] as const
 
 export function TransactionsPage() {
   const { session } = useAuth()
   const { selected } = useSavingPeriod()
   const navigate = useNavigate()
   const [transactions, setTransactions] = useState<RealTransaction[]>([])
-  const [filter, setFilter] = useState<TransactionType | 'all'>('all')
-  const [month, setMonth] = useState<'all' | string>('all')
+  // UI-15: the filters live in the URL.
+  const [filter, setFilter] = useUrlParam('type', parseTransactionTypeFilter, 'all')
+  const [month, setMonth] = useUrlParam('month', parseTransactionMonthFilter, 'all')
+  const clearFilters = useClearUrlParams(filterKeys)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -50,7 +53,6 @@ export function TransactionsPage() {
   const effectiveMonth = month !== 'all' && monthOptions.some(option => option.key === month) ? month : 'all'
   const filtered = filterTransactions(transactions, filter, effectiveMonth)
   const hasFilters = filter !== 'all' || effectiveMonth !== 'all'
-  const clearFilters = () => { setFilter('all'); setMonth('all') }
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const filterSuffix = hasFilters ? ' (filtro)' : ''
   const { income, expense } = transactionTotals(filtered)
@@ -67,9 +69,9 @@ export function TransactionsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label htmlFor="transaction-type-filter" className="block text-xs text-[#4e7460] mb-1">Tipo</label>
-            <select id="transaction-type-filter" value={filter} onChange={event => setFilter(event.target.value as TransactionType | 'all')} className="w-full px-3 py-2.5 rounded-lg text-sm">
+            <select id="transaction-type-filter" value={filter} onChange={event => setFilter(parseTransactionTypeFilter(event.target.value))} className="w-full px-3 py-2.5 rounded-lg text-sm">
               <option value="all">Todos los tipos</option>
-              {typeOrder.map(value => <option key={value} value={value}>{typeLabel[value]}</option>)}
+              {transactionTypeOrder.map(value => <option key={value} value={value}>{typeLabel[value]}</option>)}
             </select>
           </div>
           <div>

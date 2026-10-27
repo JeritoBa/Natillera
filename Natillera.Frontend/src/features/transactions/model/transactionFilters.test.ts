@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TransactionType } from '@/features/transactions/api/transactionsApi'
-import { filterTransactions, transactionMonthKey, transactionMonthOptions } from '@/features/transactions/model/transactionFilters'
+import { filterTransactions, parseTransactionMonthFilter, parseTransactionTypeFilter, transactionMonthKey, transactionMonthOptions } from '@/features/transactions/model/transactionFilters'
 
 // Colombia is UTC-5 all year, so these instants do not depend on the machine time zone.
 const tx = (type: TransactionType, occurredAt: string) => ({ type, occurredAt })
@@ -29,5 +29,21 @@ describe('transaction filters (UI-06)', () => {
 
   it('lists months newest first with counts', () => {
     expect(transactionMonthOptions(transactions)).toEqual([{ key: '2026-10', count: 2 }, { key: '2026-09', count: 1 }, { key: '2025-12', count: 1 }])
+  })
+})
+
+// UI-15
+describe('transaction filters from the URL', () => {
+  it('parses the type against the known enum', () => {
+    expect(parseTransactionTypeFilter('LoanPayment')).toBe('LoanPayment')
+    expect(parseTransactionTypeFilter('loanpayment')).toBe('all')
+    expect(parseTransactionTypeFilter('xyz')).toBe('all')
+    expect(parseTransactionTypeFilter(null)).toBe('all')
+  })
+
+  it('parses the month', () => {
+    expect(parseTransactionMonthFilter('2026-03')).toBe('2026-03')
+    expect(parseTransactionMonthFilter('2026-00')).toBe('all')
+    expect(parseTransactionMonthFilter(null)).toBe('all')
   })
 })

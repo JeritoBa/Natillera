@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { useSavingPeriod } from '@/features/settings/hooks/useSavingPeriod'
 import { defaultDateForPeriod, isDateInPeriodYear, periodDateBounds } from '@/features/settings/model/savingPeriod'
@@ -7,7 +7,7 @@ import { cancelLoan, createLoan, getLoans, updateLoan, type LoanListItem } from 
 import { descriptionCounterState, isLoanDescriptionValid, LOAN_DESCRIPTION_MAX_LENGTH, normalizeLoanDescription } from '@/features/loans/model/loanDescription'
 import { formatDateOnly, toDateInput } from '@/features/loans/model/labels'
 import { loanCancelConsequences } from '@/features/loans/model/cancelConfirm'
-import { filterLoans, loanBorrowerOptions, loanStartMonth, loanStatusCounts, parseLoanStatusFilter, type LoanStatusFilter } from '@/features/loans/model/loanFilters'
+import { filterLoans, loanBorrowerOptions, loanStartMonth, loanStatusCounts, parseLoanBorrowerFilter, parseLoanMonthFilter, parseLoanStatusFilter } from '@/features/loans/model/loanFilters'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { getFriendlyApiError } from '@/shared/api/apiError'
 import { formatCurrency, formatMonth } from '@/shared/lib/formatters'
@@ -18,6 +18,7 @@ import { Icon } from '@/shared/ui/Icon'
 import { FormError } from '@/shared/ui/FormError'
 import { Modal } from '@/shared/ui/Modal'
 import { toMoneyInputValue } from '@/shared/lib/money'
+import { useClearUrlParams, useUrlParam, useUrlTextParam } from '@/shared/lib/useUrlFilter'
 import { MoneyInput } from '@/shared/ui/MoneyInput'
 import { cellMain, colDesktop, colTablet, dangerButton, eyeButton, headCell, iconButton, mainLink, subMobile, subTablet, tableHeadStyle, tableScroll, tableWrap } from '@/shared/ui/tableStyles'
 
@@ -25,13 +26,13 @@ interface LoanForm { borrowerId: string, initialAmount: string, interestRate: st
 const emptyForm: LoanForm = { borrowerId: '', initialAmount: '', interestRate: '', startDate: '', description: '' }
 const counterClass = { normal: 'text-[#4e7460]', near: 'text-[#9a6e00]', limit: 'text-[#c0392b] font-semibold' } as const
 const cardStyle = { background: '#fff', border: '1px solid #d6e8dc' }
+const filterKeys = ['q', 'borrower', 'month', 'status'] as const
 
 export function LoansPage() {
   const { session, isDemo } = useAuth()
   const { selected } = useSavingPeriod()
   const { members } = useMembers()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const canManage = session?.user.role === 'Admin'
   const [loans, setLoans] = useState<LoanListItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,14 +44,15 @@ export function LoansPage() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [submitCount, setSubmitCount] = useState(0)
-  const [month, setMonth] = useState<'all' | string>('all')
-  const [search, setSearch] = useState('')
   const [confirmTarget, setConfirmTarget] = useState<LoanListItem | null>(null)
   const [focusSuccess, setFocusSuccess] = useState(0)
   const successRef = useRef<HTMLParagraphElement>(null)
-  // Spec 021: ?borrower=<userId>&status=Active are read once on load; the URL is not written back.
-  const [borrowerFilter, setBorrowerFilter] = useState<'all' | string>(() => searchParams.get('borrower') ?? 'all')
-  const [statusFilter, setStatusFilter] = useState<LoanStatusFilter>(() => parseLoanStatusFilter(searchParams.get('status')))
+  // UI-15: the filters live in the URL (the search text is debounced).
+  const [search, setSearch, resetSearch] = useUrlTextParam('q')
+  const [borrowerFilter, setBorrowerFilter] = useUrlParam('borrower', parseLoanBorrowerFilter, 'all')
+  const [month, setMonth] = useUrlParam('month', parseLoanMonthFilter, 'all')
+  const [statusFilter, setStatusFilter] = useUrlParam('status', parseLoanStatusFilter, 'all')
+  const clearUrlFilters = useClearUrlParams(filterKeys)
 
   const load = useCallback(async () => {
     if (!session) return
@@ -122,7 +124,7 @@ export function LoansPage() {
   const filtered = filterLoans(loans, search, effectiveMonth, statusFilter, effectiveBorrower)
   const statusCounts = loanStatusCounts(loans, search, effectiveMonth, effectiveBorrower)
   const hasFilters = effectiveMonth !== 'all' || search.trim() !== '' || statusFilter !== 'all' || effectiveBorrower !== 'all'
-  const clearFilters = () => { setMonth('all'); setSearch(''); setStatusFilter('all'); setBorrowerFilter('all') }
+  const clearFilters = () => { resetSearch(); clearUrlFilters() }
   const monthText = (key: string) => `${formatMonth(Number(key.slice(5, 7)))} ${key.slice(0, 4)}`
   const columns: { heading: ReactNode, key: string, cls: string, right: boolean }[] = [
     { key: 'borrower', heading: 'Deudor', cls: 'px-3 sm:px-5', right: false },

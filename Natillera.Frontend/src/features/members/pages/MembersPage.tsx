@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMembers } from '@/features/members/hooks/useMembers'
 import { useAuth } from '@/features/auth/hooks/useAuth'
-import { filterMembers, memberStatusCounts, type MemberStatusFilter } from '@/features/members/model/memberFilters'
+import { filterMembers, memberStatusCounts, parseMemberStatusFilter } from '@/features/members/model/memberFilters'
 import type { Member, MemberFormValues } from '@/features/members/model/memberTypes'
 import { getFriendlyApiError } from '@/shared/api/apiError'
+import { useClearUrlParams, useUrlParam, useUrlTextParam } from '@/shared/lib/useUrlFilter'
 import { Badge } from '@/shared/ui/Badge'
 import { Icon } from '@/shared/ui/Icon'
 import { FormError } from '@/shared/ui/FormError'
@@ -14,6 +15,8 @@ import { cell, cellActions, cellFirst, cellLast, cellMain, colDesktop, colTablet
 import { MemberStatusModal } from '@/features/members/components/MemberStatusModal'
 
 const emptyForm: MemberFormValues = { firstName: '', lastName: '', email: '', phone: '' }
+
+const filterKeys = ['q', 'status'] as const
 
 export function MembersPage() {
   const { members, loading, error, create, update, setStatus } = useMembers()
@@ -26,15 +29,17 @@ export function MembersPage() {
   const [modalError, setModalError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [submitCount, setSubmitCount] = useState(0)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<MemberStatusFilter>('all')
+  // UI-15: the filters live in the URL (the search text is debounced).
+  const [search, setSearch, resetSearch] = useUrlTextParam('q')
+  const [statusFilter, setStatusFilter] = useUrlParam('status', parseMemberStatusFilter, 'all')
+  const clearUrlFilters = useClearUrlParams(filterKeys)
   const [statusTarget, setStatusTarget] = useState<Member | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const activeCount = members.filter(member => member.isActive).length
   const counts = memberStatusCounts(members, search)
   const filtered = filterMembers(members, search, statusFilter)
   const hasFilters = search.trim() !== '' || statusFilter !== 'all'
-  const clearFilters = () => { setSearch(''); setStatusFilter('all') }
+  const clearFilters = () => { resetSearch(); clearUrlFilters() }
 
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModalError(null); setSuccess(null); setModal('create') }
   const openEdit = (member: Member) => {
