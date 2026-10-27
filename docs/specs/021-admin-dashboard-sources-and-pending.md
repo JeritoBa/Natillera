@@ -4,6 +4,8 @@
 - **Owner decision date / reference:** 2026-10-25 (branch `v1.1.1`; UX proposal by the ux-designer; owner answers: show only the three registered sources, no reconciliation row and nothing Pending (revised 2026-10-25), activity earnings = the activity's own **net profit** (ACT-11), rename the card to "Dinero total de la natillera", include loan principal, section title "Pendientes por cobrar"; extras accepted: proportion bar, amounts link to filtered lists, filter kept in the URL; **responsive is a requirement**)
 - **Related rules:** DASH-13, DASH-14 (new); DASH-03 (changed); DASH-02, DASH-12, MEM-10, ACT-11, ACT-15, FIN-09, FIN-14, PER-06, DEMO-06, UI-02, UI-06
 
+> **Superseded by spec 029 for "Ganancias de actividades":** it is the margin of the Paid assignments (never negative), not the net profit. The original text follows.
+>
 > **This feature changes the Admin's "Ganancias de actividades" figure:** it becomes the sum of the activities' **net profit** (collected - total cost, ACT-11), the same number shown as "Ganancia neta" in each activity detail. Extra costs are not part of it (ACT-15); they are already deducted in "Rendimientos de préstamos" (DASH-12).
 
 ## Problem / goal

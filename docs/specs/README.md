@@ -42,6 +42,7 @@ One spec per feature. Specs describe **what the system must do** (behavior, rule
 | 026 | [Server-side pagination](026-server-side-pagination.md) | Implemented | TX-03, AUD-04, UI-17, DEMO-02 |
 | 027 | [Assignment created as Paid](027-assignment-created-as-paid.md) | Implemented | ACT-16, ACT-08 |
 | 028 | [Loan edit: rate and description](028-loan-edit-rate-and-description.md) | Implemented | LOAN-12, LOAN-07, LOAN-11 |
+| 029 | [Admin activity earnings = margin of paid sales](029-admin-activity-earnings-margin.md) | Implemented | DASH-03, DASH-13 |
 
 Not specified because not implemented: in-app payments, member loan requests/approval workflow, payment reminders beyond the dashboard notice.
 

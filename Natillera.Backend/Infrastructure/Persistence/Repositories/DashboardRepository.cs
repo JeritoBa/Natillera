@@ -44,15 +44,11 @@ public sealed class DashboardRepository(NatilleraDbContext dbContext) : IDashboa
             .Select(payment => (decimal?)payment.Amount)
             .SumAsync(cancellationToken) ?? 0m;
 
-        // DASH-03 (spec 021) / ACT-11: net profit of the non-cancelled activities = collected - total cost; extra costs excluded (ACT-15).
-        var collectedByActivities = await PaidAssignments(savingPeriodId)
-            .Select(assignment => (decimal?)(assignment.QuantityAssigned * assignment.Activity.UnitSalePrice))
+        // DASH-03 (spec 029): earned so far = margin qty x (price - cost) of the Paid assignments of non-cancelled activities.
+        // Never negative (price >= cost, ACT-01); nothing is subtracted (extra costs reduce only the interest pool, ACT-15).
+        var activityEarnings = await PaidAssignments(savingPeriodId)
+            .Select(assignment => (decimal?)(assignment.QuantityAssigned * (assignment.Activity.UnitSalePrice - assignment.Activity.UnitCost)))
             .SumAsync(cancellationToken) ?? 0m;
-        var activitiesTotalCost = await dbContext.Activities
-            .Where(activity => activity.SavingPeriodId == savingPeriodId && activity.Status != ActivityStatus.Cancelled)
-            .Select(activity => (decimal?)(activity.Quantity * activity.UnitCost))
-            .SumAsync(cancellationToken) ?? 0m;
-        var activityEarnings = collectedByActivities - activitiesTotalCost;
 
         var recentTransactions = await GetRecentTransactionsAsync(savingPeriodId, cancellationToken);
         var topSellers = await GetTopSellersAsync(savingPeriodId, cancellationToken);
